@@ -4,6 +4,7 @@
 
 
 ## TL;DR
+
 The primary goal of the London Cycle Maps project is to deliver a routing application specifically tuned for cyclists in London. The system processes raw geographic data into a custom directed graph, factoring in elevation, traffic speed stress, cyclist collision history, and cycleway infrastructure. It currently consists of a fully functional data processing pipeline, a user-facing routing frontend with highly customizable safety and comfort toggles, and an extensive debug application for data validation.
 <img width="1917" height="906" alt="Image" src="https://github.com/user-attachments/assets/13b9a73f-e0f5-4c31-a56c-2571e25b1ee0" />
 ---
