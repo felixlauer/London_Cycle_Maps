@@ -1,0 +1,22 @@
+graphhopper:
+  datareader.file: ../1_data/greater-london-260106.osm.pbf
+  graph.location: graph-cache
+
+  # NEW: This tells GraphHopper to download SRTM data (NASA elevation data)
+  graph.elevation.provider: srtm
+
+  # Keep your existing settings
+  graph.encoded_values: bike_priority, bike_access, roundabout, bike_average_speed, road_class, surface, max_speed, road_environment, average_slope
+  import.osm.ignored_highways: motorway,trunk
+
+  profiles:
+    - name: bike
+      custom_model_files: [bike.json, bike_model.json]
+
+server:
+  application_connectors:
+  - type: http
+    port: 8989
+  admin_connectors:
+  - type: http
+    port: 8990

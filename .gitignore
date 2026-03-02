@@ -1,0 +1,44 @@
+# =============================================================================
+# London Cycle Maps – root .gitignore (safe for GitHub publish)
+# =============================================================================
+
+# --- Sensitive: never commit API keys or secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Documentation: exclude internal / protocol / feature-request only ---
+0_documentation/development_protocols/
+0_documentation/feature_requests/
+
+# --- Large data & unused ---
+1_data/
+2_database/
+
+# --- Folders 6 and 7: excluded entirely ---
+6_verification/
+7_testing/
+
+# --- 4_backend_engine: private data & generated artifacts ---
+4_backend_engine/.env
+4_backend_engine/.env.*
+4_backend_engine/graph-cache/
+4_backend_engine/run_command.txt
+
+# --- 5_frontend: env & build (node_modules/build also in 5_frontend/.gitignore) ---
+5_frontend/.env
+5_frontend/.env.*
+5_frontend/node_modules/
+5_frontend/build/
+
+# --- 8_debug: same principles – no secrets, no node_modules/build ---
+8_debug/5_frontend/node_modules/
+8_debug/5_frontend/build/
+8_debug/**/.env
+8_debug/**/.env.*
+
+# --- General ---
+.vscode/
+*.log
+.DS_Store
+Thumbs.db

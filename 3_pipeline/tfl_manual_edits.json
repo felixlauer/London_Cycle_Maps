@@ -1,0 +1,7386 @@
+{
+  "added": [
+    {
+      "source": "(-0.088286, 51.481679)",
+      "target": "(-0.087276, 51.482016)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.088469, 51.483151)",
+      "target": "(-0.088016, 51.483286)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.087961, 51.483301)",
+      "target": "(-0.088016, 51.483286)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.087978, 51.483364)",
+      "target": "(-0.087961, 51.483301)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.093901, 51.492819)",
+      "target": "(-0.093606, 51.492639)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.093406, 51.492462)",
+      "target": "(-0.093233, 51.492345)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.093233, 51.492345)",
+      "target": "(-0.093275, 51.492314)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.095264, 51.49418)",
+      "target": "(-0.095202, 51.494169)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.095202, 51.494169)",
+      "target": "(-0.094441, 51.494052)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.095249, 51.494209)",
+      "target": "(-0.095264, 51.49418)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.094441, 51.494052)",
+      "target": "(-0.094184, 51.494032)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.094107, 51.494035)",
+      "target": "(-0.094084, 51.494036)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.094107, 51.494035)",
+      "target": "(-0.094084, 51.494036)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.09412, 51.494035)",
+      "target": "(-0.094107, 51.494035)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.094184, 51.494032)",
+      "target": "(-0.09412, 51.494035)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.094103, 51.49411)",
+      "target": "(-0.094084, 51.494036)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.094084, 51.494036)",
+      "target": "(-0.093869, 51.493375)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.093863, 51.493355)",
+      "target": "(-0.093823, 51.493228)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.093823, 51.493228)",
+      "target": "(-0.09385, 51.492848)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.093901, 51.492819)",
+      "target": "(-0.093606, 51.492639)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.093901, 51.492819)",
+      "target": "(-0.093606, 51.492639)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.093186, 51.492382)",
+      "target": "(-0.09385, 51.492848)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.093197, 51.492371)",
+      "target": "(-0.093233, 51.492345)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.095581, 51.49444)",
+      "target": "(-0.095537, 51.494431)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.089907, 51.498725)",
+      "target": "(-0.089913, 51.498698)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.075681, 51.491567)",
+      "target": "(-0.075551, 51.491491)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.075509, 51.491469)",
+      "target": "(-0.075457, 51.491441)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.075551, 51.491491)",
+      "target": "(-0.075509, 51.491469)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.075457, 51.491441)",
+      "target": "(-0.075358, 51.491398)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.075298, 51.491375)",
+      "target": "(-0.075358, 51.491398)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.075298, 51.491375)",
+      "target": "(-0.075373, 51.491279)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.071731, 51.488618)",
+      "target": "(-0.071657, 51.488605)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "source": "(-0.072486, 51.483034)",
+      "target": "(-0.072316, 51.483094)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "source": "(-0.074177, 51.482153)",
+      "target": "(-0.074168, 51.482118)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "source": "(-0.074173, 51.481518)",
+      "target": "(-0.07417, 51.481584)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "source": "(-0.074074, 51.482871)",
+      "target": "(-0.074107, 51.48287)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "source": "(-0.07304, 51.477042)",
+      "target": "(-0.07316, 51.477076)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "source": "(-0.073232, 51.477221)",
+      "target": "(-0.073208, 51.477248)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "source": "(-0.07057, 51.474503)",
+      "target": "(-0.070429, 51.47454)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "source": "(-0.058085, 51.488635)",
+      "target": "(-0.058334, 51.488713)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.046147, 51.484439)",
+      "target": "(-0.04626, 51.484443)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.041995, 51.48431)",
+      "target": "(-0.041861, 51.484206)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.041861, 51.484206)",
+      "target": "(-0.041764, 51.48411)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.039895, 51.482475)",
+      "target": "(-0.03989, 51.482556)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.032272, 51.477318)",
+      "target": "(-0.032286, 51.477348)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.032295, 51.477412)",
+      "target": "(-0.032293, 51.47742)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.032272, 51.477318)",
+      "target": "(-0.031982, 51.475955)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.031102, 51.481015)",
+      "target": "(-0.030872, 51.480987)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.030872, 51.480987)",
+      "target": "(-0.030793, 51.480661)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.028331, 51.48087)",
+      "target": "(-0.02824, 51.480878)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.02822, 51.4808)",
+      "target": "(-0.028235, 51.480858)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.028153, 51.480715)",
+      "target": "(-0.028133, 51.480613)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.028133, 51.480613)",
+      "target": "(-0.02812, 51.480548)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.027988, 51.480255)",
+      "target": "(-0.027981, 51.480233)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.026214, 51.480045)",
+      "target": "(-0.026186, 51.479881)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.026186, 51.479881)",
+      "target": "(-0.026159, 51.479737)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.025272, 51.479395)",
+      "target": "(-0.024856, 51.479201)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.022912, 51.479244)",
+      "target": "(-0.022913, 51.479175)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.022528, 51.477348)",
+      "target": "(-0.022571, 51.477632)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.022571, 51.477632)",
+      "target": "(-0.022589, 51.477692)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.022589, 51.477692)",
+      "target": "(-0.022621, 51.477791)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.022662, 51.477919)",
+      "target": "(-0.022757, 51.477958)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.022611, 51.476481)",
+      "target": "(-0.022642, 51.476424)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.02279, 51.476321)",
+      "target": "(-0.022843, 51.476379)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.02279, 51.476321)",
+      "target": "(-0.022843, 51.476379)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.022642, 51.476424)",
+      "target": "(-0.022797, 51.476292)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.023803, 51.474919)",
+      "target": "(-0.023696, 51.475063)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.022754, 51.476216)",
+      "target": "(-0.023143, 51.475687)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.023143, 51.475687)",
+      "target": "(-0.02335, 51.475374)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.02335, 51.475374)",
+      "target": "(-0.023693, 51.474824)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.023693, 51.474824)",
+      "target": "(-0.023643, 51.474716)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.023643, 51.474716)",
+      "target": "(-0.022962, 51.47461)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.022962, 51.47461)",
+      "target": "(-0.022813, 51.474581)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.022836, 51.474539)",
+      "target": "(-0.022813, 51.474581)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.022362, 51.472219)",
+      "target": "(-0.022419, 51.472186)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.022455, 51.47216)",
+      "target": "(-0.022419, 51.472186)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.017033, 51.468995)",
+      "target": "(-0.016948, 51.469033)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.016917, 51.469047)",
+      "target": "(-0.016948, 51.469033)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.016881, 51.469065)",
+      "target": "(-0.016917, 51.469047)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.016301, 51.468438)",
+      "target": "(-0.016365, 51.468414)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.016394, 51.468391)",
+      "target": "(-0.016365, 51.468414)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.016418, 51.468368)",
+      "target": "(-0.016394, 51.468391)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.016398, 51.46832)",
+      "target": "(-0.016441, 51.468345)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.016441, 51.468345)",
+      "target": "(-0.016398, 51.46832)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.015378, 51.466768)",
+      "target": "(-0.015244, 51.466787)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.015482, 51.465802)",
+      "target": "(-0.01547, 51.465816)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.014643, 51.464655)",
+      "target": "(-0.01471, 51.464611)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.014712, 51.464585)",
+      "target": "(-0.014716, 51.464489)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.036669, 51.46489)",
+      "target": "(-0.03678, 51.464821)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.03678, 51.464821)",
+      "target": "(-0.03708, 51.46446)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.036624, 51.464915)",
+      "target": "(-0.036577, 51.464924)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.03708, 51.46446)",
+      "target": "(-0.037104, 51.464431)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.036752, 51.463917)",
+      "target": "(-0.036798, 51.463941)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.036798, 51.463941)",
+      "target": "(-0.036986, 51.464076)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.036986, 51.464076)",
+      "target": "(-0.037104, 51.464189)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.037104, 51.464189)",
+      "target": "(-0.037133, 51.464235)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.037133, 51.464235)",
+      "target": "(-0.037104, 51.464431)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.037844, 51.457693)",
+      "target": "(-0.037935, 51.457711)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.038874, 51.457875)",
+      "target": "(-0.03901, 51.457908)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.040084, 51.458079)",
+      "target": "(-0.040203, 51.458101)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.040203, 51.458101)",
+      "target": "(-0.040347, 51.458124)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.040347, 51.458124)",
+      "target": "(-0.040409, 51.458134)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.03602, 51.456295)",
+      "target": "(-0.036091, 51.456162)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.036504, 51.455638)",
+      "target": "(-0.036555, 51.455575)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.036504, 51.455638)",
+      "target": "(-0.036144, 51.456093)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.036091, 51.456162)",
+      "target": "(-0.036144, 51.456093)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.036045, 51.456302)",
+      "target": "(-0.036176, 51.456342)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.036826, 51.455233)",
+      "target": "(-0.036973, 51.454979)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.037138, 51.454862)",
+      "target": "(-0.037002, 51.454938)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.037002, 51.454938)",
+      "target": "(-0.036973, 51.454979)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.037224, 51.454888)",
+      "target": "(-0.037138, 51.454862)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.037224, 51.454888)",
+      "target": "(-0.03729, 51.454887)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.037359, 51.454874)",
+      "target": "(-0.037322, 51.454857)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.05135, 51.440198)",
+      "target": "(-0.051336, 51.440103)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.051336, 51.440103)",
+      "target": "(-0.051347, 51.44004)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "source": "(-0.017677, 51.477851)",
+      "target": "(-0.017674, 51.47797)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.017671, 51.478116)",
+      "target": "(-0.017676, 51.477985)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.017676, 51.477985)",
+      "target": "(-0.017671, 51.478116)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.015061, 51.481334)",
+      "target": "(-0.015069, 51.481434)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.014153, 51.481431)",
+      "target": "(-0.014655, 51.481359)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.014655, 51.481359)",
+      "target": "(-0.014818, 51.48141)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.014869, 51.48117)",
+      "target": "(-0.014978, 51.481192)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.014978, 51.481192)",
+      "target": "(-0.015003, 51.481297)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.0165, 51.48141)",
+      "target": "(-0.017667, 51.481363)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.017667, 51.481363)",
+      "target": "(-0.020832, 51.481043)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.023204, 51.480876)",
+      "target": "(-0.023177, 51.480906)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.030608, 51.48334)",
+      "target": "(-0.031867, 51.483974)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.034257, 51.485524)",
+      "target": "(-0.03427, 51.485517)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.034244, 51.485531)",
+      "target": "(-0.034699, 51.485898)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.034699, 51.485898)",
+      "target": "(-0.037593, 51.487678)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.037593, 51.487678)",
+      "target": "(-0.037531, 51.487759)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.037531, 51.487759)",
+      "target": "(-0.037543, 51.487783)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.037799, 51.487766)",
+      "target": "(-0.037654, 51.48783)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.037616, 51.487822)",
+      "target": "(-0.037543, 51.487783)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.040352, 51.489041)",
+      "target": "(-0.040456, 51.489097)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.04457, 51.49176)",
+      "target": "(-0.044635, 51.491807)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.04457, 51.49176)",
+      "target": "(-0.04447, 51.491685)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.04447, 51.491685)",
+      "target": "(-0.044477, 51.491632)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.045956, 51.492571)",
+      "target": "(-0.046021, 51.492554)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.045956, 51.492571)",
+      "target": "(-0.046021, 51.492554)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.044635, 51.491807)",
+      "target": "(-0.044683, 51.491795)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.04447, 51.491685)",
+      "target": "(-0.044477, 51.491632)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.049101, 51.494085)",
+      "target": "(-0.048979, 51.494095)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.048521, 51.493806)",
+      "target": "(-0.04853, 51.493888)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.049101, 51.494085)",
+      "target": "(-0.048979, 51.494095)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.048291, 51.49381)",
+      "target": "(-0.048174, 51.493753)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.047086, 51.493157)",
+      "target": "(-0.047152, 51.493234)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.048257, 51.493625)",
+      "target": "(-0.048331, 51.493572)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.048328, 51.493662)",
+      "target": "(-0.048294, 51.493598)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.048273, 51.493562)",
+      "target": "(-0.048294, 51.493598)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.048216, 51.493601)",
+      "target": "(-0.048294, 51.493598)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.051941, 51.495892)",
+      "target": "(-0.052601, 51.496534)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.054156, 51.497592)",
+      "target": "(-0.05416, 51.49768)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.054156, 51.497592)",
+      "target": "(-0.053678, 51.497246)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.05368, 51.497223)",
+      "target": "(-0.053592, 51.497171)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.053678, 51.497246)",
+      "target": "(-0.053526, 51.497175)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.056212, 51.498861)",
+      "target": "(-0.056089, 51.498809)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.056035, 51.498784)",
+      "target": "(-0.055993, 51.498839)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.056089, 51.498809)",
+      "target": "(-0.055827, 51.498698)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.055827, 51.498698)",
+      "target": "(-0.055036, 51.498268)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.055036, 51.498268)",
+      "target": "(-0.054759, 51.498081)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.054759, 51.498081)",
+      "target": "(-0.054623, 51.498085)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.054764, 51.498035)",
+      "target": "(-0.05476, 51.498025)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.054759, 51.498081)",
+      "target": "(-0.054623, 51.498085)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.05416, 51.49768)",
+      "target": "(-0.054554, 51.498007)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.055971, 51.499084)",
+      "target": "(-0.05594, 51.498991)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.055949, 51.498905)",
+      "target": "(-0.05594, 51.498991)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.055949, 51.498905)",
+      "target": "(-0.055993, 51.498839)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.078276, 51.502958)",
+      "target": "(-0.078213, 51.502916)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.078314, 51.502985)",
+      "target": "(-0.078276, 51.502958)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.078336, 51.502998)",
+      "target": "(-0.078314, 51.502985)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.07837, 51.503017)",
+      "target": "(-0.078336, 51.502998)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.078406, 51.503038)",
+      "target": "(-0.07837, 51.503017)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.091731, 51.50321)",
+      "target": "(-0.091681, 51.503271)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.082092, 51.500443)",
+      "target": "(-0.082154, 51.500418)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.08172, 51.500433)",
+      "target": "(-0.08177, 51.500567)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.096023, 51.500068)",
+      "target": "(-0.095887, 51.500023)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.095887, 51.500023)",
+      "target": "(-0.095575, 51.499903)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "source": "(-0.090721, 51.480251)",
+      "target": "(-0.090772, 51.480224)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.09114, 51.480438)",
+      "target": "(-0.091327, 51.480547)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "source": "(-0.062612, 51.500536)",
+      "target": "(-0.06177, 51.500567)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.058292, 51.500624)",
+      "target": "(-0.05822, 51.500628)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.054693, 51.500419)",
+      "target": "(-0.054694, 51.500391)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.054693, 51.500419)",
+      "target": "(-0.054741, 51.500531)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.052639, 51.501466)",
+      "target": "(-0.052509, 51.501557)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.048964, 51.500112)",
+      "target": "(-0.049074, 51.50011)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.048882, 51.500122)",
+      "target": "(-0.048784, 51.500133)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.048964, 51.500112)",
+      "target": "(-0.048882, 51.500122)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.048757, 51.500136)",
+      "target": "(-0.048504, 51.500166)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.048469, 51.50017)",
+      "target": "(-0.048504, 51.500166)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.048377, 51.500181)",
+      "target": "(-0.048469, 51.50017)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.048339, 51.500187)",
+      "target": "(-0.048227, 51.500176)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.048207, 51.500168)",
+      "target": "(-0.047974, 51.500072)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.047943, 51.500059)",
+      "target": "(-0.047732, 51.499973)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.046442, 51.499396)",
+      "target": "(-0.04647, 51.499408)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.046442, 51.499396)",
+      "target": "(-0.04647, 51.499408)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.046305, 51.499527)",
+      "target": "(-0.046265, 51.499509)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.04647, 51.499408)",
+      "target": "(-0.046299, 51.499542)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.041195, 51.499406)",
+      "target": "(-0.041237, 51.499361)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.041237, 51.499361)",
+      "target": "(-0.041284, 51.499291)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.036158, 51.498225)",
+      "target": "(-0.036319, 51.498377)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.03442, 51.496456)",
+      "target": "(-0.035317, 51.496293)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.035317, 51.496293)",
+      "target": "(-0.035345, 51.496342)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.03442, 51.496456)",
+      "target": "(-0.034096, 51.495761)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.034096, 51.495761)",
+      "target": "(-0.034044, 51.495663)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.034044, 51.495663)",
+      "target": "(-0.033935, 51.495451)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.033935, 51.495451)",
+      "target": "(-0.03387, 51.495348)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.033851, 51.495317)",
+      "target": "(-0.033612, 51.494861)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.033456, 51.494581)",
+      "target": "(-0.03314, 51.494643)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.032882, 51.494549)",
+      "target": "(-0.0333, 51.494296)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.033249, 51.494239)",
+      "target": "(-0.033276, 51.494255)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.033157, 51.494024)",
+      "target": "(-0.033162, 51.494075)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.033162, 51.494108)",
+      "target": "(-0.033162, 51.494075)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.033167, 51.494117)",
+      "target": "(-0.033206, 51.494191)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.033209, 51.494197)",
+      "target": "(-0.033229, 51.494184)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.033206, 51.494191)",
+      "target": "(-0.033167, 51.494117)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.033209, 51.494197)",
+      "target": "(-0.033249, 51.494239)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.03245, 51.492933)",
+      "target": "(-0.032419, 51.493023)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.03174, 51.488293)",
+      "target": "(-0.031722, 51.488179)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.031818, 51.488146)",
+      "target": "(-0.031722, 51.488179)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.032956, 51.48675)",
+      "target": "(-0.03312, 51.486884)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.01184, 51.49006)",
+      "target": "(0.011947, 51.490037)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.011979, 51.49006)",
+      "target": "(0.011947, 51.490037)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.012045, 51.490089)",
+      "target": "(0.011979, 51.49006)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.012045, 51.490089)",
+      "target": "(0.012087, 51.490186)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.012956, 51.49131)",
+      "target": "(0.012982, 51.491331)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.012956, 51.49131)",
+      "target": "(0.012893, 51.491256)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.012846, 51.491218)",
+      "target": "(0.012774, 51.491156)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.012982, 51.491331)",
+      "target": "(0.012953, 51.491357)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.015206, 51.492814)",
+      "target": "(0.015222, 51.492864)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.061044, 51.494366)",
+      "target": "(0.061051, 51.494324)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.088075, 51.504067)",
+      "target": "(0.088105, 51.504153)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(-0.051536, 51.495632)",
+      "target": "(-0.051517, 51.495686)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.048521, 51.493806)",
+      "target": "(-0.04853, 51.493888)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.049101, 51.494085)",
+      "target": "(-0.048979, 51.494095)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.049101, 51.494085)",
+      "target": "(-0.048979, 51.494095)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.022998, 51.480846)",
+      "target": "(-0.022997, 51.480787)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.022997, 51.480787)",
+      "target": "(-0.022994, 51.480746)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.022972, 51.48066)",
+      "target": "(-0.023041, 51.479881)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.022994, 51.480746)",
+      "target": "(-0.022972, 51.48066)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.022995, 51.480879)",
+      "target": "(-0.022998, 51.480846)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.023005, 51.479603)",
+      "target": "(-0.022912, 51.479244)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.022797, 51.476292)",
+      "target": "(-0.022698, 51.476289)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.022836, 51.474539)",
+      "target": "(-0.022866, 51.474475)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.022779, 51.474347)",
+      "target": "(-0.022761, 51.47442)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.026239, 51.439632)",
+      "target": "(-0.026384, 51.439695)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.026926, 51.442064)",
+      "target": "(-0.026756, 51.44208)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.02645, 51.442716)",
+      "target": "(-0.026274, 51.442778)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.026051, 51.443798)",
+      "target": "(-0.026096, 51.443767)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.026274, 51.442778)",
+      "target": "(-0.026221, 51.442798)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.026137, 51.443742)",
+      "target": "(-0.026096, 51.443767)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.026137, 51.443742)",
+      "target": "(-0.026191, 51.443721)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.02845, 51.433767)",
+      "target": "(-0.028552, 51.433802)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.028552, 51.433802)",
+      "target": "(-0.028748, 51.433864)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.028748, 51.433864)",
+      "target": "(-0.028552, 51.433802)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.028748, 51.433864)",
+      "target": "(-0.028885, 51.433886)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.031148, 51.430671)",
+      "target": "(-0.031337, 51.43072)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.033119, 51.427809)",
+      "target": "(-0.033152, 51.427742)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.033063, 51.427728)",
+      "target": "(-0.033152, 51.427742)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.032971, 51.428153)",
+      "target": "(-0.032974, 51.428147)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.032971, 51.428153)",
+      "target": "(-0.032974, 51.428147)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.032921, 51.428145)",
+      "target": "(-0.033004, 51.428159)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.033449, 51.425156)",
+      "target": "(-0.033384, 51.425187)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.03485, 51.422962)",
+      "target": "(-0.034956, 51.422755)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.034642, 51.423382)",
+      "target": "(-0.033632, 51.424683)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.034956, 51.422755)",
+      "target": "(-0.034998, 51.422691)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.03733, 51.420789)",
+      "target": "(-0.037746, 51.4206)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.037746, 51.4206)",
+      "target": "(-0.037852, 51.420555)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.037852, 51.420555)",
+      "target": "(-0.038567, 51.420098)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.038524, 51.420071)",
+      "target": "(-0.038553, 51.420091)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.038484, 51.420011)",
+      "target": "(-0.038524, 51.420071)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.038496, 51.419987)",
+      "target": "(-0.039396, 51.416517)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.038496, 51.419987)",
+      "target": "(-0.038484, 51.420011)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.045123, 51.412556)",
+      "target": "(-0.045124, 51.412466)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.045124, 51.412466)",
+      "target": "(-0.045025, 51.412421)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.045025, 51.412421)",
+      "target": "(-0.04492, 51.412389)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.044446, 51.412991)",
+      "target": "(-0.04448, 51.413009)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.044343, 51.412934)",
+      "target": "(-0.044405, 51.412885)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.043835, 51.412809)",
+      "target": "(-0.043748, 51.412786)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(-0.044343, 51.412934)",
+      "target": "(-0.044379, 51.41295)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "source": "(0.025918, 51.472222)",
+      "target": "(0.027083, 51.470409)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(0.029082, 51.467032)",
+      "target": "(0.028583, 51.46777)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(0.030277, 51.463286)",
+      "target": "(0.030388, 51.463265)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(0.034022, 51.460348)",
+      "target": "(0.034883, 51.459985)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(0.034883, 51.459985)",
+      "target": "(0.034965, 51.460037)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(0.050919, 51.455642)",
+      "target": "(0.050755, 51.455908)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(0.064772, 51.456788)",
+      "target": "(0.064796, 51.456722)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(0.064549, 51.457277)",
+      "target": "(0.064575, 51.45731)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(0.064772, 51.456788)",
+      "target": "(0.06476, 51.456818)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(0.059033, 51.478575)",
+      "target": "(0.058923, 51.478612)",
+      "programme": "cycleway",
+      "route": "C33"
+    },
+    {
+      "source": "(0.067042, 51.487212)",
+      "target": "(0.067088, 51.487192)",
+      "programme": "cycleway",
+      "route": "C33"
+    },
+    {
+      "source": "(0.066987, 51.487031)",
+      "target": "(0.067059, 51.487075)",
+      "programme": "cycleway",
+      "route": "C33"
+    },
+    {
+      "source": "(0.001573, 51.484756)",
+      "target": "(0.001904, 51.485115)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.001904, 51.485115)",
+      "target": "(0.004044, 51.485121)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "source": "(0.004044, 51.485121)",
+      "target": "(0.004107, 51.485049)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.016702, 51.486452)",
+      "target": "(0.016797, 51.486465)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.016845, 51.486426)",
+      "target": "(0.016845, 51.486481)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.017656, 51.486639)",
+      "target": "(0.017548, 51.486576)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.018086, 51.486483)",
+      "target": "(0.017761, 51.486699)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.017761, 51.486699)",
+      "target": "(0.017656, 51.486639)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.016699, 51.486368)",
+      "target": "(0.016713, 51.486313)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.01683, 51.486478)",
+      "target": "(0.016797, 51.486465)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.018719, 51.486637)",
+      "target": "(0.018808, 51.486632)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.018828, 51.48658)",
+      "target": "(0.018808, 51.486632)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.018808, 51.486632)",
+      "target": "(0.018719, 51.486637)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.018801, 51.486706)",
+      "target": "(0.018866, 51.486692)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.023087, 51.486918)",
+      "target": "(0.023239, 51.486978)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.027526, 51.487434)",
+      "target": "(0.028271, 51.487493)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.028271, 51.487493)",
+      "target": "(0.028574, 51.487527)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.028608, 51.487532)",
+      "target": "(0.028574, 51.487527)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.028737, 51.487529)",
+      "target": "(0.028635, 51.487537)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.030759, 51.487796)",
+      "target": "(0.028762, 51.487531)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.030724, 51.487944)",
+      "target": "(0.030974, 51.487999)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.030685, 51.487936)",
+      "target": "(0.030724, 51.487944)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.030724, 51.487944)",
+      "target": "(0.030974, 51.487999)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(0.030607, 51.487919)",
+      "target": "(0.030685, 51.487936)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "source": "(-0.160963, 51.512275)",
+      "target": "(-0.16097, 51.512294)",
+      "programme": "cycleway",
+      "route": "C55"
+    },
+    {
+      "source": "(-0.160894, 51.512254)",
+      "target": "(-0.160963, 51.512275)",
+      "programme": "cycleway",
+      "route": "C55"
+    },
+    {
+      "source": "(-0.160816, 51.512274)",
+      "target": "(-0.160894, 51.512254)",
+      "programme": "cycleway",
+      "route": "C55"
+    },
+    {
+      "source": "(-0.16077, 51.512305)",
+      "target": "(-0.160816, 51.512274)",
+      "programme": "cycleway",
+      "route": "C55"
+    },
+    {
+      "source": "(-0.161162, 51.512275)",
+      "target": "(-0.16139, 51.51224)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.161121, 51.512298)",
+      "target": "(-0.161162, 51.512275)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.16106, 51.512274)",
+      "target": "(-0.161162, 51.512275)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.157253, 51.510056)",
+      "target": "(-0.157231, 51.51003)",
+      "programme": "cycleway",
+      "route": "C55"
+    },
+    {
+      "source": "(-0.162458, 51.490159)",
+      "target": "(-0.16252, 51.490124)",
+      "programme": "quietway",
+      "route": "Q15"
+    },
+    {
+      "source": "(-0.162237, 51.489994)",
+      "target": "(-0.1623, 51.490006)",
+      "programme": "quietway",
+      "route": "Q15"
+    },
+    {
+      "source": "(-0.162478, 51.490094)",
+      "target": "(-0.162546, 51.490141)",
+      "programme": "quietway",
+      "route": "Q15"
+    },
+    {
+      "source": "(-0.162546, 51.490141)",
+      "target": "(-0.162518, 51.490183)",
+      "programme": "quietway",
+      "route": "Q15"
+    },
+    {
+      "source": "(-0.129685, 51.488851)",
+      "target": "(-0.130506, 51.489233)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.130706, 51.48933)",
+      "target": "(-0.130765, 51.48936)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "source": "(-0.123627, 51.486614)",
+      "target": "(-0.123732, 51.486638)",
+      "programme": "cycleway",
+      "route": "C"
+    }
+  ],
+  "removed": [
+    {
+      "source": "(-0.090739, 51.480936)",
+      "target": "(-0.090718, 51.480797)"
+    },
+    {
+      "source": "(-0.08817, 51.483303)",
+      "target": "(-0.08852, 51.483226)"
+    },
+    {
+      "source": "(-0.08852, 51.483226)",
+      "target": "(-0.088208, 51.483354)"
+    },
+    {
+      "source": "(-0.094586, 51.494164)",
+      "target": "(-0.09504, 51.494226)"
+    },
+    {
+      "source": "(-0.09504, 51.494226)",
+      "target": "(-0.095528, 51.494296)"
+    },
+    {
+      "source": "(-0.094148, 51.494034)",
+      "target": "(-0.094177, 51.494109)"
+    },
+    {
+      "source": "(-0.091712, 51.499312)",
+      "target": "(-0.091626, 51.499219)"
+    },
+    {
+      "source": "(-0.094515, 51.499282)",
+      "target": "(-0.094378, 51.499378)"
+    },
+    {
+      "source": "(-0.096023, 51.500068)",
+      "target": "(-0.095887, 51.500023)"
+    },
+    {
+      "source": "(-0.095887, 51.500023)",
+      "target": "(-0.095575, 51.499903)"
+    },
+    {
+      "source": "(-0.096434, 51.500059)",
+      "target": "(-0.097524, 51.500422)"
+    },
+    {
+      "source": "(-0.089929, 51.498581)",
+      "target": "(-0.089833, 51.498618)"
+    },
+    {
+      "source": "(-0.09159, 51.499185)",
+      "target": "(-0.091626, 51.499219)"
+    },
+    {
+      "source": "(-0.087718, 51.496638)",
+      "target": "(-0.08778, 51.496705)"
+    },
+    {
+      "source": "(-0.087828, 51.496688)",
+      "target": "(-0.08778, 51.496705)"
+    },
+    {
+      "source": "(-0.085434, 51.497473)",
+      "target": "(-0.085367, 51.497422)"
+    },
+    {
+      "source": "(-0.085182, 51.497389)",
+      "target": "(-0.085367, 51.497422)"
+    },
+    {
+      "source": "(-0.084737, 51.497127)",
+      "target": "(-0.084826, 51.497075)"
+    },
+    {
+      "source": "(-0.08137, 51.495024)",
+      "target": "(-0.081487, 51.494957)"
+    },
+    {
+      "source": "(-0.081466, 51.494768)",
+      "target": "(-0.081293, 51.494876)"
+    },
+    {
+      "source": "(-0.071598, 51.488677)",
+      "target": "(-0.072603, 51.488813)"
+    },
+    {
+      "source": "(-0.073895, 51.481296)",
+      "target": "(-0.074019, 51.48287)"
+    },
+    {
+      "source": "(-0.071378, 51.474327)",
+      "target": "(-0.071407, 51.474373)"
+    },
+    {
+      "source": "(-0.069797, 51.4889)",
+      "target": "(-0.069827, 51.48872)"
+    },
+    {
+      "source": "(-0.065585, 51.488486)",
+      "target": "(-0.065639, 51.488097)"
+    },
+    {
+      "source": "(-0.058251, 51.488417)",
+      "target": "(-0.058334, 51.488713)"
+    },
+    {
+      "source": "(-0.057827, 51.488473)",
+      "target": "(-0.057631, 51.488731)"
+    },
+    {
+      "source": "(-0.057748, 51.488436)",
+      "target": "(-0.056834, 51.488462)"
+    },
+    {
+      "source": "(-0.052484, 51.487539)",
+      "target": "(-0.052529, 51.487555)"
+    },
+    {
+      "source": "(-0.051719, 51.487326)",
+      "target": "(-0.052193, 51.487589)"
+    },
+    {
+      "source": "(-0.049371, 51.484317)",
+      "target": "(-0.049282, 51.484312)"
+    },
+    {
+      "source": "(-0.049282, 51.484312)",
+      "target": "(-0.049174, 51.484312)"
+    },
+    {
+      "source": "(-0.04914, 51.484312)",
+      "target": "(-0.049091, 51.484312)"
+    },
+    {
+      "source": "(-0.049174, 51.484312)",
+      "target": "(-0.04914, 51.484312)"
+    },
+    {
+      "source": "(-0.049271, 51.484392)",
+      "target": "(-0.047391, 51.484353)"
+    },
+    {
+      "source": "(-0.047391, 51.484353)",
+      "target": "(-0.042403, 51.484339)"
+    },
+    {
+      "source": "(-0.042403, 51.484339)",
+      "target": "(-0.042268, 51.484423)"
+    },
+    {
+      "source": "(-0.038564, 51.483434)",
+      "target": "(-0.038598, 51.483447)"
+    },
+    {
+      "source": "(-0.03864, 51.483464)",
+      "target": "(-0.038598, 51.483447)"
+    },
+    {
+      "source": "(-0.03232, 51.481657)",
+      "target": "(-0.032496, 51.481462)"
+    },
+    {
+      "source": "(-0.030936, 51.480588)",
+      "target": "(-0.030781, 51.480608)"
+    },
+    {
+      "source": "(-0.030781, 51.480608)",
+      "target": "(-0.030531, 51.480613)"
+    },
+    {
+      "source": "(-0.030531, 51.480613)",
+      "target": "(-0.030453, 51.480614)"
+    },
+    {
+      "source": "(-0.030453, 51.480614)",
+      "target": "(-0.03019, 51.480627)"
+    },
+    {
+      "source": "(-0.03019, 51.480627)",
+      "target": "(-0.028228, 51.48083)"
+    },
+    {
+      "source": "(-0.025348, 51.479374)",
+      "target": "(-0.025272, 51.479395)"
+    },
+    {
+      "source": "(-0.022797, 51.476292)",
+      "target": "(-0.023205, 51.475736)"
+    },
+    {
+      "source": "(-0.023205, 51.475736)",
+      "target": "(-0.023696, 51.475063)"
+    },
+    {
+      "source": "(-0.023696, 51.475063)",
+      "target": "(-0.023803, 51.474919)"
+    },
+    {
+      "source": "(-0.023803, 51.474919)",
+      "target": "(-0.023651, 51.474637)"
+    },
+    {
+      "source": "(-0.023835, 51.474757)",
+      "target": "(-0.023908, 51.474777)"
+    },
+    {
+      "source": "(-0.023803, 51.474919)",
+      "target": "(-0.023983, 51.474696)"
+    },
+    {
+      "source": "(-0.023983, 51.474696)",
+      "target": "(-0.023963, 51.474807)"
+    },
+    {
+      "source": "(-0.023696, 51.474584)",
+      "target": "(-0.023983, 51.474696)"
+    },
+    {
+      "source": "(-0.023167, 51.474452)",
+      "target": "(-0.023696, 51.474584)"
+    },
+    {
+      "source": "(-0.023427, 51.474487)",
+      "target": "(-0.023829, 51.474549)"
+    },
+    {
+      "source": "(-0.023502, 51.474613)",
+      "target": "(-0.023171, 51.474559)"
+    },
+    {
+      "source": "(-0.016776, 51.46903)",
+      "target": "(-0.01689, 51.469119)"
+    },
+    {
+      "source": "(-0.014587, 51.465277)",
+      "target": "(-0.014517, 51.46454)"
+    },
+    {
+      "source": "(-0.015319, 51.465711)",
+      "target": "(-0.014587, 51.465277)"
+    },
+    {
+      "source": "(-0.015495, 51.465787)",
+      "target": "(-0.015319, 51.465711)"
+    },
+    {
+      "source": "(-0.015756, 51.465882)",
+      "target": "(-0.015515, 51.465793)"
+    },
+    {
+      "source": "(-0.015891, 51.465921)",
+      "target": "(-0.015756, 51.465882)"
+    },
+    {
+      "source": "(-0.013767, 51.464557)",
+      "target": "(-0.01331, 51.464576)"
+    },
+    {
+      "source": "(-0.012909, 51.464532)",
+      "target": "(-0.012864, 51.46461)"
+    },
+    {
+      "source": "(-0.013022, 51.464706)",
+      "target": "(-0.012909, 51.464532)"
+    },
+    {
+      "source": "(-0.012974, 51.464432)",
+      "target": "(-0.013767, 51.464557)"
+    },
+    {
+      "source": "(-0.012974, 51.464432)",
+      "target": "(-0.012978, 51.464392)"
+    },
+    {
+      "source": "(-0.036077, 51.456365)",
+      "target": "(-0.036203, 51.456207)"
+    },
+    {
+      "source": "(-0.036242, 51.456155)",
+      "target": "(-0.036304, 51.456179)"
+    },
+    {
+      "source": "(-0.036203, 51.456207)",
+      "target": "(-0.036708, 51.455514)"
+    },
+    {
+      "source": "(-0.036708, 51.455514)",
+      "target": "(-0.036901, 51.455252)"
+    },
+    {
+      "source": "(-0.037264, 51.454765)",
+      "target": "(-0.037227, 51.454814)"
+    },
+    {
+      "source": "(-0.037227, 51.454814)",
+      "target": "(-0.03718, 51.454874)"
+    },
+    {
+      "source": "(-0.03718, 51.454874)",
+      "target": "(-0.03705, 51.455052)"
+    },
+    {
+      "source": "(-0.03705, 51.455052)",
+      "target": "(-0.036901, 51.455252)"
+    },
+    {
+      "source": "(-0.042293, 51.455272)",
+      "target": "(-0.042423, 51.455186)"
+    },
+    {
+      "source": "(-0.051481, 51.440012)",
+      "target": "(-0.051412, 51.440126)"
+    },
+    {
+      "source": "(-0.051412, 51.440126)",
+      "target": "(-0.051092, 51.442302)"
+    },
+    {
+      "source": "(-0.051224, 51.439958)",
+      "target": "(-0.051371, 51.439864)"
+    },
+    {
+      "source": "(-0.051371, 51.439864)",
+      "target": "(-0.051504, 51.439808)"
+    },
+    {
+      "source": "(-0.014818, 51.48141)",
+      "target": "(-0.015789, 51.481377)"
+    },
+    {
+      "source": "(-0.015903, 51.4814)",
+      "target": "(-0.015789, 51.481377)"
+    },
+    {
+      "source": "(-0.016498, 51.481387)",
+      "target": "(-0.015903, 51.4814)"
+    },
+    {
+      "source": "(-0.016496, 51.481337)",
+      "target": "(-0.016628, 51.481353)"
+    },
+    {
+      "source": "(-0.016628, 51.481353)",
+      "target": "(-0.016498, 51.481387)"
+    },
+    {
+      "source": "(-0.016628, 51.481353)",
+      "target": "(-0.017657, 51.481306)"
+    },
+    {
+      "source": "(-0.017657, 51.481306)",
+      "target": "(-0.018211, 51.481256)"
+    },
+    {
+      "source": "(-0.018211, 51.481256)",
+      "target": "(-0.018654, 51.481218)"
+    },
+    {
+      "source": "(-0.019109, 51.481211)",
+      "target": "(-0.018654, 51.481218)"
+    },
+    {
+      "source": "(-0.019219, 51.481201)",
+      "target": "(-0.019109, 51.481211)"
+    },
+    {
+      "source": "(-0.019605, 51.481126)",
+      "target": "(-0.019219, 51.481201)"
+    },
+    {
+      "source": "(-0.019605, 51.481126)",
+      "target": "(-0.022387, 51.480813)"
+    },
+    {
+      "source": "(-0.022387, 51.480813)",
+      "target": "(-0.019605, 51.481126)"
+    },
+    {
+      "source": "(-0.022387, 51.480813)",
+      "target": "(-0.022593, 51.480788)"
+    },
+    {
+      "source": "(-0.022997, 51.48081)",
+      "target": "(-0.022593, 51.480788)"
+    },
+    {
+      "source": "(-0.023083, 51.480816)",
+      "target": "(-0.023072, 51.480705)"
+    },
+    {
+      "source": "(-0.023083, 51.480816)",
+      "target": "(-0.022997, 51.48081)"
+    },
+    {
+      "source": "(-0.023169, 51.480841)",
+      "target": "(-0.023083, 51.480816)"
+    },
+    {
+      "source": "(-0.023209, 51.480721)",
+      "target": "(-0.023169, 51.480841)"
+    },
+    {
+      "source": "(-0.023225, 51.480669)",
+      "target": "(-0.023209, 51.480721)"
+    },
+    {
+      "source": "(-0.023222, 51.480641)",
+      "target": "(-0.023225, 51.480669)"
+    },
+    {
+      "source": "(-0.023125, 51.480453)",
+      "target": "(-0.023222, 51.480641)"
+    },
+    {
+      "source": "(-0.024024, 51.481017)",
+      "target": "(-0.02359, 51.480909)"
+    },
+    {
+      "source": "(-0.024197, 51.481025)",
+      "target": "(-0.024024, 51.481017)"
+    },
+    {
+      "source": "(-0.024197, 51.481025)",
+      "target": "(-0.025296, 51.481285)"
+    },
+    {
+      "source": "(-0.025296, 51.481285)",
+      "target": "(-0.025513, 51.481333)"
+    },
+    {
+      "source": "(-0.025513, 51.481333)",
+      "target": "(-0.026181, 51.481468)"
+    },
+    {
+      "source": "(-0.02713, 51.481643)",
+      "target": "(-0.027454, 51.481749)"
+    },
+    {
+      "source": "(-0.026181, 51.481468)",
+      "target": "(-0.026343, 51.481504)"
+    },
+    {
+      "source": "(-0.026343, 51.481504)",
+      "target": "(-0.027408, 51.481802)"
+    },
+    {
+      "source": "(-0.027408, 51.481802)",
+      "target": "(-0.030825, 51.483342)"
+    },
+    {
+      "source": "(-0.030825, 51.483342)",
+      "target": "(-0.031221, 51.483541)"
+    },
+    {
+      "source": "(-0.031221, 51.483541)",
+      "target": "(-0.032531, 51.484186)"
+    },
+    {
+      "source": "(-0.031694, 51.484965)",
+      "target": "(-0.031753, 51.484967)"
+    },
+    {
+      "source": "(-0.031682, 51.485707)",
+      "target": "(-0.031766, 51.485701)"
+    },
+    {
+      "source": "(-0.032531, 51.484186)",
+      "target": "(-0.033075, 51.484513)"
+    },
+    {
+      "source": "(-0.033075, 51.484513)",
+      "target": "(-0.033162, 51.48458)"
+    },
+    {
+      "source": "(-0.033162, 51.48458)",
+      "target": "(-0.033289, 51.484687)"
+    },
+    {
+      "source": "(-0.033289, 51.484687)",
+      "target": "(-0.033936, 51.485227)"
+    },
+    {
+      "source": "(-0.033936, 51.485227)",
+      "target": "(-0.034287, 51.485452)"
+    },
+    {
+      "source": "(-0.034333, 51.485486)",
+      "target": "(-0.034287, 51.485452)"
+    },
+    {
+      "source": "(-0.03435, 51.485499)",
+      "target": "(-0.035854, 51.486605)"
+    },
+    {
+      "source": "(-0.035854, 51.486605)",
+      "target": "(-0.035948, 51.486661)"
+    },
+    {
+      "source": "(-0.036157, 51.486786)",
+      "target": "(-0.035948, 51.486661)"
+    },
+    {
+      "source": "(-0.036157, 51.486786)",
+      "target": "(-0.036074, 51.486809)"
+    },
+    {
+      "source": "(-0.034333, 51.485486)",
+      "target": "(-0.03435, 51.485499)"
+    },
+    {
+      "source": "(-0.034379, 51.485464)",
+      "target": "(-0.034693, 51.485287)"
+    },
+    {
+      "source": "(-0.034379, 51.485464)",
+      "target": "(-0.034287, 51.485509)"
+    },
+    {
+      "source": "(-0.036157, 51.486786)",
+      "target": "(-0.037764, 51.487666)"
+    },
+    {
+      "source": "(-0.037764, 51.487666)",
+      "target": "(-0.038162, 51.487844)"
+    },
+    {
+      "source": "(-0.038162, 51.487844)",
+      "target": "(-0.039352, 51.488436)"
+    },
+    {
+      "source": "(-0.039352, 51.488436)",
+      "target": "(-0.039771, 51.488645)"
+    },
+    {
+      "source": "(-0.039771, 51.488645)",
+      "target": "(-0.040164, 51.488842)"
+    },
+    {
+      "source": "(-0.040164, 51.488842)",
+      "target": "(-0.04049, 51.489011)"
+    },
+    {
+      "source": "(-0.04049, 51.489011)",
+      "target": "(-0.041531, 51.489594)"
+    },
+    {
+      "source": "(-0.041531, 51.489594)",
+      "target": "(-0.041605, 51.489637)"
+    },
+    {
+      "source": "(-0.041605, 51.489637)",
+      "target": "(-0.041729, 51.489732)"
+    },
+    {
+      "source": "(-0.041855, 51.489833)",
+      "target": "(-0.041966, 51.489906)"
+    },
+    {
+      "source": "(-0.041966, 51.489906)",
+      "target": "(-0.042141, 51.490021)"
+    },
+    {
+      "source": "(-0.053184, 51.497022)",
+      "target": "(-0.053516, 51.49727)"
+    },
+    {
+      "source": "(-0.053516, 51.49727)",
+      "target": "(-0.0538, 51.497466)"
+    },
+    {
+      "source": "(-0.0538, 51.497466)",
+      "target": "(-0.053896, 51.497533)"
+    },
+    {
+      "source": "(-0.053989, 51.497609)",
+      "target": "(-0.053896, 51.497533)"
+    },
+    {
+      "source": "(-0.053989, 51.497609)",
+      "target": "(-0.05416, 51.49768)"
+    },
+    {
+      "source": "(-0.055137, 51.498421)",
+      "target": "(-0.055361, 51.498737)"
+    },
+    {
+      "source": "(-0.054623, 51.498085)",
+      "target": "(-0.054701, 51.498167)"
+    },
+    {
+      "source": "(-0.054773, 51.498269)",
+      "target": "(-0.054701, 51.498167)"
+    },
+    {
+      "source": "(-0.054701, 51.498167)",
+      "target": "(-0.054855, 51.498225)"
+    },
+    {
+      "source": "(-0.054947, 51.498406)",
+      "target": "(-0.054824, 51.498309)"
+    },
+    {
+      "source": "(-0.055029, 51.498819)",
+      "target": "(-0.054947, 51.498406)"
+    },
+    {
+      "source": "(-0.055029, 51.498819)",
+      "target": "(-0.055361, 51.498737)"
+    },
+    {
+      "source": "(-0.055141, 51.499165)",
+      "target": "(-0.054998, 51.498847)"
+    },
+    {
+      "source": "(-0.055141, 51.499165)",
+      "target": "(-0.055077, 51.499159)"
+    },
+    {
+      "source": "(-0.055309, 51.499339)",
+      "target": "(-0.055209, 51.499182)"
+    },
+    {
+      "source": "(-0.055209, 51.499182)",
+      "target": "(-0.055141, 51.499165)"
+    },
+    {
+      "source": "(-0.055559, 51.499133)",
+      "target": "(-0.055209, 51.499182)"
+    },
+    {
+      "source": "(-0.055623, 51.499086)",
+      "target": "(-0.055559, 51.499133)"
+    },
+    {
+      "source": "(-0.055541, 51.498785)",
+      "target": "(-0.055623, 51.499086)"
+    },
+    {
+      "source": "(-0.055361, 51.498737)",
+      "target": "(-0.055541, 51.498785)"
+    },
+    {
+      "source": "(-0.055963, 51.49887)",
+      "target": "(-0.057511, 51.498897)"
+    },
+    {
+      "source": "(-0.055927, 51.499041)",
+      "target": "(-0.055623, 51.499086)"
+    },
+    {
+      "source": "(-0.055927, 51.499041)",
+      "target": "(-0.055579, 51.499213)"
+    },
+    {
+      "source": "(-0.056061, 51.499023)",
+      "target": "(-0.055927, 51.499041)"
+    },
+    {
+      "source": "(-0.056675, 51.49904)",
+      "target": "(-0.056061, 51.499023)"
+    },
+    {
+      "source": "(-0.057034, 51.499016)",
+      "target": "(-0.056675, 51.49904)"
+    },
+    {
+      "source": "(-0.057435, 51.498975)",
+      "target": "(-0.057034, 51.499016)"
+    },
+    {
+      "source": "(-0.058579, 51.49889)",
+      "target": "(-0.058516, 51.498934)"
+    },
+    {
+      "source": "(-0.057946, 51.498917)",
+      "target": "(-0.057435, 51.498975)"
+    },
+    {
+      "source": "(-0.058303, 51.49889)",
+      "target": "(-0.057946, 51.498917)"
+    },
+    {
+      "source": "(-0.05842, 51.498949)",
+      "target": "(-0.05835, 51.498886)"
+    },
+    {
+      "source": "(-0.058446, 51.498878)",
+      "target": "(-0.058303, 51.49889)"
+    },
+    {
+      "source": "(-0.058446, 51.498878)",
+      "target": "(-0.058586, 51.498863)"
+    },
+    {
+      "source": "(-0.058641, 51.498857)",
+      "target": "(-0.058586, 51.498863)"
+    },
+    {
+      "source": "(-0.059716, 51.49875)",
+      "target": "(-0.058641, 51.498857)"
+    },
+    {
+      "source": "(-0.057511, 51.498897)",
+      "target": "(-0.058288, 51.498836)"
+    },
+    {
+      "source": "(-0.058288, 51.498836)",
+      "target": "(-0.058426, 51.49882)"
+    },
+    {
+      "source": "(-0.058479, 51.498774)",
+      "target": "(-0.058551, 51.498782)"
+    },
+    {
+      "source": "(-0.058426, 51.49882)",
+      "target": "(-0.058846, 51.498777)"
+    },
+    {
+      "source": "(-0.058846, 51.498777)",
+      "target": "(-0.059846, 51.498677)"
+    },
+    {
+      "source": "(-0.060378, 51.498682)",
+      "target": "(-0.059716, 51.49875)"
+    },
+    {
+      "source": "(-0.060567, 51.498642)",
+      "target": "(-0.060378, 51.498682)"
+    },
+    {
+      "source": "(-0.060569, 51.498719)",
+      "target": "(-0.060682, 51.498673)"
+    },
+    {
+      "source": "(-0.060683, 51.498618)",
+      "target": "(-0.060567, 51.498642)"
+    },
+    {
+      "source": "(-0.060682, 51.498673)",
+      "target": "(-0.060776, 51.498636)"
+    },
+    {
+      "source": "(-0.059846, 51.498677)",
+      "target": "(-0.060563, 51.498567)"
+    },
+    {
+      "source": "(-0.060563, 51.498567)",
+      "target": "(-0.060674, 51.498553)"
+    },
+    {
+      "source": "(-0.060674, 51.498553)",
+      "target": "(-0.060953, 51.498511)"
+    },
+    {
+      "source": "(-0.060972, 51.498569)",
+      "target": "(-0.060683, 51.498618)"
+    },
+    {
+      "source": "(-0.062174, 51.498408)",
+      "target": "(-0.060972, 51.498569)"
+    },
+    {
+      "source": "(-0.060953, 51.498511)",
+      "target": "(-0.061735, 51.498405)"
+    },
+    {
+      "source": "(-0.061735, 51.498405)",
+      "target": "(-0.06278, 51.498271)"
+    },
+    {
+      "source": "(-0.064476, 51.498079)",
+      "target": "(-0.062174, 51.498408)"
+    },
+    {
+      "source": "(-0.06278, 51.498271)",
+      "target": "(-0.064476, 51.498079)"
+    },
+    {
+      "source": "(-0.064476, 51.498079)",
+      "target": "(-0.064998, 51.498027)"
+    },
+    {
+      "source": "(-0.064998, 51.498027)",
+      "target": "(-0.065878, 51.49795)"
+    },
+    {
+      "source": "(-0.066115, 51.497986)",
+      "target": "(-0.065878, 51.49795)"
+    },
+    {
+      "source": "(-0.066267, 51.49799)",
+      "target": "(-0.066115, 51.497986)"
+    },
+    {
+      "source": "(-0.066583, 51.497922)",
+      "target": "(-0.066859, 51.497985)"
+    },
+    {
+      "source": "(-0.066583, 51.497922)",
+      "target": "(-0.066859, 51.497985)"
+    },
+    {
+      "source": "(-0.066541, 51.497995)",
+      "target": "(-0.066385, 51.497991)"
+    },
+    {
+      "source": "(-0.066385, 51.497991)",
+      "target": "(-0.066267, 51.49799)"
+    },
+    {
+      "source": "(-0.066541, 51.497995)",
+      "target": "(-0.066385, 51.497991)"
+    },
+    {
+      "source": "(-0.066583, 51.497922)",
+      "target": "(-0.066859, 51.497985)"
+    },
+    {
+      "source": "(-0.066859, 51.497985)",
+      "target": "(-0.066541, 51.497995)"
+    },
+    {
+      "source": "(-0.066908, 51.497986)",
+      "target": "(-0.066859, 51.497985)"
+    },
+    {
+      "source": "(-0.066908, 51.497986)",
+      "target": "(-0.068781, 51.498299)"
+    },
+    {
+      "source": "(-0.068781, 51.498299)",
+      "target": "(-0.06928, 51.498404)"
+    },
+    {
+      "source": "(-0.069997, 51.498728)",
+      "target": "(-0.068781, 51.498299)"
+    },
+    {
+      "source": "(-0.070177, 51.498799)",
+      "target": "(-0.069997, 51.498728)"
+    },
+    {
+      "source": "(-0.072311, 51.499848)",
+      "target": "(-0.072264, 51.499818)"
+    },
+    {
+      "source": "(-0.072359, 51.499877)",
+      "target": "(-0.072489, 51.499947)"
+    },
+    {
+      "source": "(-0.072525, 51.499998)",
+      "target": "(-0.072489, 51.499947)"
+    },
+    {
+      "source": "(-0.072742, 51.50011)",
+      "target": "(-0.072554, 51.500018)"
+    },
+    {
+      "source": "(-0.072554, 51.500018)",
+      "target": "(-0.072525, 51.499998)"
+    },
+    {
+      "source": "(-0.072819, 51.500141)",
+      "target": "(-0.072742, 51.50011)"
+    },
+    {
+      "source": "(-0.072931, 51.500109)",
+      "target": "(-0.072873, 51.500159)"
+    },
+    {
+      "source": "(-0.072951, 51.500181)",
+      "target": "(-0.072819, 51.500141)"
+    },
+    {
+      "source": "(-0.073399, 51.500299)",
+      "target": "(-0.072951, 51.500181)"
+    },
+    {
+      "source": "(-0.073977, 51.500452)",
+      "target": "(-0.073399, 51.500299)"
+    },
+    {
+      "source": "(-0.073807, 51.500348)",
+      "target": "(-0.073977, 51.500452)"
+    },
+    {
+      "source": "(-0.073396, 51.500233)",
+      "target": "(-0.073614, 51.500293)"
+    },
+    {
+      "source": "(-0.073034, 51.500139)",
+      "target": "(-0.073396, 51.500233)"
+    },
+    {
+      "source": "(-0.072489, 51.499947)",
+      "target": "(-0.073034, 51.500139)"
+    },
+    {
+      "source": "(-0.072311, 51.499848)",
+      "target": "(-0.072359, 51.499877)"
+    },
+    {
+      "source": "(-0.074063, 51.500479)",
+      "target": "(-0.073977, 51.500452)"
+    },
+    {
+      "source": "(-0.074063, 51.500479)",
+      "target": "(-0.074219, 51.500517)"
+    },
+    {
+      "source": "(-0.074219, 51.500517)",
+      "target": "(-0.074271, 51.50053)"
+    },
+    {
+      "source": "(-0.074271, 51.50053)",
+      "target": "(-0.075987, 51.50017)"
+    },
+    {
+      "source": "(-0.075987, 51.50017)",
+      "target": "(-0.076223, 51.500259)"
+    },
+    {
+      "source": "(-0.074271, 51.50053)",
+      "target": "(-0.074734, 51.500774)"
+    },
+    {
+      "source": "(-0.074734, 51.500774)",
+      "target": "(-0.076322, 51.501585)"
+    },
+    {
+      "source": "(-0.077368, 51.502268)",
+      "target": "(-0.077469, 51.502345)"
+    },
+    {
+      "source": "(-0.077306, 51.502206)",
+      "target": "(-0.077368, 51.502268)"
+    },
+    {
+      "source": "(-0.095272, 51.504115)",
+      "target": "(-0.094806, 51.503973)"
+    },
+    {
+      "source": "(-0.079438, 51.500218)",
+      "target": "(-0.078582, 51.500245)"
+    },
+    {
+      "source": "(-0.093606, 51.492639)",
+      "target": "(-0.093962, 51.492776)"
+    },
+    {
+      "source": "(-0.093965, 51.492831)",
+      "target": "(-0.093901, 51.492819)"
+    },
+    {
+      "source": "(-0.093406, 51.492462)",
+      "target": "(-0.093606, 51.492639)"
+    },
+    {
+      "source": "(-0.093406, 51.492462)",
+      "target": "(-0.093233, 51.492345)"
+    },
+    {
+      "source": "(-0.093901, 51.492819)",
+      "target": "(-0.093606, 51.492639)"
+    },
+    {
+      "source": "(-0.054824, 51.498309)",
+      "target": "(-0.054773, 51.498269)"
+    },
+    {
+      "source": "(-0.051558, 51.495809)",
+      "target": "(-0.051339, 51.495658)"
+    },
+    {
+      "source": "(-0.050902, 51.495335)",
+      "target": "(-0.050953, 51.495404)"
+    },
+    {
+      "source": "(-0.050822, 51.495301)",
+      "target": "(-0.050788, 51.495273)"
+    },
+    {
+      "source": "(-0.050902, 51.495335)",
+      "target": "(-0.050822, 51.495301)"
+    },
+    {
+      "source": "(-0.051775, 51.500774)",
+      "target": "(-0.051676, 51.500824)"
+    },
+    {
+      "source": "(-0.042162, 51.500088)",
+      "target": "(-0.043501, 51.500064)"
+    },
+    {
+      "source": "(-0.043501, 51.500064)",
+      "target": "(-0.04372, 51.500038)"
+    },
+    {
+      "source": "(-0.030626, 51.49009)",
+      "target": "(-0.031333, 51.491051)"
+    },
+    {
+      "source": "(-0.027019, 51.483347)",
+      "target": "(-0.027135, 51.483323)"
+    },
+    {
+      "source": "(-0.018792, 51.482717)",
+      "target": "(-0.018901, 51.483223)"
+    },
+    {
+      "source": "(-0.018901, 51.483223)",
+      "target": "(-0.019193, 51.483248)"
+    },
+    {
+      "source": "(-0.019193, 51.483248)",
+      "target": "(-0.019283, 51.483317)"
+    },
+    {
+      "source": "(-0.019283, 51.483317)",
+      "target": "(-0.022087, 51.484395)"
+    },
+    {
+      "source": "(-0.022087, 51.484395)",
+      "target": "(-0.022221, 51.484344)"
+    },
+    {
+      "source": "(0.012824, 51.491336)",
+      "target": "(0.0127, 51.491247)"
+    },
+    {
+      "source": "(0.01242, 51.491174)",
+      "target": "(0.0127, 51.491247)"
+    },
+    {
+      "source": "(0.012233, 51.491039)",
+      "target": "(0.01242, 51.491174)"
+    },
+    {
+      "source": "(0.011912, 51.490825)",
+      "target": "(0.012233, 51.491039)"
+    },
+    {
+      "source": "(0.011832, 51.490265)",
+      "target": "(0.011912, 51.490825)"
+    },
+    {
+      "source": "(0.011812, 51.490572)",
+      "target": "(0.011912, 51.490825)"
+    },
+    {
+      "source": "(0.011812, 51.490572)",
+      "target": "(0.011802, 51.490509)"
+    },
+    {
+      "source": "(0.011802, 51.490509)",
+      "target": "(0.011832, 51.490265)"
+    },
+    {
+      "source": "(0.011832, 51.490265)",
+      "target": "(0.012031, 51.490052)"
+    },
+    {
+      "source": "(0.012856, 51.491412)",
+      "target": "(0.012939, 51.491365)"
+    },
+    {
+      "source": "(0.061196, 51.494439)",
+      "target": "(0.061031, 51.494425)"
+    },
+    {
+      "source": "(0.060787, 51.494421)",
+      "target": "(0.060868, 51.494423)"
+    },
+    {
+      "source": "(0.060868, 51.494423)",
+      "target": "(0.060922, 51.494418)"
+    },
+    {
+      "source": "(0.060922, 51.494418)",
+      "target": "(0.061031, 51.494425)"
+    },
+    {
+      "source": "(0.08828, 51.504031)",
+      "target": "(0.088091, 51.504113)"
+    },
+    {
+      "source": "(0.088026, 51.504126)",
+      "target": "(0.088091, 51.504113)"
+    },
+    {
+      "source": "(0.088382, 51.504815)",
+      "target": "(0.088275, 51.504839)"
+    },
+    {
+      "source": "(0.088216, 51.504851)",
+      "target": "(0.088256, 51.504846)"
+    },
+    {
+      "source": "(0.119628, 51.511096)",
+      "target": "(0.119706, 51.511198)"
+    },
+    {
+      "source": "(0.119686, 51.511233)",
+      "target": "(0.11946, 51.511223)"
+    },
+    {
+      "source": "(0.12496, 51.512755)",
+      "target": "(0.124896, 51.512825)"
+    },
+    {
+      "source": "(0.133069, 51.511367)",
+      "target": "(0.133163, 51.511481)"
+    },
+    {
+      "source": "(-0.033245, 51.486828)",
+      "target": "(-0.03312, 51.486884)"
+    },
+    {
+      "source": "(-0.023205, 51.475736)",
+      "target": "(-0.023046, 51.476098)"
+    },
+    {
+      "source": "(-0.023803, 51.474919)",
+      "target": "(-0.023696, 51.475063)"
+    },
+    {
+      "source": "(-0.026183, 51.443819)",
+      "target": "(-0.026235, 51.443784)"
+    },
+    {
+      "source": "(-0.025832, 51.444036)",
+      "target": "(-0.025023, 51.444303)"
+    },
+    {
+      "source": "(-0.02601, 51.443949)",
+      "target": "(-0.026183, 51.443819)"
+    },
+    {
+      "source": "(-0.028184, 51.433676)",
+      "target": "(-0.02845, 51.433767)"
+    },
+    {
+      "source": "(-0.034211, 51.424773)",
+      "target": "(-0.038604, 51.420116)"
+    },
+    {
+      "source": "(-0.034211, 51.424773)",
+      "target": "(-0.033609, 51.424727)"
+    },
+    {
+      "source": "(0.030142, 51.462047)",
+      "target": "(0.030224, 51.462071)"
+    },
+    {
+      "source": "(0.046736, 51.456025)",
+      "target": "(0.047312, 51.45558)"
+    },
+    {
+      "source": "(0.064821, 51.456655)",
+      "target": "(0.064686, 51.456634)"
+    },
+    {
+      "source": "(0.067134, 51.486974)",
+      "target": "(0.066925, 51.487116)"
+    },
+    {
+      "source": "(0.004166, 51.485014)",
+      "target": "(0.00434, 51.485066)"
+    },
+    {
+      "source": "(0.00434, 51.485066)",
+      "target": "(0.004475, 51.485105)"
+    },
+    {
+      "source": "(0.004475, 51.485105)",
+      "target": "(0.004989, 51.485208)"
+    },
+    {
+      "source": "(0.004989, 51.485208)",
+      "target": "(0.005984, 51.485418)"
+    },
+    {
+      "source": "(0.005984, 51.485418)",
+      "target": "(0.006609, 51.485604)"
+    },
+    {
+      "source": "(0.006609, 51.485604)",
+      "target": "(0.006992, 51.485718)"
+    },
+    {
+      "source": "(0.006992, 51.485718)",
+      "target": "(0.007287, 51.485825)"
+    },
+    {
+      "source": "(0.007354, 51.485855)",
+      "target": "(0.007287, 51.485825)"
+    },
+    {
+      "source": "(0.007354, 51.485855)",
+      "target": "(0.007519, 51.485922)"
+    },
+    {
+      "source": "(0.007557, 51.485936)",
+      "target": "(0.007519, 51.485922)"
+    },
+    {
+      "source": "(0.007557, 51.485936)",
+      "target": "(0.007687, 51.485983)"
+    },
+    {
+      "source": "(0.007687, 51.485983)",
+      "target": "(0.008055, 51.486121)"
+    },
+    {
+      "source": "(0.008055, 51.486121)",
+      "target": "(0.008445, 51.486227)"
+    },
+    {
+      "source": "(0.008445, 51.486227)",
+      "target": "(0.008954, 51.486294)"
+    },
+    {
+      "source": "(0.008954, 51.486294)",
+      "target": "(0.00936, 51.486293)"
+    },
+    {
+      "source": "(0.00936, 51.486293)",
+      "target": "(0.014252, 51.486018)"
+    },
+    {
+      "source": "(0.014252, 51.486018)",
+      "target": "(0.015152, 51.486105)"
+    },
+    {
+      "source": "(0.015152, 51.486105)",
+      "target": "(0.016177, 51.486312)"
+    },
+    {
+      "source": "(0.016177, 51.486312)",
+      "target": "(0.016452, 51.486348)"
+    },
+    {
+      "source": "(0.016452, 51.486348)",
+      "target": "(0.016811, 51.486423)"
+    },
+    {
+      "source": "(0.017832, 51.486398)",
+      "target": "(0.017135, 51.486389)"
+    },
+    {
+      "source": "(0.017135, 51.486389)",
+      "target": "(0.016706, 51.486341)"
+    },
+    {
+      "source": "(0.017152, 51.486462)",
+      "target": "(0.017405, 51.486567)"
+    },
+    {
+      "source": "(0.016811, 51.486423)",
+      "target": "(0.017152, 51.486462)"
+    },
+    {
+      "source": "(0.018027, 51.48666)",
+      "target": "(0.018232, 51.486601)"
+    },
+    {
+      "source": "(0.018232, 51.486601)",
+      "target": "(0.018708, 51.486665)"
+    },
+    {
+      "source": "(0.030896, 51.487816)",
+      "target": "(0.030759, 51.487796)"
+    },
+    {
+      "source": "(-0.114036, 51.505469)",
+      "target": "(-0.11378, 51.505224)"
+    },
+    {
+      "source": "(-0.152543, 51.503914)",
+      "target": "(-0.152835, 51.503482)"
+    },
+    {
+      "source": "(-0.152835, 51.503482)",
+      "target": "(-0.158612, 51.50272)"
+    },
+    {
+      "source": "(-0.158612, 51.50272)",
+      "target": "(-0.170193, 51.5022)"
+    },
+    {
+      "source": "(-0.170193, 51.5022)",
+      "target": "(-0.174268, 51.502153)"
+    },
+    {
+      "source": "(-0.174268, 51.502153)",
+      "target": "(-0.17439, 51.502153)"
+    },
+    {
+      "source": "(-0.174572, 51.502171)",
+      "target": "(-0.17439, 51.502153)"
+    },
+    {
+      "source": "(-0.174388, 51.502108)",
+      "target": "(-0.17445, 51.502072)"
+    },
+    {
+      "source": "(-0.162458, 51.490159)",
+      "target": "(-0.16252, 51.490124)"
+    },
+    {
+      "source": "(-0.128728, 51.488356)",
+      "target": "(-0.129339, 51.488511)"
+    },
+    {
+      "source": "(-0.129339, 51.488511)",
+      "target": "(-0.129498, 51.48857)"
+    },
+    {
+      "source": "(-0.148813, 51.479448)",
+      "target": "(-0.148789, 51.479304)"
+    },
+    {
+      "source": "(-0.148789, 51.479304)",
+      "target": "(-0.148757, 51.479137)"
+    },
+    {
+      "source": "(-0.148671, 51.478653)",
+      "target": "(-0.148646, 51.478514)"
+    },
+    {
+      "source": "(-0.148646, 51.478514)",
+      "target": "(-0.148616, 51.478348)"
+    }
+  ],
+  "history": [
+    {
+      "type": "remove",
+      "source": "(-0.090739, 51.480936)",
+      "target": "(-0.090718, 51.480797)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.088286, 51.481679)",
+      "target": "(-0.087276, 51.482016)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.08817, 51.483303)",
+      "target": "(-0.08852, 51.483226)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.08852, 51.483226)",
+      "target": "(-0.088208, 51.483354)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.088469, 51.483151)",
+      "target": "(-0.088016, 51.483286)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.087961, 51.483301)",
+      "target": "(-0.088016, 51.483286)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.087978, 51.483364)",
+      "target": "(-0.087961, 51.483301)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.093901, 51.492819)",
+      "target": "(-0.093606, 51.492639)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.093406, 51.492462)",
+      "target": "(-0.093233, 51.492345)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.093233, 51.492345)",
+      "target": "(-0.093275, 51.492314)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.095264, 51.49418)",
+      "target": "(-0.095202, 51.494169)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.095202, 51.494169)",
+      "target": "(-0.094441, 51.494052)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.095249, 51.494209)",
+      "target": "(-0.095264, 51.49418)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.094586, 51.494164)",
+      "target": "(-0.09504, 51.494226)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.09504, 51.494226)",
+      "target": "(-0.095528, 51.494296)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.094148, 51.494034)",
+      "target": "(-0.094177, 51.494109)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.094441, 51.494052)",
+      "target": "(-0.094184, 51.494032)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.094107, 51.494035)",
+      "target": "(-0.094084, 51.494036)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.094107, 51.494035)",
+      "target": "(-0.094084, 51.494036)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.09412, 51.494035)",
+      "target": "(-0.094107, 51.494035)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.094184, 51.494032)",
+      "target": "(-0.09412, 51.494035)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.094103, 51.49411)",
+      "target": "(-0.094084, 51.494036)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.094084, 51.494036)",
+      "target": "(-0.093869, 51.493375)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.093863, 51.493355)",
+      "target": "(-0.093823, 51.493228)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.093823, 51.493228)",
+      "target": "(-0.09385, 51.492848)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.093901, 51.492819)",
+      "target": "(-0.093606, 51.492639)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.093901, 51.492819)",
+      "target": "(-0.093606, 51.492639)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.093186, 51.492382)",
+      "target": "(-0.09385, 51.492848)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.093197, 51.492371)",
+      "target": "(-0.093233, 51.492345)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.095581, 51.49444)",
+      "target": "(-0.095537, 51.494431)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.091712, 51.499312)",
+      "target": "(-0.091626, 51.499219)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.094515, 51.499282)",
+      "target": "(-0.094378, 51.499378)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.096023, 51.500068)",
+      "target": "(-0.095887, 51.500023)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.095887, 51.500023)",
+      "target": "(-0.095575, 51.499903)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.096434, 51.500059)",
+      "target": "(-0.097524, 51.500422)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.089907, 51.498725)",
+      "target": "(-0.089913, 51.498698)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.089929, 51.498581)",
+      "target": "(-0.089833, 51.498618)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.09159, 51.499185)",
+      "target": "(-0.091626, 51.499219)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.087718, 51.496638)",
+      "target": "(-0.08778, 51.496705)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.087828, 51.496688)",
+      "target": "(-0.08778, 51.496705)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.085434, 51.497473)",
+      "target": "(-0.085367, 51.497422)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.085182, 51.497389)",
+      "target": "(-0.085367, 51.497422)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.084737, 51.497127)",
+      "target": "(-0.084826, 51.497075)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.08137, 51.495024)",
+      "target": "(-0.081487, 51.494957)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.081466, 51.494768)",
+      "target": "(-0.081293, 51.494876)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.075681, 51.491567)",
+      "target": "(-0.075551, 51.491491)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.075509, 51.491469)",
+      "target": "(-0.075457, 51.491441)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.075551, 51.491491)",
+      "target": "(-0.075509, 51.491469)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.075457, 51.491441)",
+      "target": "(-0.075358, 51.491398)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.075298, 51.491375)",
+      "target": "(-0.075358, 51.491398)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.075298, 51.491375)",
+      "target": "(-0.075373, 51.491279)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.071731, 51.488618)",
+      "target": "(-0.071657, 51.488605)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.071598, 51.488677)",
+      "target": "(-0.072603, 51.488813)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.072486, 51.483034)",
+      "target": "(-0.072316, 51.483094)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.073895, 51.481296)",
+      "target": "(-0.074019, 51.48287)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.074177, 51.482153)",
+      "target": "(-0.074168, 51.482118)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "type": "add",
+      "source": "(-0.074173, 51.481518)",
+      "target": "(-0.07417, 51.481584)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "type": "add",
+      "source": "(-0.074074, 51.482871)",
+      "target": "(-0.074107, 51.48287)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "type": "add",
+      "source": "(-0.07304, 51.477042)",
+      "target": "(-0.07316, 51.477076)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "type": "add",
+      "source": "(-0.073232, 51.477221)",
+      "target": "(-0.073208, 51.477248)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.071378, 51.474327)",
+      "target": "(-0.071407, 51.474373)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.07057, 51.474503)",
+      "target": "(-0.070429, 51.47454)",
+      "programme": "cycleway",
+      "route": "C35"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.069797, 51.4889)",
+      "target": "(-0.069827, 51.48872)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.065585, 51.488486)",
+      "target": "(-0.065639, 51.488097)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.058085, 51.488635)",
+      "target": "(-0.058334, 51.488713)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.058251, 51.488417)",
+      "target": "(-0.058334, 51.488713)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.057827, 51.488473)",
+      "target": "(-0.057631, 51.488731)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.057748, 51.488436)",
+      "target": "(-0.056834, 51.488462)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.052484, 51.487539)",
+      "target": "(-0.052529, 51.487555)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.051719, 51.487326)",
+      "target": "(-0.052193, 51.487589)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.049371, 51.484317)",
+      "target": "(-0.049282, 51.484312)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.049282, 51.484312)",
+      "target": "(-0.049174, 51.484312)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.04914, 51.484312)",
+      "target": "(-0.049091, 51.484312)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.049174, 51.484312)",
+      "target": "(-0.04914, 51.484312)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.049271, 51.484392)",
+      "target": "(-0.047391, 51.484353)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.047391, 51.484353)",
+      "target": "(-0.042403, 51.484339)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.046147, 51.484439)",
+      "target": "(-0.04626, 51.484443)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.042403, 51.484339)",
+      "target": "(-0.042268, 51.484423)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.041995, 51.48431)",
+      "target": "(-0.041861, 51.484206)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.041861, 51.484206)",
+      "target": "(-0.041764, 51.48411)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.039895, 51.482475)",
+      "target": "(-0.03989, 51.482556)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.032272, 51.477318)",
+      "target": "(-0.032286, 51.477348)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.032295, 51.477412)",
+      "target": "(-0.032293, 51.47742)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.032272, 51.477318)",
+      "target": "(-0.031982, 51.475955)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.038564, 51.483434)",
+      "target": "(-0.038598, 51.483447)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.03864, 51.483464)",
+      "target": "(-0.038598, 51.483447)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.03232, 51.481657)",
+      "target": "(-0.032496, 51.481462)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.031102, 51.481015)",
+      "target": "(-0.030872, 51.480987)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.030872, 51.480987)",
+      "target": "(-0.030793, 51.480661)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.030936, 51.480588)",
+      "target": "(-0.030781, 51.480608)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.030781, 51.480608)",
+      "target": "(-0.030531, 51.480613)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.030531, 51.480613)",
+      "target": "(-0.030453, 51.480614)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.030453, 51.480614)",
+      "target": "(-0.03019, 51.480627)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.03019, 51.480627)",
+      "target": "(-0.028228, 51.48083)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.028331, 51.48087)",
+      "target": "(-0.02824, 51.480878)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.02822, 51.4808)",
+      "target": "(-0.028235, 51.480858)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.028153, 51.480715)",
+      "target": "(-0.028133, 51.480613)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.028133, 51.480613)",
+      "target": "(-0.02812, 51.480548)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.027988, 51.480255)",
+      "target": "(-0.027981, 51.480233)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.026214, 51.480045)",
+      "target": "(-0.026186, 51.479881)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.026186, 51.479881)",
+      "target": "(-0.026159, 51.479737)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.025348, 51.479374)",
+      "target": "(-0.025272, 51.479395)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.025272, 51.479395)",
+      "target": "(-0.024856, 51.479201)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022912, 51.479244)",
+      "target": "(-0.022913, 51.479175)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022528, 51.477348)",
+      "target": "(-0.022571, 51.477632)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022571, 51.477632)",
+      "target": "(-0.022589, 51.477692)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022589, 51.477692)",
+      "target": "(-0.022621, 51.477791)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022662, 51.477919)",
+      "target": "(-0.022757, 51.477958)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022611, 51.476481)",
+      "target": "(-0.022642, 51.476424)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.02279, 51.476321)",
+      "target": "(-0.022843, 51.476379)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.02279, 51.476321)",
+      "target": "(-0.022843, 51.476379)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022642, 51.476424)",
+      "target": "(-0.022797, 51.476292)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.023803, 51.474919)",
+      "target": "(-0.023696, 51.475063)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022754, 51.476216)",
+      "target": "(-0.023143, 51.475687)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.023143, 51.475687)",
+      "target": "(-0.02335, 51.475374)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.02335, 51.475374)",
+      "target": "(-0.023693, 51.474824)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.023693, 51.474824)",
+      "target": "(-0.023643, 51.474716)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.023643, 51.474716)",
+      "target": "(-0.022962, 51.47461)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022962, 51.47461)",
+      "target": "(-0.022813, 51.474581)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022836, 51.474539)",
+      "target": "(-0.022813, 51.474581)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.022797, 51.476292)",
+      "target": "(-0.023205, 51.475736)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023205, 51.475736)",
+      "target": "(-0.023696, 51.475063)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023696, 51.475063)",
+      "target": "(-0.023803, 51.474919)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023803, 51.474919)",
+      "target": "(-0.023651, 51.474637)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023835, 51.474757)",
+      "target": "(-0.023908, 51.474777)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023803, 51.474919)",
+      "target": "(-0.023983, 51.474696)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023983, 51.474696)",
+      "target": "(-0.023963, 51.474807)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023696, 51.474584)",
+      "target": "(-0.023983, 51.474696)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023167, 51.474452)",
+      "target": "(-0.023696, 51.474584)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023427, 51.474487)",
+      "target": "(-0.023829, 51.474549)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023502, 51.474613)",
+      "target": "(-0.023171, 51.474559)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022362, 51.472219)",
+      "target": "(-0.022419, 51.472186)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022455, 51.47216)",
+      "target": "(-0.022419, 51.472186)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.017033, 51.468995)",
+      "target": "(-0.016948, 51.469033)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.016917, 51.469047)",
+      "target": "(-0.016948, 51.469033)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.016881, 51.469065)",
+      "target": "(-0.016917, 51.469047)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.016301, 51.468438)",
+      "target": "(-0.016365, 51.468414)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.016394, 51.468391)",
+      "target": "(-0.016365, 51.468414)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.016418, 51.468368)",
+      "target": "(-0.016394, 51.468391)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.016398, 51.46832)",
+      "target": "(-0.016441, 51.468345)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.016441, 51.468345)",
+      "target": "(-0.016398, 51.46832)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.016776, 51.46903)",
+      "target": "(-0.01689, 51.469119)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.015378, 51.466768)",
+      "target": "(-0.015244, 51.466787)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.014587, 51.465277)",
+      "target": "(-0.014517, 51.46454)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.015319, 51.465711)",
+      "target": "(-0.014587, 51.465277)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.015495, 51.465787)",
+      "target": "(-0.015319, 51.465711)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.015756, 51.465882)",
+      "target": "(-0.015515, 51.465793)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.015891, 51.465921)",
+      "target": "(-0.015756, 51.465882)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.015482, 51.465802)",
+      "target": "(-0.01547, 51.465816)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.014643, 51.464655)",
+      "target": "(-0.01471, 51.464611)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.014712, 51.464585)",
+      "target": "(-0.014716, 51.464489)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.013767, 51.464557)",
+      "target": "(-0.01331, 51.464576)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.012909, 51.464532)",
+      "target": "(-0.012864, 51.46461)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.013022, 51.464706)",
+      "target": "(-0.012909, 51.464532)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.012974, 51.464432)",
+      "target": "(-0.013767, 51.464557)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.012974, 51.464432)",
+      "target": "(-0.012978, 51.464392)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.036669, 51.46489)",
+      "target": "(-0.03678, 51.464821)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.03678, 51.464821)",
+      "target": "(-0.03708, 51.46446)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.036624, 51.464915)",
+      "target": "(-0.036577, 51.464924)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.03708, 51.46446)",
+      "target": "(-0.037104, 51.464431)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.036752, 51.463917)",
+      "target": "(-0.036798, 51.463941)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.036798, 51.463941)",
+      "target": "(-0.036986, 51.464076)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.036986, 51.464076)",
+      "target": "(-0.037104, 51.464189)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037104, 51.464189)",
+      "target": "(-0.037133, 51.464235)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037133, 51.464235)",
+      "target": "(-0.037104, 51.464431)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037844, 51.457693)",
+      "target": "(-0.037935, 51.457711)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.038874, 51.457875)",
+      "target": "(-0.03901, 51.457908)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.040084, 51.458079)",
+      "target": "(-0.040203, 51.458101)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.040203, 51.458101)",
+      "target": "(-0.040347, 51.458124)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.040347, 51.458124)",
+      "target": "(-0.040409, 51.458134)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.03602, 51.456295)",
+      "target": "(-0.036091, 51.456162)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.036077, 51.456365)",
+      "target": "(-0.036203, 51.456207)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.036242, 51.456155)",
+      "target": "(-0.036304, 51.456179)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.036203, 51.456207)",
+      "target": "(-0.036708, 51.455514)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.036708, 51.455514)",
+      "target": "(-0.036901, 51.455252)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.036504, 51.455638)",
+      "target": "(-0.036555, 51.455575)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.036504, 51.455638)",
+      "target": "(-0.036144, 51.456093)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.036091, 51.456162)",
+      "target": "(-0.036144, 51.456093)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.036045, 51.456302)",
+      "target": "(-0.036176, 51.456342)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.036826, 51.455233)",
+      "target": "(-0.036973, 51.454979)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037138, 51.454862)",
+      "target": "(-0.037002, 51.454938)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037002, 51.454938)",
+      "target": "(-0.036973, 51.454979)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.037264, 51.454765)",
+      "target": "(-0.037227, 51.454814)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.037227, 51.454814)",
+      "target": "(-0.03718, 51.454874)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.03718, 51.454874)",
+      "target": "(-0.03705, 51.455052)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.03705, 51.455052)",
+      "target": "(-0.036901, 51.455252)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037224, 51.454888)",
+      "target": "(-0.037138, 51.454862)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037224, 51.454888)",
+      "target": "(-0.03729, 51.454887)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037359, 51.454874)",
+      "target": "(-0.037322, 51.454857)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.042293, 51.455272)",
+      "target": "(-0.042423, 51.455186)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.051481, 51.440012)",
+      "target": "(-0.051412, 51.440126)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.051412, 51.440126)",
+      "target": "(-0.051092, 51.442302)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.05135, 51.440198)",
+      "target": "(-0.051336, 51.440103)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "add",
+      "source": "(-0.051336, 51.440103)",
+      "target": "(-0.051347, 51.44004)",
+      "programme": "cycleway",
+      "route": "C66"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.051224, 51.439958)",
+      "target": "(-0.051371, 51.439864)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.051371, 51.439864)",
+      "target": "(-0.051504, 51.439808)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.017677, 51.477851)",
+      "target": "(-0.017674, 51.47797)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.017671, 51.478116)",
+      "target": "(-0.017676, 51.477985)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.017676, 51.477985)",
+      "target": "(-0.017671, 51.478116)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.014818, 51.48141)",
+      "target": "(-0.015789, 51.481377)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.015903, 51.4814)",
+      "target": "(-0.015789, 51.481377)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.016498, 51.481387)",
+      "target": "(-0.015903, 51.4814)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.016496, 51.481337)",
+      "target": "(-0.016628, 51.481353)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.015061, 51.481334)",
+      "target": "(-0.015069, 51.481434)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.014153, 51.481431)",
+      "target": "(-0.014655, 51.481359)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.014655, 51.481359)",
+      "target": "(-0.014818, 51.48141)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.014869, 51.48117)",
+      "target": "(-0.014978, 51.481192)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.014978, 51.481192)",
+      "target": "(-0.015003, 51.481297)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.016628, 51.481353)",
+      "target": "(-0.016498, 51.481387)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.0165, 51.48141)",
+      "target": "(-0.017667, 51.481363)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.017667, 51.481363)",
+      "target": "(-0.020832, 51.481043)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.016628, 51.481353)",
+      "target": "(-0.017657, 51.481306)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.017657, 51.481306)",
+      "target": "(-0.018211, 51.481256)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.018211, 51.481256)",
+      "target": "(-0.018654, 51.481218)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.019109, 51.481211)",
+      "target": "(-0.018654, 51.481218)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.019219, 51.481201)",
+      "target": "(-0.019109, 51.481211)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.019605, 51.481126)",
+      "target": "(-0.019219, 51.481201)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.019605, 51.481126)",
+      "target": "(-0.022387, 51.480813)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.022387, 51.480813)",
+      "target": "(-0.019605, 51.481126)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.022387, 51.480813)",
+      "target": "(-0.022593, 51.480788)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.022997, 51.48081)",
+      "target": "(-0.022593, 51.480788)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023083, 51.480816)",
+      "target": "(-0.023072, 51.480705)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023083, 51.480816)",
+      "target": "(-0.022997, 51.48081)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023169, 51.480841)",
+      "target": "(-0.023083, 51.480816)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023209, 51.480721)",
+      "target": "(-0.023169, 51.480841)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023225, 51.480669)",
+      "target": "(-0.023209, 51.480721)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023222, 51.480641)",
+      "target": "(-0.023225, 51.480669)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023125, 51.480453)",
+      "target": "(-0.023222, 51.480641)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.023204, 51.480876)",
+      "target": "(-0.023177, 51.480906)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.024024, 51.481017)",
+      "target": "(-0.02359, 51.480909)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.024197, 51.481025)",
+      "target": "(-0.024024, 51.481017)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.024197, 51.481025)",
+      "target": "(-0.025296, 51.481285)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.025296, 51.481285)",
+      "target": "(-0.025513, 51.481333)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.025513, 51.481333)",
+      "target": "(-0.026181, 51.481468)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.02713, 51.481643)",
+      "target": "(-0.027454, 51.481749)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.026181, 51.481468)",
+      "target": "(-0.026343, 51.481504)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.026343, 51.481504)",
+      "target": "(-0.027408, 51.481802)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.027408, 51.481802)",
+      "target": "(-0.030825, 51.483342)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.030608, 51.48334)",
+      "target": "(-0.031867, 51.483974)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.030825, 51.483342)",
+      "target": "(-0.031221, 51.483541)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.031221, 51.483541)",
+      "target": "(-0.032531, 51.484186)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.031694, 51.484965)",
+      "target": "(-0.031753, 51.484967)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.031682, 51.485707)",
+      "target": "(-0.031766, 51.485701)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.032531, 51.484186)",
+      "target": "(-0.033075, 51.484513)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.033075, 51.484513)",
+      "target": "(-0.033162, 51.48458)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.033162, 51.48458)",
+      "target": "(-0.033289, 51.484687)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.033289, 51.484687)",
+      "target": "(-0.033936, 51.485227)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.034257, 51.485524)",
+      "target": "(-0.03427, 51.485517)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.034244, 51.485531)",
+      "target": "(-0.034699, 51.485898)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.034699, 51.485898)",
+      "target": "(-0.037593, 51.487678)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.033936, 51.485227)",
+      "target": "(-0.034287, 51.485452)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.034333, 51.485486)",
+      "target": "(-0.034287, 51.485452)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.03435, 51.485499)",
+      "target": "(-0.035854, 51.486605)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.035854, 51.486605)",
+      "target": "(-0.035948, 51.486661)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.036157, 51.486786)",
+      "target": "(-0.035948, 51.486661)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.036157, 51.486786)",
+      "target": "(-0.036074, 51.486809)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.034333, 51.485486)",
+      "target": "(-0.03435, 51.485499)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.034379, 51.485464)",
+      "target": "(-0.034693, 51.485287)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.034379, 51.485464)",
+      "target": "(-0.034287, 51.485509)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.036157, 51.486786)",
+      "target": "(-0.037764, 51.487666)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037593, 51.487678)",
+      "target": "(-0.037531, 51.487759)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037531, 51.487759)",
+      "target": "(-0.037543, 51.487783)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037799, 51.487766)",
+      "target": "(-0.037654, 51.48783)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037616, 51.487822)",
+      "target": "(-0.037543, 51.487783)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.037764, 51.487666)",
+      "target": "(-0.038162, 51.487844)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.038162, 51.487844)",
+      "target": "(-0.039352, 51.488436)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.039352, 51.488436)",
+      "target": "(-0.039771, 51.488645)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.040352, 51.489041)",
+      "target": "(-0.040456, 51.489097)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.039771, 51.488645)",
+      "target": "(-0.040164, 51.488842)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.040164, 51.488842)",
+      "target": "(-0.04049, 51.489011)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.04049, 51.489011)",
+      "target": "(-0.041531, 51.489594)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.041531, 51.489594)",
+      "target": "(-0.041605, 51.489637)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.041605, 51.489637)",
+      "target": "(-0.041729, 51.489732)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.041855, 51.489833)",
+      "target": "(-0.041966, 51.489906)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.041966, 51.489906)",
+      "target": "(-0.042141, 51.490021)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.04457, 51.49176)",
+      "target": "(-0.044635, 51.491807)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.04457, 51.49176)",
+      "target": "(-0.04447, 51.491685)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.04447, 51.491685)",
+      "target": "(-0.044477, 51.491632)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.045956, 51.492571)",
+      "target": "(-0.046021, 51.492554)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.045956, 51.492571)",
+      "target": "(-0.046021, 51.492554)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.044635, 51.491807)",
+      "target": "(-0.044683, 51.491795)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.04447, 51.491685)",
+      "target": "(-0.044477, 51.491632)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048521, 51.493806)",
+      "target": "(-0.04853, 51.493888)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048521, 51.493806)",
+      "target": "(-0.04853, 51.493888)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.049101, 51.494085)",
+      "target": "(-0.048979, 51.494095)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.049101, 51.494085)",
+      "target": "(-0.048979, 51.494095)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048291, 51.49381)",
+      "target": "(-0.048174, 51.493753)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.047086, 51.493157)",
+      "target": "(-0.047152, 51.493234)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048257, 51.493625)",
+      "target": "(-0.048331, 51.493572)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048328, 51.493662)",
+      "target": "(-0.048294, 51.493598)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048273, 51.493562)",
+      "target": "(-0.048294, 51.493598)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048216, 51.493601)",
+      "target": "(-0.048294, 51.493598)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.051536, 51.495632)",
+      "target": "(-0.051517, 51.495686)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.052487, 51.496309)",
+      "target": "(-0.052452, 51.496327)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.051941, 51.495892)",
+      "target": "(-0.052601, 51.496534)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.054156, 51.497592)",
+      "target": "(-0.05416, 51.49768)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.054156, 51.497592)",
+      "target": "(-0.053678, 51.497246)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.05368, 51.497223)",
+      "target": "(-0.053592, 51.497171)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.053678, 51.497246)",
+      "target": "(-0.053526, 51.497175)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.053184, 51.497022)",
+      "target": "(-0.053516, 51.49727)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.053516, 51.49727)",
+      "target": "(-0.0538, 51.497466)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.0538, 51.497466)",
+      "target": "(-0.053896, 51.497533)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.053989, 51.497609)",
+      "target": "(-0.053896, 51.497533)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.053989, 51.497609)",
+      "target": "(-0.05416, 51.49768)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.056212, 51.498861)",
+      "target": "(-0.056089, 51.498809)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.056035, 51.498784)",
+      "target": "(-0.055993, 51.498839)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.056089, 51.498809)",
+      "target": "(-0.055827, 51.498698)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.055827, 51.498698)",
+      "target": "(-0.055036, 51.498268)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.055036, 51.498268)",
+      "target": "(-0.054759, 51.498081)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.054759, 51.498081)",
+      "target": "(-0.054623, 51.498085)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.054764, 51.498035)",
+      "target": "(-0.05476, 51.498025)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.054759, 51.498081)",
+      "target": "(-0.054623, 51.498085)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.05416, 51.49768)",
+      "target": "(-0.054554, 51.498007)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055137, 51.498421)",
+      "target": "(-0.055361, 51.498737)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.054623, 51.498085)",
+      "target": "(-0.054701, 51.498167)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.054773, 51.498269)",
+      "target": "(-0.054701, 51.498167)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.054701, 51.498167)",
+      "target": "(-0.054855, 51.498225)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.054947, 51.498406)",
+      "target": "(-0.054824, 51.498309)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055029, 51.498819)",
+      "target": "(-0.054947, 51.498406)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055029, 51.498819)",
+      "target": "(-0.055361, 51.498737)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055141, 51.499165)",
+      "target": "(-0.054998, 51.498847)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055141, 51.499165)",
+      "target": "(-0.055077, 51.499159)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055309, 51.499339)",
+      "target": "(-0.055209, 51.499182)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055209, 51.499182)",
+      "target": "(-0.055141, 51.499165)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055559, 51.499133)",
+      "target": "(-0.055209, 51.499182)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055623, 51.499086)",
+      "target": "(-0.055559, 51.499133)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055541, 51.498785)",
+      "target": "(-0.055623, 51.499086)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055361, 51.498737)",
+      "target": "(-0.055541, 51.498785)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055963, 51.49887)",
+      "target": "(-0.057511, 51.498897)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.055971, 51.499084)",
+      "target": "(-0.05594, 51.498991)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.055949, 51.498905)",
+      "target": "(-0.05594, 51.498991)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.055949, 51.498905)",
+      "target": "(-0.055993, 51.498839)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055927, 51.499041)",
+      "target": "(-0.055623, 51.499086)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.055927, 51.499041)",
+      "target": "(-0.055579, 51.499213)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.056061, 51.499023)",
+      "target": "(-0.055927, 51.499041)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.056675, 51.49904)",
+      "target": "(-0.056061, 51.499023)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.057034, 51.499016)",
+      "target": "(-0.056675, 51.49904)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.057435, 51.498975)",
+      "target": "(-0.057034, 51.499016)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.058579, 51.49889)",
+      "target": "(-0.058516, 51.498934)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.057946, 51.498917)",
+      "target": "(-0.057435, 51.498975)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.058303, 51.49889)",
+      "target": "(-0.057946, 51.498917)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.05842, 51.498949)",
+      "target": "(-0.05835, 51.498886)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.058446, 51.498878)",
+      "target": "(-0.058303, 51.49889)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.058446, 51.498878)",
+      "target": "(-0.058586, 51.498863)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.058641, 51.498857)",
+      "target": "(-0.058586, 51.498863)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.059716, 51.49875)",
+      "target": "(-0.058641, 51.498857)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.057511, 51.498897)",
+      "target": "(-0.058288, 51.498836)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.058288, 51.498836)",
+      "target": "(-0.058426, 51.49882)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.058479, 51.498774)",
+      "target": "(-0.058551, 51.498782)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.058426, 51.49882)",
+      "target": "(-0.058846, 51.498777)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.058846, 51.498777)",
+      "target": "(-0.059846, 51.498677)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.060378, 51.498682)",
+      "target": "(-0.059716, 51.49875)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.060567, 51.498642)",
+      "target": "(-0.060378, 51.498682)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.060569, 51.498719)",
+      "target": "(-0.060682, 51.498673)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.060683, 51.498618)",
+      "target": "(-0.060567, 51.498642)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.060682, 51.498673)",
+      "target": "(-0.060776, 51.498636)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.059846, 51.498677)",
+      "target": "(-0.060563, 51.498567)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.060563, 51.498567)",
+      "target": "(-0.060674, 51.498553)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.060674, 51.498553)",
+      "target": "(-0.060953, 51.498511)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.060972, 51.498569)",
+      "target": "(-0.060683, 51.498618)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.062174, 51.498408)",
+      "target": "(-0.060972, 51.498569)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.060953, 51.498511)",
+      "target": "(-0.061735, 51.498405)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.061735, 51.498405)",
+      "target": "(-0.06278, 51.498271)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.064476, 51.498079)",
+      "target": "(-0.062174, 51.498408)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.06278, 51.498271)",
+      "target": "(-0.064476, 51.498079)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.064476, 51.498079)",
+      "target": "(-0.064998, 51.498027)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.064998, 51.498027)",
+      "target": "(-0.065878, 51.49795)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.066115, 51.497986)",
+      "target": "(-0.065878, 51.49795)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.066267, 51.49799)",
+      "target": "(-0.066115, 51.497986)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.066583, 51.497922)",
+      "target": "(-0.066859, 51.497985)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.066583, 51.497922)",
+      "target": "(-0.066859, 51.497985)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.066541, 51.497995)",
+      "target": "(-0.066385, 51.497991)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.066385, 51.497991)",
+      "target": "(-0.066267, 51.49799)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.066541, 51.497995)",
+      "target": "(-0.066385, 51.497991)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.066583, 51.497922)",
+      "target": "(-0.066859, 51.497985)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.066859, 51.497985)",
+      "target": "(-0.066541, 51.497995)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.066908, 51.497986)",
+      "target": "(-0.066859, 51.497985)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.066908, 51.497986)",
+      "target": "(-0.068781, 51.498299)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.068781, 51.498299)",
+      "target": "(-0.06928, 51.498404)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.069997, 51.498728)",
+      "target": "(-0.068781, 51.498299)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.070177, 51.498799)",
+      "target": "(-0.069997, 51.498728)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.072311, 51.499848)",
+      "target": "(-0.072264, 51.499818)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.072359, 51.499877)",
+      "target": "(-0.072489, 51.499947)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.072525, 51.499998)",
+      "target": "(-0.072489, 51.499947)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.072742, 51.50011)",
+      "target": "(-0.072554, 51.500018)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.072554, 51.500018)",
+      "target": "(-0.072525, 51.499998)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.072819, 51.500141)",
+      "target": "(-0.072742, 51.50011)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.072931, 51.500109)",
+      "target": "(-0.072873, 51.500159)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.072951, 51.500181)",
+      "target": "(-0.072819, 51.500141)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.073399, 51.500299)",
+      "target": "(-0.072951, 51.500181)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.073977, 51.500452)",
+      "target": "(-0.073399, 51.500299)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.073807, 51.500348)",
+      "target": "(-0.073977, 51.500452)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.073396, 51.500233)",
+      "target": "(-0.073614, 51.500293)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.073034, 51.500139)",
+      "target": "(-0.073396, 51.500233)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.072489, 51.499947)",
+      "target": "(-0.073034, 51.500139)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.072311, 51.499848)",
+      "target": "(-0.072359, 51.499877)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.074063, 51.500479)",
+      "target": "(-0.073977, 51.500452)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.074063, 51.500479)",
+      "target": "(-0.074219, 51.500517)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.074219, 51.500517)",
+      "target": "(-0.074271, 51.50053)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.074271, 51.50053)",
+      "target": "(-0.075987, 51.50017)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.075987, 51.50017)",
+      "target": "(-0.076223, 51.500259)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.074271, 51.50053)",
+      "target": "(-0.074734, 51.500774)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.074734, 51.500774)",
+      "target": "(-0.076322, 51.501585)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.077368, 51.502268)",
+      "target": "(-0.077469, 51.502345)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.077306, 51.502206)",
+      "target": "(-0.077368, 51.502268)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.078276, 51.502958)",
+      "target": "(-0.078213, 51.502916)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.078314, 51.502985)",
+      "target": "(-0.078276, 51.502958)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.078336, 51.502998)",
+      "target": "(-0.078314, 51.502985)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.07837, 51.503017)",
+      "target": "(-0.078336, 51.502998)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.078406, 51.503038)",
+      "target": "(-0.07837, 51.503017)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.091731, 51.50321)",
+      "target": "(-0.091681, 51.503271)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.095272, 51.504115)",
+      "target": "(-0.094806, 51.503973)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.082092, 51.500443)",
+      "target": "(-0.082154, 51.500418)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.08172, 51.500433)",
+      "target": "(-0.08177, 51.500567)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.079438, 51.500218)",
+      "target": "(-0.078582, 51.500245)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.096023, 51.500068)",
+      "target": "(-0.095887, 51.500023)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "add",
+      "source": "(-0.095887, 51.500023)",
+      "target": "(-0.095575, 51.499903)",
+      "programme": "cycleway",
+      "route": "C10"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.093606, 51.492639)",
+      "target": "(-0.093962, 51.492776)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.093965, 51.492831)",
+      "target": "(-0.093901, 51.492819)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.093406, 51.492462)",
+      "target": "(-0.093606, 51.492639)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.093406, 51.492462)",
+      "target": "(-0.093233, 51.492345)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.093901, 51.492819)",
+      "target": "(-0.093606, 51.492639)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.090721, 51.480251)",
+      "target": "(-0.090772, 51.480224)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.09114, 51.480438)",
+      "target": "(-0.091327, 51.480547)",
+      "programme": "cycleway",
+      "route": "C17"
+    },
+    {
+      "type": "add",
+      "source": "(-0.062612, 51.500536)",
+      "target": "(-0.06177, 51.500567)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.058292, 51.500624)",
+      "target": "(-0.05822, 51.500628)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.054693, 51.500419)",
+      "target": "(-0.054694, 51.500391)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.054693, 51.500419)",
+      "target": "(-0.054741, 51.500531)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.054824, 51.498309)",
+      "target": "(-0.054773, 51.498269)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.051558, 51.495809)",
+      "target": "(-0.051339, 51.495658)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.050902, 51.495335)",
+      "target": "(-0.050953, 51.495404)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.050822, 51.495301)",
+      "target": "(-0.050788, 51.495273)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.050902, 51.495335)",
+      "target": "(-0.050822, 51.495301)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.051775, 51.500774)",
+      "target": "(-0.051676, 51.500824)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.052639, 51.501466)",
+      "target": "(-0.052509, 51.501557)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048964, 51.500112)",
+      "target": "(-0.049074, 51.50011)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048882, 51.500122)",
+      "target": "(-0.048784, 51.500133)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048964, 51.500112)",
+      "target": "(-0.048882, 51.500122)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048757, 51.500136)",
+      "target": "(-0.048504, 51.500166)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048469, 51.50017)",
+      "target": "(-0.048504, 51.500166)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048377, 51.500181)",
+      "target": "(-0.048469, 51.50017)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048339, 51.500187)",
+      "target": "(-0.048227, 51.500176)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.048207, 51.500168)",
+      "target": "(-0.047974, 51.500072)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.047943, 51.500059)",
+      "target": "(-0.047732, 51.499973)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.046442, 51.499396)",
+      "target": "(-0.04647, 51.499408)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.046442, 51.499396)",
+      "target": "(-0.04647, 51.499408)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.046305, 51.499527)",
+      "target": "(-0.046265, 51.499509)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.04647, 51.499408)",
+      "target": "(-0.046299, 51.499542)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.042162, 51.500088)",
+      "target": "(-0.043501, 51.500064)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.043501, 51.500064)",
+      "target": "(-0.04372, 51.500038)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.041195, 51.499406)",
+      "target": "(-0.041237, 51.499361)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.041237, 51.499361)",
+      "target": "(-0.041284, 51.499291)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.036158, 51.498225)",
+      "target": "(-0.036319, 51.498377)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.03442, 51.496456)",
+      "target": "(-0.035317, 51.496293)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.035317, 51.496293)",
+      "target": "(-0.035345, 51.496342)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.03442, 51.496456)",
+      "target": "(-0.034096, 51.495761)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.034096, 51.495761)",
+      "target": "(-0.034044, 51.495663)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.034044, 51.495663)",
+      "target": "(-0.033935, 51.495451)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033935, 51.495451)",
+      "target": "(-0.03387, 51.495348)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033851, 51.495317)",
+      "target": "(-0.033612, 51.494861)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033456, 51.494581)",
+      "target": "(-0.03314, 51.494643)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.032882, 51.494549)",
+      "target": "(-0.0333, 51.494296)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033249, 51.494239)",
+      "target": "(-0.033276, 51.494255)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033157, 51.494024)",
+      "target": "(-0.033162, 51.494075)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033162, 51.494108)",
+      "target": "(-0.033162, 51.494075)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033167, 51.494117)",
+      "target": "(-0.033206, 51.494191)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033209, 51.494197)",
+      "target": "(-0.033229, 51.494184)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033206, 51.494191)",
+      "target": "(-0.033167, 51.494117)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033209, 51.494197)",
+      "target": "(-0.033249, 51.494239)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.03245, 51.492933)",
+      "target": "(-0.032419, 51.493023)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.030626, 51.49009)",
+      "target": "(-0.031333, 51.491051)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.03174, 51.488293)",
+      "target": "(-0.031722, 51.488179)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.031818, 51.488146)",
+      "target": "(-0.031722, 51.488179)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(-0.032956, 51.48675)",
+      "target": "(-0.03312, 51.486884)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.027019, 51.483347)",
+      "target": "(-0.027135, 51.483323)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.018792, 51.482717)",
+      "target": "(-0.018901, 51.483223)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.018901, 51.483223)",
+      "target": "(-0.019193, 51.483248)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.019193, 51.483248)",
+      "target": "(-0.019283, 51.483317)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.019283, 51.483317)",
+      "target": "(-0.022087, 51.484395)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.022087, 51.484395)",
+      "target": "(-0.022221, 51.484344)"
+    },
+    {
+      "type": "add",
+      "source": "(0.01184, 51.49006)",
+      "target": "(0.011947, 51.490037)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(0.011979, 51.49006)",
+      "target": "(0.011947, 51.490037)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(0.012045, 51.490089)",
+      "target": "(0.011979, 51.49006)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(0.012045, 51.490089)",
+      "target": "(0.012087, 51.490186)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "remove",
+      "source": "(0.012824, 51.491336)",
+      "target": "(0.0127, 51.491247)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.01242, 51.491174)",
+      "target": "(0.0127, 51.491247)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.012233, 51.491039)",
+      "target": "(0.01242, 51.491174)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.011912, 51.490825)",
+      "target": "(0.012233, 51.491039)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.011832, 51.490265)",
+      "target": "(0.011912, 51.490825)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.011812, 51.490572)",
+      "target": "(0.011912, 51.490825)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.011812, 51.490572)",
+      "target": "(0.011802, 51.490509)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.011802, 51.490509)",
+      "target": "(0.011832, 51.490265)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.011832, 51.490265)",
+      "target": "(0.012031, 51.490052)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.012856, 51.491412)",
+      "target": "(0.012939, 51.491365)"
+    },
+    {
+      "type": "add",
+      "source": "(0.012956, 51.49131)",
+      "target": "(0.012982, 51.491331)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(0.012956, 51.49131)",
+      "target": "(0.012893, 51.491256)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(0.012846, 51.491218)",
+      "target": "(0.012774, 51.491156)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(0.012982, 51.491331)",
+      "target": "(0.012953, 51.491357)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(0.015206, 51.492814)",
+      "target": "(0.015222, 51.492864)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(0.061044, 51.494366)",
+      "target": "(0.061051, 51.494324)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "remove",
+      "source": "(0.061196, 51.494439)",
+      "target": "(0.061031, 51.494425)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.060787, 51.494421)",
+      "target": "(0.060868, 51.494423)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.060868, 51.494423)",
+      "target": "(0.060922, 51.494418)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.060922, 51.494418)",
+      "target": "(0.061031, 51.494425)"
+    },
+    {
+      "type": "add",
+      "source": "(0.088075, 51.504067)",
+      "target": "(0.088105, 51.504153)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "remove",
+      "source": "(0.08828, 51.504031)",
+      "target": "(0.088091, 51.504113)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.088026, 51.504126)",
+      "target": "(0.088091, 51.504113)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.088382, 51.504815)",
+      "target": "(0.088275, 51.504839)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.088216, 51.504851)",
+      "target": "(0.088256, 51.504846)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.119628, 51.511096)",
+      "target": "(0.119706, 51.511198)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.119686, 51.511233)",
+      "target": "(0.11946, 51.511223)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.12496, 51.512755)",
+      "target": "(0.124896, 51.512825)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.133069, 51.511367)",
+      "target": "(0.133163, 51.511481)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.049101, 51.494085)",
+      "target": "(-0.048979, 51.494095)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.049101, 51.494085)",
+      "target": "(-0.048979, 51.494095)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.033245, 51.486828)",
+      "target": "(-0.03312, 51.486884)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022998, 51.480846)",
+      "target": "(-0.022997, 51.480787)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022997, 51.480787)",
+      "target": "(-0.022994, 51.480746)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022972, 51.48066)",
+      "target": "(-0.023041, 51.479881)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022994, 51.480746)",
+      "target": "(-0.022972, 51.48066)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022995, 51.480879)",
+      "target": "(-0.022998, 51.480846)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(-0.023005, 51.479603)",
+      "target": "(-0.022912, 51.479244)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023205, 51.475736)",
+      "target": "(-0.023046, 51.476098)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022797, 51.476292)",
+      "target": "(-0.022698, 51.476289)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.023803, 51.474919)",
+      "target": "(-0.023696, 51.475063)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022836, 51.474539)",
+      "target": "(-0.022866, 51.474475)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.022779, 51.474347)",
+      "target": "(-0.022761, 51.47442)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.026239, 51.439632)",
+      "target": "(-0.026384, 51.439695)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.026926, 51.442064)",
+      "target": "(-0.026756, 51.44208)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.02645, 51.442716)",
+      "target": "(-0.026274, 51.442778)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.026051, 51.443798)",
+      "target": "(-0.026096, 51.443767)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.026274, 51.442778)",
+      "target": "(-0.026221, 51.442798)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.026137, 51.443742)",
+      "target": "(-0.026096, 51.443767)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.026137, 51.443742)",
+      "target": "(-0.026191, 51.443721)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.026183, 51.443819)",
+      "target": "(-0.026235, 51.443784)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.025832, 51.444036)",
+      "target": "(-0.025023, 51.444303)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.02601, 51.443949)",
+      "target": "(-0.026183, 51.443819)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.02845, 51.433767)",
+      "target": "(-0.028552, 51.433802)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.028552, 51.433802)",
+      "target": "(-0.028748, 51.433864)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.028748, 51.433864)",
+      "target": "(-0.028552, 51.433802)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.028184, 51.433676)",
+      "target": "(-0.02845, 51.433767)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.028748, 51.433864)",
+      "target": "(-0.028885, 51.433886)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.031148, 51.430671)",
+      "target": "(-0.031337, 51.43072)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033119, 51.427809)",
+      "target": "(-0.033152, 51.427742)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033063, 51.427728)",
+      "target": "(-0.033152, 51.427742)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.032971, 51.428153)",
+      "target": "(-0.032974, 51.428147)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.032971, 51.428153)",
+      "target": "(-0.032974, 51.428147)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.032921, 51.428145)",
+      "target": "(-0.033004, 51.428159)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.033449, 51.425156)",
+      "target": "(-0.033384, 51.425187)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.03485, 51.422962)",
+      "target": "(-0.034956, 51.422755)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.034642, 51.423382)",
+      "target": "(-0.033632, 51.424683)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.034956, 51.422755)",
+      "target": "(-0.034998, 51.422691)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.034211, 51.424773)",
+      "target": "(-0.038604, 51.420116)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.034211, 51.424773)",
+      "target": "(-0.033609, 51.424727)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.03733, 51.420789)",
+      "target": "(-0.037746, 51.4206)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037746, 51.4206)",
+      "target": "(-0.037852, 51.420555)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.037852, 51.420555)",
+      "target": "(-0.038567, 51.420098)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.038524, 51.420071)",
+      "target": "(-0.038553, 51.420091)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.038484, 51.420011)",
+      "target": "(-0.038524, 51.420071)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.038496, 51.419987)",
+      "target": "(-0.039396, 51.416517)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.038496, 51.419987)",
+      "target": "(-0.038484, 51.420011)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.045123, 51.412556)",
+      "target": "(-0.045124, 51.412466)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.045124, 51.412466)",
+      "target": "(-0.045025, 51.412421)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.045025, 51.412421)",
+      "target": "(-0.04492, 51.412389)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.044446, 51.412991)",
+      "target": "(-0.04448, 51.413009)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.044343, 51.412934)",
+      "target": "(-0.044405, 51.412885)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.043835, 51.412809)",
+      "target": "(-0.043748, 51.412786)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(-0.044343, 51.412934)",
+      "target": "(-0.044379, 51.41295)",
+      "programme": "cycleway",
+      "route": "C18"
+    },
+    {
+      "type": "add",
+      "source": "(0.025918, 51.472222)",
+      "target": "(0.027083, 51.470409)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(0.029082, 51.467032)",
+      "target": "(0.028583, 51.46777)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(0.030277, 51.463286)",
+      "target": "(0.030388, 51.463265)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "remove",
+      "source": "(0.030142, 51.462047)",
+      "target": "(0.030224, 51.462071)"
+    },
+    {
+      "type": "add",
+      "source": "(0.034022, 51.460348)",
+      "target": "(0.034883, 51.459985)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(0.034883, 51.459985)",
+      "target": "(0.034965, 51.460037)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "remove",
+      "source": "(0.046736, 51.456025)",
+      "target": "(0.047312, 51.45558)"
+    },
+    {
+      "type": "add",
+      "source": "(0.050919, 51.455642)",
+      "target": "(0.050755, 51.455908)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(0.064772, 51.456788)",
+      "target": "(0.064796, 51.456722)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(0.064549, 51.457277)",
+      "target": "(0.064575, 51.45731)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(0.064772, 51.456788)",
+      "target": "(0.06476, 51.456818)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "remove",
+      "source": "(0.064821, 51.456655)",
+      "target": "(0.064686, 51.456634)"
+    },
+    {
+      "type": "add",
+      "source": "(0.059033, 51.478575)",
+      "target": "(0.058923, 51.478612)",
+      "programme": "cycleway",
+      "route": "C33"
+    },
+    {
+      "type": "add",
+      "source": "(0.067042, 51.487212)",
+      "target": "(0.067088, 51.487192)",
+      "programme": "cycleway",
+      "route": "C33"
+    },
+    {
+      "type": "add",
+      "source": "(0.066987, 51.487031)",
+      "target": "(0.067059, 51.487075)",
+      "programme": "cycleway",
+      "route": "C33"
+    },
+    {
+      "type": "remove",
+      "source": "(0.067134, 51.486974)",
+      "target": "(0.066925, 51.487116)"
+    },
+    {
+      "type": "add",
+      "source": "(0.001573, 51.484756)",
+      "target": "(0.001904, 51.485115)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(0.001904, 51.485115)",
+      "target": "(0.004044, 51.485121)",
+      "programme": "cycleway",
+      "route": "C14"
+    },
+    {
+      "type": "add",
+      "source": "(0.004044, 51.485121)",
+      "target": "(0.004107, 51.485049)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(0.004166, 51.485014)",
+      "target": "(0.00434, 51.485066)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.00434, 51.485066)",
+      "target": "(0.004475, 51.485105)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.004475, 51.485105)",
+      "target": "(0.004989, 51.485208)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.004989, 51.485208)",
+      "target": "(0.005984, 51.485418)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.005984, 51.485418)",
+      "target": "(0.006609, 51.485604)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.006609, 51.485604)",
+      "target": "(0.006992, 51.485718)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.006992, 51.485718)",
+      "target": "(0.007287, 51.485825)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.007354, 51.485855)",
+      "target": "(0.007287, 51.485825)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.007354, 51.485855)",
+      "target": "(0.007519, 51.485922)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.007557, 51.485936)",
+      "target": "(0.007519, 51.485922)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.007557, 51.485936)",
+      "target": "(0.007687, 51.485983)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.007687, 51.485983)",
+      "target": "(0.008055, 51.486121)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.008055, 51.486121)",
+      "target": "(0.008445, 51.486227)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.008445, 51.486227)",
+      "target": "(0.008954, 51.486294)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.008954, 51.486294)",
+      "target": "(0.00936, 51.486293)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.00936, 51.486293)",
+      "target": "(0.014252, 51.486018)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.014252, 51.486018)",
+      "target": "(0.015152, 51.486105)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.015152, 51.486105)",
+      "target": "(0.016177, 51.486312)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.016177, 51.486312)",
+      "target": "(0.016452, 51.486348)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.016452, 51.486348)",
+      "target": "(0.016811, 51.486423)"
+    },
+    {
+      "type": "add",
+      "source": "(0.016702, 51.486452)",
+      "target": "(0.016797, 51.486465)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.016845, 51.486426)",
+      "target": "(0.016845, 51.486481)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.017656, 51.486639)",
+      "target": "(0.017548, 51.486576)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.018086, 51.486483)",
+      "target": "(0.017761, 51.486699)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.017761, 51.486699)",
+      "target": "(0.017656, 51.486639)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.016699, 51.486368)",
+      "target": "(0.016713, 51.486313)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(0.017832, 51.486398)",
+      "target": "(0.017135, 51.486389)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.017135, 51.486389)",
+      "target": "(0.016706, 51.486341)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.017152, 51.486462)",
+      "target": "(0.017405, 51.486567)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.016811, 51.486423)",
+      "target": "(0.017152, 51.486462)"
+    },
+    {
+      "type": "add",
+      "source": "(0.01683, 51.486478)",
+      "target": "(0.016797, 51.486465)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(0.018027, 51.48666)",
+      "target": "(0.018232, 51.486601)"
+    },
+    {
+      "type": "remove",
+      "source": "(0.018232, 51.486601)",
+      "target": "(0.018708, 51.486665)"
+    },
+    {
+      "type": "add",
+      "source": "(0.018719, 51.486637)",
+      "target": "(0.018808, 51.486632)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.018828, 51.48658)",
+      "target": "(0.018808, 51.486632)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.018808, 51.486632)",
+      "target": "(0.018719, 51.486637)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.018801, 51.486706)",
+      "target": "(0.018866, 51.486692)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.023087, 51.486918)",
+      "target": "(0.023239, 51.486978)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.027526, 51.487434)",
+      "target": "(0.028271, 51.487493)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.028271, 51.487493)",
+      "target": "(0.028574, 51.487527)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.028608, 51.487532)",
+      "target": "(0.028574, 51.487527)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.028737, 51.487529)",
+      "target": "(0.028635, 51.487537)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(0.030896, 51.487816)",
+      "target": "(0.030759, 51.487796)"
+    },
+    {
+      "type": "add",
+      "source": "(0.030759, 51.487796)",
+      "target": "(0.028762, 51.487531)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.030724, 51.487944)",
+      "target": "(0.030974, 51.487999)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.030685, 51.487936)",
+      "target": "(0.030724, 51.487944)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.030724, 51.487944)",
+      "target": "(0.030974, 51.487999)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "add",
+      "source": "(0.030607, 51.487919)",
+      "target": "(0.030685, 51.487936)",
+      "programme": "cycleway",
+      "route": "C4"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.114036, 51.505469)",
+      "target": "(-0.11378, 51.505224)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.160963, 51.512275)",
+      "target": "(-0.16097, 51.512294)",
+      "programme": "cycleway",
+      "route": "C55"
+    },
+    {
+      "type": "add",
+      "source": "(-0.160894, 51.512254)",
+      "target": "(-0.160963, 51.512275)",
+      "programme": "cycleway",
+      "route": "C55"
+    },
+    {
+      "type": "add",
+      "source": "(-0.160816, 51.512274)",
+      "target": "(-0.160894, 51.512254)",
+      "programme": "cycleway",
+      "route": "C55"
+    },
+    {
+      "type": "add",
+      "source": "(-0.16077, 51.512305)",
+      "target": "(-0.160816, 51.512274)",
+      "programme": "cycleway",
+      "route": "C55"
+    },
+    {
+      "type": "add",
+      "source": "(-0.161162, 51.512275)",
+      "target": "(-0.16139, 51.51224)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.161121, 51.512298)",
+      "target": "(-0.161162, 51.512275)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.16106, 51.512274)",
+      "target": "(-0.161162, 51.512275)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.157253, 51.510056)",
+      "target": "(-0.157231, 51.51003)",
+      "programme": "cycleway",
+      "route": "C55"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.152543, 51.503914)",
+      "target": "(-0.152835, 51.503482)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.152835, 51.503482)",
+      "target": "(-0.158612, 51.50272)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.158612, 51.50272)",
+      "target": "(-0.170193, 51.5022)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.170193, 51.5022)",
+      "target": "(-0.174268, 51.502153)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.174268, 51.502153)",
+      "target": "(-0.17439, 51.502153)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.174572, 51.502171)",
+      "target": "(-0.17439, 51.502153)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.174388, 51.502108)",
+      "target": "(-0.17445, 51.502072)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.162458, 51.490159)",
+      "target": "(-0.16252, 51.490124)",
+      "programme": "quietway",
+      "route": "Q15"
+    },
+    {
+      "type": "add",
+      "source": "(-0.162237, 51.489994)",
+      "target": "(-0.1623, 51.490006)",
+      "programme": "quietway",
+      "route": "Q15"
+    },
+    {
+      "type": "add",
+      "source": "(-0.162478, 51.490094)",
+      "target": "(-0.162546, 51.490141)",
+      "programme": "quietway",
+      "route": "Q15"
+    },
+    {
+      "type": "add",
+      "source": "(-0.162546, 51.490141)",
+      "target": "(-0.162518, 51.490183)",
+      "programme": "quietway",
+      "route": "Q15"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.162458, 51.490159)",
+      "target": "(-0.16252, 51.490124)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.128728, 51.488356)",
+      "target": "(-0.129339, 51.488511)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.129339, 51.488511)",
+      "target": "(-0.129498, 51.48857)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.129685, 51.488851)",
+      "target": "(-0.130506, 51.489233)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.130706, 51.48933)",
+      "target": "(-0.130765, 51.48936)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "add",
+      "source": "(-0.123627, 51.486614)",
+      "target": "(-0.123732, 51.486638)",
+      "programme": "cycleway",
+      "route": "C"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.148813, 51.479448)",
+      "target": "(-0.148789, 51.479304)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.148789, 51.479304)",
+      "target": "(-0.148757, 51.479137)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.148671, 51.478653)",
+      "target": "(-0.148646, 51.478514)"
+    },
+    {
+      "type": "remove",
+      "source": "(-0.148646, 51.478514)",
+      "target": "(-0.148616, 51.478348)"
+    }
+  ]
+}
