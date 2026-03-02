@@ -11,7 +11,7 @@ The primary goal of the London Cycle Maps project is to deliver a routing applic
 
 ## Project Overview & Current Results
 
-We are building a production-grade cycle route planner that goes beyond simple distance calculation. Rather than relying purely on the shortest path, the routing engine successfully evaluates complex safety and comfort parameters. 
+I am building a production-grade cycle route planner that goes beyond simple distance calculation. Rather than relying purely on the shortest path, the routing engine successfully evaluates complex safety and comfort parameters. 
 
 Current major achievements include:
 * **Custom Graph Generation:** A multi-stage data pipeline successfully converts OpenStreetMap data, UK accident CSVs, and LIDAR elevation models into a consolidated, directed routing graph.
