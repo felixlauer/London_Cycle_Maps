@@ -350,7 +350,7 @@ function App() {
       routeGrey: '#ffffff', routeOptimized: '#40E0D0', litColor: '#FFFF00', steepColor: '#00FF00',
       tflCyclewayColor: '#2196F3', tflQuietwayColor: '#8BC34A', greenColor: '#009688', narrowColor: '#7B1FA2',
       nodeBarrier: '#5D4037', nodeSignal: '#F57C00', nodeJunction: '#795548', nodeCalming: '#00838F',
-      disruptionColor: '#FF6D00',
+      disruptionColor: '#FF0000',
       tileFilter: 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)'
   } : {
       mode: 'light',
@@ -359,7 +359,7 @@ function App() {
       routeGrey: '#555', routeOptimized: '#d32f2f', litColor: 'transparent', steepColor: '#00cc00',
       tflCyclewayColor: '#1976D2', tflQuietwayColor: '#388E3C', greenColor: '#00796B', narrowColor: '#7B1FA2',
       nodeBarrier: '#5D4037', nodeSignal: '#F57C00', nodeJunction: '#795548', nodeCalming: '#00838F',
-      disruptionColor: '#FF6D00',
+      disruptionColor: '#FFD700',
       tileFilter: 'none'
   };
 
@@ -617,14 +617,14 @@ function App() {
           <Toggle label="Traffic signals" isOn={useSignals} setIsOn={setUseSignals} activeColor="#F57C00" theme={theme} />
           <Toggle label="Barriers" isOn={useBarriers} setIsOn={setUseBarriers} activeColor="#5D4037" theme={theme} />
           <Toggle label="Junction danger" isOn={useJunctionDanger} setIsOn={setUseJunctionDanger} activeColor="#795548" theme={theme} />
-          <Toggle label="Live TfL Disruptions" isOn={useTflLive} setIsOn={setUseTflLive} activeColor="#FF6D00" theme={theme} />
+          <Toggle label="Live TfL Disruptions" isOn={useTflLive} setIsOn={setUseTflLive} activeColor={theme.disruptionColor} theme={theme} />
           {useTflLive && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", marginLeft: "12px" }}>
               <button type="button" onClick={handleRefreshTfl} style={{ padding: "4px 10px", fontSize: "11px", background: theme.toggleInactive, border: `1px solid ${theme.border}`, borderRadius: "4px", cursor: "pointer", color: theme.textMain }}>Refresh</button>
               <span style={{ fontSize: "10px", color: theme.textSub }}>{tflDisruptionStatus || "Not loaded"}</span>
             </div>
           )}
-          <Toggle label="Live TomTom Disruptions" isOn={useTomtomLive} setIsOn={setUseTomtomLive} activeColor="#D32F2F" theme={theme} />
+          <Toggle label="Live TomTom Disruptions" isOn={useTomtomLive} setIsOn={setUseTomtomLive} activeColor={theme.disruptionColor} theme={theme} />
           {useTomtomLive && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", marginLeft: "12px" }}>
               <button type="button" onClick={handleRefreshTomtom} style={{ padding: "4px 10px", fontSize: "11px", background: theme.toggleInactive, border: `1px solid ${theme.border}`, borderRadius: "4px", cursor: "pointer", color: theme.textMain }}>Refresh</button>

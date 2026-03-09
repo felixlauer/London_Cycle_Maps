@@ -33,6 +33,7 @@ The main app is the production cycling route planner for London. Users set start
 - **Port:** 5000
 - **Graph:** `1_data/london_elev_final_tfl.graphml` (directed, node id = (lon, lat), includes TfL and node point-features).
 - **No DB in main app:** Routing uses only the graph; no PostgreSQL in this process.
+- **Dynamic API data:** Live disruptions come from two sources—**TfL** (Road Disruptions) and **TomTom** (Traffic Incidents v5). Both are refreshed independently via `POST /admin/update_tfl` and `POST /admin/update_tomtom`; the backend merges them into a single lookup used for routing and the “Live TfL Disruptions” overlay (see Section 4.1).
 - **Cost functions:** See **Section 5** for full mathematical formulation, preset constants, and per-mode formulas.
 - **Optimized weight** is built per request via `make_weight_optimized(w)` (no global weights; safe for concurrent users). Formula: **Weight = (Length × M_total × R) + A_total + H**
 
@@ -63,7 +64,7 @@ The main app is the production cycling route planner for London. Users set start
 ### 3.3 Segment inspector
 
 - **Right-click** on map → request to `GET /inspect?lat=…&lon=…` → backend returns nearest edge’s tags + geometry.
-- **Inspector window** (offset from click so segment stays visible): core tags (name, surface, maxspeed, grade, length, elevation_start, elevation_end); when edge is affected by a live TfL disruption, also shows `tfl_live_category`, `tfl_live_severity`, `tfl_live_description`; “Show All Tags” expands to full edge attributes.
+- **Inspector window** (offset from click so segment stays visible): core tags (name, surface, maxspeed, grade, length, elevation_start, elevation_end); when edge is affected by a live disruption (TfL or TomTom), also shows `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` (and for TomTom: `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay`); “Show All Tags” expands to full edge attributes.
 - **Red polyline** overlay on the inspected segment; left-click elsewhere or close button dismisses.
 
 ### 3.4 Daylight and theme
@@ -78,14 +79,26 @@ The main app is the production cycling route planner for London. Users set start
 | Method | Endpoint | Query params | Response |
 |--------|----------|--------------|----------|
 | GET | `/route` | `start_lat`, `start_lon`, `end_lat`, `end_lon`, plus weight params below | `{ status, fastest: { path, stats }, safest: { path, stats, lit_chunks, steep_chunks, tfl_cycleway_chunks, tfl_quietway_chunks, green_chunks, narrow_chunks, disruption_chunks, node_highlights } }` |
-| POST | `/admin/update_tfl` | (none) | `{ ok, message, count }` — fetch TfL, rebuild master lookup |
-| POST | `/admin/update_tomtom` | (none) | `{ ok, message, count }` — fetch TomTom, rebuild master lookup |
+| POST | `/admin/update_tfl` | (none) | `{ ok, message, count }` — fetch TfL Road Disruptions, rebuild master lookup |
+| POST | `/admin/update_tomtom` | (none) | `{ ok, message, count }` — fetch TomTom Traffic Incidents, rebuild master lookup |
+| GET | `/admin/tfl_status` | — | `{ loaded, edge_count, disruption_count, last_update, error }` — TfL live data status |
+| GET | `/admin/tomtom_status` | — | `{ loaded, edge_count, last_update, error }` — TomTom live data status |
 | GET | `/inspect` | `lat`, `lon` | `{ tags, geometry }` or `{ error }` |
+
+### 4.1 Dynamic API data (live disruptions)
+
+Live disruption data is **not** in the graph file; it is fetched at runtime from two external APIs and matched to graph edges (see `0_documentation/GRAPH.md` §9).
+
+- **TfL:** Transport for London Road Disruptions API. Refreshed via `POST /admin/update_tfl`. Optional `.env`: **`TFL_APP_KEY`** (recommended for rate limits).
+- **TomTom:** TomTom Traffic Incident API v5 (cluster types: closure, roadworks, jam, environmental). Refreshed via `POST /admin/update_tomtom`. Required `.env`: **`TOMTOM_API_KEY`**.
+- **Merge:** The backend keeps source-specific state and a merged **MASTER_LIVE_LOOKUP** (worst-case per edge when both sources affect it). Routing uses this merged lookup for the “Live TfL Disruptions” toggle (`tfl_live_weight`); overlay and stats use the same data.
+- **Status:** `GET /admin/tfl_status` and `GET /admin/tomtom_status` return whether each source is loaded, edge count, last update time, and any error.
+- **Inspector:** When an inspected edge is affected by a live disruption, the response includes `tfl_live_category`, `tfl_live_severity`, `tfl_live_description`; for TomTom-sourced (or merged) records, also `tfl_live_iconCategory` and `tfl_live_magnitudeOfDelay`.
 
 **Route weight params** (each 0.0–1.0, typically 0 or 1): `risk_weight`, `light_weight`, `surface_weight`, `hill_weight`, `tfl_cycleway_weight`, `tfl_quietway_weight`, `speed_weight`, `width_weight`, `green_weight`, `barrier_weight`, `calming_weight`, `junction_weight`, `signal_weight`, `tfl_live_weight`. **Optional:** `calming_source` = `way` \| `point` \| `both` (default `way`) — which calming data to use for the calming additive and highlights (way = OSM way tag only; point = snapped OSM nodes only; both = max of the two).
 
 - **Stats** (per route): `length_m`, `accidents`, `duration_min`, `illumination_pct`, `rough_pct`, `elevation_gain`, `steep_count`, `tfl_cycleway_pct`, `tfl_quietway_pct`, `speed_stress_km`, **`speed_stress_pct`**, `narrow_km`, `green_km`, `barrier_count`, `give_way_count`, `stop_sign_count` (edge-based), `calming_count` (according to `calming_source`), `signal_count`, `junction_count`, `disruption_count`.
-- **Paths / geometry:** arrays of `[lat, lon]` (WGS84). Chunk arrays are lists of segment geometries for the optimized route only. **node_highlights** is a list of `{ lat, lon, type, details }` where `type` is `barrier`, `signal`, `junction`, `junction_danger`, or `calming` and `details` holds e.g. `{ barrier: "gate" }`, `{ traffic_calming: "hump", source: "way" }` or `"point"`, `{ degree: 5 }`. Calming highlights use the chosen `calming_source`; point-based calming uses stored `traffic_calming_point_lat/lon`. **Inspector tags:** when edge is affected by live disruption (TfL or TomTom), includes `tfl_live_category`, `tfl_live_severity`, `tfl_live_description`; for TomTom also `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay`. **Live disruptions** combine TfL and TomTom via `live_disruptions`; routing uses `MASTER_LIVE_LOOKUP` (O(1)). **.env:** `TFL_APP_KEY`, `TOMTOM_API_KEY`.
+- **Paths / geometry:** arrays of `[lat, lon]` (WGS84). Chunk arrays are lists of segment geometries for the optimized route only. **node_highlights** is a list of `{ lat, lon, type, details }` where `type` is `barrier`, `signal`, `junction`, `junction_danger`, or `calming` and `details` holds e.g. `{ barrier: "gate" }`, `{ traffic_calming: "hump", source: "way" }` or `"point"`, `{ degree: 5 }`. Calming highlights use the chosen `calming_source`; point-based calming uses stored `traffic_calming_point_lat/lon`. **Inspector:** when an edge is affected by a live disruption, tags include `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` (and for TomTom: `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay`). Routing uses the merged live lookup (Section 4.1) for the “Live TfL Disruptions” weight.
 
 ---
 

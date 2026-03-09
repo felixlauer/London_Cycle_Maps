@@ -6,7 +6,7 @@ Documentation for the **data-debugging / visualization app**: frontend (`8_debug
 
 ## 1. Purpose
 
-The debug app is for inspecting and validating graph data (elevation, surfaces, lighting, accidents, intersections, cycleway infra, HGV bans, traffic calming, junctions, live TfL and TomTom disruptions). It does **not** do routing. It provides overlay “modes” (uphill, accidents, surfaces, unlit, cycleway, HGV banned, traffic calming points, junction points) and a segment inspector, all backed by the same graph as the main app (`london_elev_final.graphml`) plus live accident points from PostgreSQL.
+The debug app is for inspecting and validating graph data (elevation, surfaces, lighting, accidents, intersections, cycleway infra, HGV bans, traffic calming, junctions, live TfL and TomTom disruptions). It does **not** do routing. It provides overlay “modes” (uphill, accidents, surfaces, unlit, cycleway, HGV banned, traffic calming points, junction points) and a segment inspector, all backed by the same graph as the main app (`london_elev_final_tfl.graphml`) plus live accident points from PostgreSQL.
 
 ---
 
@@ -18,11 +18,11 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 |-------|------|----------|
 | Frontend | React 19, Leaflet, react-leaflet | `8_debug/5_frontend/src/` |
 | Backend | Flask, NetworkX, Shapely, SQLAlchemy | `4_backend_engine/app_debug.py` |
-| Data | GraphML + PostgreSQL (accidents) | `1_data/london_elev_final.graphml`, DB `accidents` |
+| Data | GraphML + PostgreSQL (accidents) | `1_data/london_elev_final_tfl.graphml`, DB `accidents` |
 
 ### 2.2 Data flow
 
-1. **Graph:** Loaded once at startup; pre-processed into in-memory caches (steep segments, bad-surface segments, unlit segments) for fast viewport queries. The `tfl_live` module is initialized at startup (builds STRtree edge spatial index). Live disruption data is populated via `POST /admin/update_tfl` and stored in an in-memory lookup table (not as a graph cache).
+1. **Graph:** Loaded once at startup; pre-processed into in-memory caches (steep segments, bad-surface segments, unlit segments) for fast viewport queries. The `tfl_live` module is initialized at startup (builds STRtree edge spatial index). **Live disruption data (TfL and TomTom)** is populated via `POST /admin/update_tfl` and `POST /admin/update_tomtom` (each source refreshed independently); stored in a merged in-memory lookup and source-specific caches for overlays (not as a graph cache). See `0_documentation/GRAPH.md` §9.
 2. **Overlays:** User toggles modes. Segment-based (Uphill, Surfaces, Unlit, Cycleway, HGV banned): frontend sends map bounds; backend returns segments with 20k limit when needed; Surfaces and Unlit have **subtoggles** for “no data” / “unknown” and show a 20k-limit message when truncated. Point-based: **Edge tags** — Traffic calming, Junction type (edge): points from edge midpoints, color-coded by type; left-click shows type. **Node tags** — Barriers (color-coded: cycling-relevant types, others grey), Traffic signals, Mini roundabouts, Crossing, Give way, Stop: each has its own toggle and endpoint; left-click shows type/label. Accidents: loaded once from `/accidents`; left-click shows nothing.
 3. **Inspector:** Right-click → `GET /inspect` → popup + red segment overlay. Disabled when **Modify TfL** mode is on.
 4. **Modify suite (bottom-left):** One mode, **Modify TfL cycle routes**. When active, the Debug panel collapses and is deactivated. Same TfL overlay (color-coded). Left click = add segment to TfL (tag), right click = remove tag. Programme (cycleway / quietway / superhighway) selected via buttons; route shortcode from closest TfL segment. Added segments drawn in yellow, removed in black. Edits saved to `3_pipeline/tfl_manual_edits.json`; apply with `3_pipeline/apply_tfl_manual_edits.py`.
@@ -31,7 +31,7 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 ### 2.3 Backend (app_debug.py)
 
 - **Port:** 5001 (so it can run alongside main app on 5000).
-- **Graph:** Same file as main app: `1_data/london_elev_final.graphml`.
+- **Graph:** Same file as main app: `1_data/london_elev_final_tfl.graphml`.
 - **Caches (built at startup):**
   - **STEEP_CACHE** — edges with grade ≥ 3.3% (for uphill heatmap).
   - **SURFACE_CACHE** — segments with surface/quality issues or no surface data (see Surfaces below). When returning surfaces, **no_data** segments are limited to 20k per request (by distance from bbox centre); response includes `limit_reached` when truncated.
@@ -43,7 +43,7 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
   - **TRAFFIC_CALMING_POINT_POINTS** — point-based: list of `{lat, lon, type, source: 'point'}` from edges with `traffic_calming_point` and stored lat/lon.
   - **JUNCTION_POINTS** — list of `{lat, lon, type}` from edge midpoints where `junction` is set (roundabout, circular, etc.).
   - **Node point caches** (from graph nodes / edges): **BARRIER_POINTS** `{lat, lon, type, details}` where `details` includes `barrier` and optionally `barrier_confidence`; **TRAFFIC_SIGNALS_POINTS**, **MINI_ROUNDABOUT_POINTS**, **CROSSING_POINTS**, **GIVE_WAY_POINTS**, **STOP_POINTS** (each `{lat, lon}`).
-- **TfL Live Disruptions** — not a graph cache; uses shared `tfl_live` module with in-memory lookup table populated via `POST /admin/update_tfl`. STRtree spatial index built from all 350k edge geometries at startup.
+- **Live disruptions (TfL and TomTom)** — not a graph cache; uses shared `tfl_live`, `tomtom_live`, and `live_disruptions` modules. STRtree built at startup from graph edge geometries; data populated via `POST /admin/update_tfl` and `POST /admin/update_tomtom` (independent refresh per source). Merged lookup used for routing in main app; debug app exposes separate TfL and TomTom overlay toggles and status endpoints.
 - **Segment/point limits:** Surfaces, Unlit, cycleway layers, HGV banned, and all point endpoints apply a **20k limit** (prioritised by distance from viewport centre) when the result set exceeds 20k.
 - **PostgreSQL:** Used only for `GET /accidents` (all accident points).
 - **Inspector:** Same logic as main app: nearest node → nearest edge → tags + geometry; response includes `source` and `target` (node ids). No routing.
@@ -52,7 +52,7 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 ### 2.4 Frontend (8_debug/5_frontend)
 
 - Separate React app (copy of CRA structure); main UI in `App.js`.
-- Collapsible **Debug panel** (top-right): toggles for Uphill, Accidents, Surfaces, Unlit, Cycleway, HGV banned, TfL cycle routes, TfL Live Disruptions, Traffic calming, Junction type, **Node tags** (Barriers, Traffic signals, etc.). Left-click on point overlays shows type; right-click opens segment inspector. When **Modify TfL** is on, the Debug panel is forced collapsed and inspector is disabled.
+- Collapsible **Debug panel** (top-right): toggles for Uphill, Accidents, Surfaces, Unlit, Cycleway, HGV banned, TfL cycle routes, **TfL Live Disruptions**, **TomTom Live Disruptions**, Traffic calming, Junction type, **Node tags** (Barriers, Traffic signals, etc.). Left-click on point overlays shows type; right-click opens segment inspector. When **Modify TfL** is on, the Debug panel is forced collapsed and inspector is disabled.
 - **Modify suite** (bottom-left): collapsible panel; one mode **Modify TfL cycle routes**. When on: TfL overlay is shown; left click = add segment (yellow), right click = remove (black). **Undo:** back arrow button or **Ctrl+Z** / Cmd+Z; removes last operation from the map and from the edits file. Programme chosen via Cycleway / Quietway / Superhighway buttons; route from closest TfL segment. Edits saved to file automatically.
 - No start/end markers, no route polylines — only overlay polylines, point markers, inspector, and modify overlays.
 
@@ -135,7 +135,15 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 - **Legend:** Closure, Incident, Works, Diversion, Other.
 - **Submode — Show TfL ground truth:** When on, displays the **exact geometries from the TfL API** (points, lines, polygons) as overlay: purple circle markers for point locations, dashed purple polylines for line geometries, semi-transparent purple polygons for polygon geometries. Data from `GET /debug/tfl_disruptions_raw` (bbox-filtered). Use to compare matched graph edges with the raw TfL data.
 - **Left-click on disruption:** When TfL Live Disruptions is on, **left-click** on a disruption (either the matched segments overlay, or the ground-truth point/line/polygon, with a slightly larger hit margin) opens a **TfL disruption detail window** (inspector-style) showing **all data TfL parses** for that disruption (id, status, category, severity, location, comments, point, geography, geometry, roadDisruptionLines, etc.). Hit-test uses `GET /debug/tfl_disruption_at` (tolerance ~25 m). Closing the window or right-clicking (inspector) clears it.
-- **Inspector enrichment:** When right-clicking an affected edge, the inspector shows `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` in a "Live disruptions" group.
+- **Inspector enrichment:** When right-clicking an affected edge, the inspector shows `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` in a "Live disruptions" group; for TomTom-sourced (or merged) edges, also `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay`.
+
+### 3.12 TomTom Live Disruptions
+
+- **Toggle:** "TomTom Live Disruptions". **Refresh button** fetches latest data from TomTom Traffic Incident API v5 via `POST /admin/update_tomtom`; status text shows count and last update time (from `GET /admin/tomtom_status`).
+- **Backend:** `GET /debug/tomtom_disruptions?min_lat=&max_lat=&min_lon=&max_lon=` returns segments from the TomTom visualization list (matched to graph edges via the same STRtree as TfL); 20k limit. Segments include `source: "tomtom"`, `iconCategory`, `magnitudeOfDelay`, `description`.
+- **Display:** Polylines color-coded by TomTom cluster: Red = closure (A), Orange = roadworks (B), Yellow = jam (C), Blue/dashed = environmental (D), Grey = other.
+- **Left-click on disruption:** When TomTom Live Disruptions is on, **left-click** on a TomTom segment opens a **TomTom disruption detail window** with the full incident payload. Hit-test uses `GET /debug/tomtom_disruption_at` (lat, lon, optional tolerance).
+- **Inspector enrichment:** Same as TfL (Section 3.10): when an edge is affected by TomTom (or merged) data, inspector shows the same "Live disruptions" group including `tfl_live_iconCategory` and `tfl_live_magnitudeOfDelay` where present.
 
 ---
 
@@ -157,15 +165,16 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 | GET | `/debug/give_way_points` | same | Array of `{ lat, lon }` (20k limit) |
 | GET | `/debug/stop_points` | same | Array of `{ lat, lon }` (20k limit) |
 | GET | `/accidents` | — | Array of `[lat, lon]` (all accidents) |
-| GET | `/inspect` | `lat`, `lon` | `{ tags, geometry, source, target }` or `{ error }`; includes `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` when edge is affected |
-| POST | `/admin/update_tfl` | — | `{ ok, message, count }` |
-| POST | `/admin/update_tomtom` | — | `{ ok, message, count }` |
+| GET | `/inspect` | `lat`, `lon` | `{ tags, geometry, source, target }` or `{ error }`; when edge has live disruption: `tfl_live_category`, `tfl_live_severity`, `tfl_live_description`; for TomTom also `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay` |
+| POST | `/admin/update_tfl` | — | `{ ok, message, count }` — fetch TfL Road Disruptions, rebuild master lookup |
+| POST | `/admin/update_tomtom` | — | `{ ok, message, count }` — fetch TomTom Traffic Incidents, rebuild master lookup |
 | GET | `/admin/tfl_status` | — | `{ loaded, edge_count, disruption_count, last_update, error }` (TfL only) |
 | GET | `/admin/tomtom_status` | — | `{ loaded, edge_count, last_update, error }` (TomTom only) |
 | GET | `/debug/tfl_disruptions` | min_lat, max_lat, min_lon, max_lon | `{ segments: [{ id, p, type, severity, category, description }], limit_reached }` |
 | GET | `/debug/tomtom_disruptions` | min_lat, max_lat, min_lon, max_lon | `{ segments: [{ id, p, type, source: "tomtom", iconCategory, magnitudeOfDelay, description }], limit_reached }` |
 | GET | `/debug/tfl_disruptions_raw` | min_lat, max_lat, min_lon, max_lon | `{ points: [{ type, coordinates: [lat,lon], ... }], lines: [{ type, coordinates: [[lat,lon],...], ... }], polygons: [...], limit_reached }` — TfL ground-truth geometries |
 | GET | `/debug/tfl_disruption_at` | lat, lon, optional tolerance | `{ disruptions: [ ...full TfL API objects... ] }` — disruptions at click (raw geometry + matched segments hit-test) |
+| GET | `/debug/tomtom_disruption_at` | lat, lon, optional tolerance | `{ disruptions: [ ...TomTom incident objects... ] }` — TomTom disruptions at click |
 | GET | `/modify/tfl_edits` | — | `{ added: [{ source, target, programme, route, geometry }], removed: [{ source, target, geometry }] }` |
 | POST | `/modify/tfl_add` | JSON: `lat`, `lon`, `programme` | `{ source, target, programme, route, geometry }` or `{ error }`; appends to file |
 | POST | `/modify/tfl_remove` | JSON: `lat`, `lon` | `{ source, target, geometry }` or `{ error }`; appends to file |
@@ -199,5 +208,6 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 - **New endpoint or cache:** Update Section 4 and Section 2.3.
 - **Change of port or graph path:** Update Section 2.
 - **Change of BAD_SURFACES / BAD_SMOOTHNESS / LIT_VALUES or overlay logic:** Update Section 3 and Section 5.
+- **Change of live disruption APIs (TfL / TomTom):** Update Section 3.11–3.12 and Section 4; sync with `0_documentation/GRAPH.md` §9 and `APP_MAIN.md` §4.1.
 
 A reminder to update this file is in the top comment of `8_debug/5_frontend/src/App.js` and at the top of `4_backend_engine/app_debug.py`.

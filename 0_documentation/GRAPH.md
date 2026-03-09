@@ -424,18 +424,53 @@ So the pipeline ran correctly and the resulting graph is suitable for routing an
 
 ## 8. Routing use
 
-- **File used:** `1_data/london_elev_final.graphml`.
+- **File used:** `1_data/london_elev_final_tfl.graphml` (elevation + TfL cycle routes; see pipeline step 7).
 - **Graph type:** `networkx.DiGraph`; node id = `(lon, lat)` tuple.
 - **Cost function:** Currently uses edge attributes only (e.g. `length`, `risk`, `lit`, `surface`, `grade`). Node attributes (e.g. `traffic_signals`, `barrier`) are **not** used in routing yet; they are available for future cost/penalty logic.
 
 ---
 
-## 9. Keeping this document up to date
+## 9. Dynamic API data (live disruptions)
+
+Live road disruption data (**TfL** and **TomTom**) is **not** stored in the graph file. It is fetched at runtime by the backend and matched to the same graph edges. This section explains why it is handled outside the graph pipeline and how the API system works.
+
+### 9.1 Why it is outsourced from the graph pipeline
+
+- The graph pipeline (steps 1–7) produces a **static** snapshot: OSM roads, elevation, and TfL cycle route tags. The output file (`london_elev_final_tfl.graphml`) is written once and reused.
+- Live disruptions (road closures, works, incidents, diversions) change constantly and come from **external APIs**. They do not belong in a static GraphML build; they belong in the **runtime** layer that already loads that graph for routing.
+- So disruption data is **logistically outsourced**: the same graph is loaded by the backend; a spatial index over edge geometries is built once at startup; APIs are called on demand (e.g. via `POST /admin/update_tfl` and `POST /admin/update_tomtom`); matches are stored in in-memory lookups. Routing and overlays then use this dynamic data alongside the static graph. Conceptually, “what affects routing” still includes these disruptions—they are just supplied by a separate system that consumes the graph rather than being part of the graph file.
+
+### 9.2 How the API system works
+
+**Two API modes:**
+
+1. **TfL (Transport for London)** — `4_backend_engine/tfl_live.py`
+   - **Endpoint:** `https://api.tfl.gov.uk/Road/all/Disruption` (optional `TFL_APP_KEY` in `.env` for rate limits).
+   - **Data:** Closures, diversions, works, incidents; each disruption can have point, line (MultiLineString WKT), or polygon geometry.
+   - **Matching:** At startup, `tfl_live.init(G)` builds an STRtree from all graph edge geometries. When disruptions are fetched, each disruption geometry is matched to edges: for an edge to be tagged, a sufficient fraction of its length (e.g. ≥50% alignment threshold) must lie inside the disruption zone; for short edges, angularity (roughly parallel to disruption line) is also used. Matched edges are stored in `TFL_LIVE_LOOKUP` and a visualization cache.
+   - **Penalties:** Used by the cost function when “Live TfL Disruptions” is on: closures block the edge; diversions/works/incidents add multipliers; severity (minimal → severe) scales the penalty.
+
+2. **TomTom** — `4_backend_engine/tomtom_live.py`
+   - **Endpoint:** TomTom Traffic Incident API v5 (incidentDetails); requires `TOMTOM_API_KEY` in `.env`.
+   - **Data:** Incidents with cluster types (e.g. A = closure, B = roadworks, C = jam, D = environmental). Geometry from API is matched to the graph using the **same** STRtree built by `tfl_live.init(G)` (TomTom has no separate init; it reuses the graph and index).
+   - **Matching:** Incident geometry is passed to `tfl_live.match_geometry_to_edges`; matched edges are stored in `TOMTOM_EDGES` and a visualization list. Optional fields such as `iconCategory` and `magnitudeOfDelay` are kept for the inspector and debug overlays.
+
+**Unified layer** — `4_backend_engine/live_disruptions.py`:
+- **Initialization:** `live_disruptions.init(G)` calls `tfl_live.init(G)` once; no separate TomTom init.
+- **Updates:** `POST /admin/update_tfl` fetches TfL and updates TfL state; `POST /admin/update_tomtom` fetches TomTom and updates TomTom state. Updating one source **never** clears the other (safe update pattern).
+- **Merge:** After any update, `_rebuild_master_lookup()` merges TfL and TomTom into **`MASTER_LIVE_LOOKUP`**: for each edge key `(u, v)`, if both sources have a disruption, the merged record takes the worst-case penalty (e.g. max severity multiplier, closure if either has closure). Routing uses **O(1)** lookup via `get_edge_disruption(u, v)`.
+
+**Summary:** The graph file stays static. The backend loads it, builds one STRtree over edges, and uses it for both TfL and TomTom. Each API mode is refreshed independently; the merged lookup drives routing and combined overlays; inspector and debug app can show source-specific fields (e.g. TomTom `iconCategory`, `magnitudeOfDelay`). Environment variables: **`TFL_APP_KEY`** (optional), **`TOMTOM_API_KEY`** (required for TomTom).
+
+---
+
+## 10. Keeping this document up to date
 
 - **Adding/removing tags in `build_graph.py`:** Update Section 3 (edge attributes) and/or Section 4 (node attributes). If the SQL or snap logic changes, update Section 2.
 - **Changing direction or exclusion rules:** Update Section 5.
 - **Adding a new pipeline script or changing order:** Update Section 1 and any affected sections.
-- **Changing elevation behaviour or outputs:** Update Section 6.
+- **Changing elevation behaviour or outputs:** Update Section 7.
 - **Using new attributes in the backend:** Update Section 8; consider adding or updating a task in `0_documentation/TASKS.md`.
+- **Changing live disruption APIs or merge logic:** Update Section 9; sync with `0_documentation/APP_MAIN.md` and `APP_DEBUG.md`.
 
 A reminder to update this file is at the top of `3_pipeline/build_graph.py`.
