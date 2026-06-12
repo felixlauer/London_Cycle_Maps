@@ -42,11 +42,12 @@ The core of the system is the data generation pipeline that builds the underlyin
 
 1. **Network Ingestion:** OpenStreetMap shapefiles are loaded into a PostgreSQL database.
 2. **Accident Integration:** Cyclist collision records are imported and matched to road segments.
-3. **Graph Construction:** A directed graph is built using NetworkX, banning motorways while respecting one-way streets and cycling contraflows.
-4. **Island Cleanup:** Disconnected nodes and isolated road clusters are purged, leaving only the largest weakly connected component.
-5. **Intersection Snapping:** Point features like traffic signals, crossings, and barriers are snapped to the nearest graph node or edge using KD-trees and STRtrees.
-6. **Elevation Processing:** LIDAR raster data is sampled to attach elevation values to nodes and calculate physical grades for edges.
-7. **TfL Tagging:** Geographic JSON data for Cycleways is algorithmically mapped onto the graph edges.
+3. **Intersection Noding:** Highway lines are split at junctions in PostGIS/pgRouting (`noded_network.py`) so the graph connects at T-junctions while preserving OSM tags.
+4. **Graph Construction:** A directed graph is built using NetworkX, banning motorways while respecting one-way streets and cycling contraflows.
+5. **Island Cleanup:** Disconnected nodes and isolated road clusters are purged, leaving only the largest weakly connected component.
+6. **Intersection Snapping:** Point features like traffic signals, crossings, and barriers are snapped to the nearest graph node or edge using KD-trees and STRtrees.
+7. **Elevation Processing:** LIDAR raster data is sampled to attach elevation values to nodes and calculate physical grades for edges.
+8. **TfL Tagging:** Geographic JSON data for Cycleways is algorithmically mapped onto the graph edges.
 
 ---
 

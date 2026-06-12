@@ -1,50 +1,96 @@
 """
-Main routing backend: /route and /inspect. Uses 1_data/london_elev_final_tfl.graphml.
+Main routing backend: /route and /inspect. Uses 1_data/london_elev_final_tfl.gpickle (fast) or .graphml fallback.
 When changing API or cost logic, update 0_documentation/APP_MAIN.md (and TASKS.md if needed).
 """
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import math
 import networkx as nx
+import numpy as np
+from scipy.spatial import cKDTree
 from shapely.wkt import loads as load_wkt
-from shapely.geometry import Point, LineString
 import os
+import sys
+import time
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "3_pipeline"))
+from graph_io import load_graph, fast_path
+
 import tfl_live
 import tomtom_live
 import live_disruptions
+from routing_heuristic import (
+    TFL_CYCLEWAY_REWARD,
+    TFL_QUIETWAY_REWARD,
+    GREEN_REWARD,
+    compute_optimized_cost_per_metre_lower_bound,
+    make_heuristic,
+)
+from barrier_clusters import (
+    BARRIER_HARD_COST,
+    barrier_additive_penalty,
+    barrier_is_hard_block,
+    barrier_cluster_meta,
+)
 
 # --- CONFIGURATION ---
 # UPDATED: Pointing to the final, clean, dual-pass processed graph
 GRAPH_PATH = os.path.join("..", "1_data", "london_elev_final_tfl.graphml")
 
+USE_RELOADER = os.environ.get("FLASK_USE_RELOADER", "").lower() in ("1", "true", "yes")
+
 app = Flask(__name__)
 CORS(app)
 
-print("--- STARTING STANDARD ROUTING ENGINE ---")
-if not os.path.exists(GRAPH_PATH):
-    print(f"CRITICAL ERROR: {GRAPH_PATH} not found.")
-    exit()
-
-print(f"Loading graph from {GRAPH_PATH}...")
-G = nx.read_graphml(GRAPH_PATH)
-
-# Build Node Index
+G = None
 node_data = []
-for node, data in G.nodes(data=True):
-    if 'x' in data and 'y' in data:
-        node_data.append({'id': node, 'x': float(data['x']), 'y': float(data['y'])})
-print(f"Graph Loaded with {len(G.nodes())} nodes.")
+NODE_KDTREE = None
+NODE_IDS = []
 
-live_disruptions.init(G)
+
+def _should_run_bootstrap():
+    if not USE_RELOADER:
+        return True
+    return os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+
+
+def bootstrap_routing_engine():
+    global G, node_data, NODE_KDTREE, NODE_IDS
+    t_boot = time.perf_counter()
+    print("--- STARTING STANDARD ROUTING ENGINE ---")
+    if not os.path.exists(GRAPH_PATH) and not os.path.exists(fast_path(GRAPH_PATH)):
+        print(f"CRITICAL ERROR: {GRAPH_PATH} (or .gpickle) not found.")
+        exit()
+
+    print(f"Loading graph (fast pickle preferred): {GRAPH_PATH}...")
+    t0 = time.perf_counter()
+    G = load_graph(GRAPH_PATH)
+    node_data = []
+    for node, data in G.nodes(data=True):
+        if 'x' in data and 'y' in data:
+            node_data.append({'id': node, 'x': float(data['x']), 'y': float(data['y'])})
+    print(f"Graph loaded with {len(G.nodes())} nodes ({time.perf_counter() - t0:.1f}s).")
+
+    t0 = time.perf_counter()
+    coords = np.array([[n['x'], n['y']] for n in node_data], dtype=np.float64)
+    NODE_IDS = [n['id'] for n in node_data]
+    NODE_KDTREE = cKDTree(coords)
+    print(f"--> Node KD-tree: {len(NODE_IDS)} nodes ({time.perf_counter() - t0:.1f}s)")
+
+    t0 = time.perf_counter()
+    live_disruptions.init(G)
+    print(f"--> Live disruption index: {time.perf_counter() - t0:.1f}s")
+    print(f"--- Bootstrap complete in {time.perf_counter() - t_boot:.1f}s ---")
+
+
+if _should_run_bootstrap():
+    bootstrap_routing_engine()
 
 def get_nearest_node(lat, lon):
-    best_node = None
-    min_dist = float('inf')
-    for node in node_data:
-        dist = (node['y'] - lat)**2 + (node['x'] - lon)**2
-        if dist < min_dist:
-            min_dist = dist
-            best_node = node['id']
-    return best_node
+    if NODE_KDTREE is None or not NODE_IDS:
+        return None
+    _, idx = NODE_KDTREE.query([lon, lat])
+    return NODE_IDS[int(idx)]
 
 # Weights are passed per-request (no globals) for multi-user safety; see make_weight_optimized().
 
@@ -64,6 +110,12 @@ SPEED_DIFF_LOW_KMH = 30
 M_MIN = 0.1   # Ensure edge weight never zero/negative for A*
 R_MIN = 0.1   # Reward multiplier minimum (rewards implemented as R < 1, not negative penalty)
 
+# Highway-type length multipliers (cost ∝ length × M_highway × …)
+PEDESTRIAN_HIGHWAY_M = 4.0
+STEPS_HIGHWAY_M = 10.0
+PEDESTRIAN_HIGHWAY_TYPES = frozenset(['footway', 'pedestrian', 'path'])
+CYCLEWAY_TAG_KEYS = ('cycleway', 'cycleway_left', 'cycleway_right', 'cycleway_both')
+
 # --- CONSTANTS ---
 UP_THRESH = 0.033
 DOWN_THRESH = -0.033
@@ -80,6 +132,23 @@ JUNCTION_DANGER_MIN_CAR_ROADS = 4
 def is_lit(d):
     val = str(d.get('lit', '')).lower()
     return val in ['yes', 'true', '24/7', 'on', 'designated']
+
+
+def _has_dedicated_cycle_infrastructure(d):
+    if str(d.get('type', '')).strip().lower() == 'cycleway':
+        return True
+    return any(str(d.get(k, '')).strip() for k in CYCLEWAY_TAG_KEYS)
+
+
+def _highway_type_multiplier(d):
+    """Length multiplier for pedestrian ways without dedicated cycle infrastructure."""
+    highway = str(d.get('type', '')).strip().lower()
+    if highway == 'steps':
+        return STEPS_HIGHWAY_M
+    if highway in PEDESTRIAN_HIGHWAY_TYPES and not _has_dedicated_cycle_infrastructure(d):
+        return PEDESTRIAN_HIGHWAY_M
+    return 1.0
+
 
 # --- NODE/EDGE HELPERS (for cost factors) ---
 def _parse_maxspeed_kmh(d):
@@ -132,15 +201,17 @@ def _is_tfl_cycleway_or_superhighway(d):
 def _is_tfl_quietway(d):
     return 'quietway' in _tfl_programmes(d)
 
-def _is_green_edge(d):
-    """Park-like: path types + natural surface or unlit."""
-    highway = str(d.get('type', '')).lower()
-    if highway not in ('footway', 'cycleway', 'path', 'bridleway'):
-        return False
-    surface = str(d.get('surface', '')).lower()
-    natural = surface in ('grass', 'ground', 'earth', 'gravel', 'dirt', 'mud', 'woodchips', '')
-    unlit = str(d.get('lit', '')).lower() in ('no', 'false', '')
-    return natural or unlit
+def _is_yes_attr(val):
+    return str(val or '').strip().lower() in ('yes', 'true', '1')
+
+
+def _has_attraction_edge(d):
+    """Green/scenic: OSM parks, manual park/river/sight regions (graph edge flags)."""
+    return (
+        _is_yes_attr(d.get('is_park'))
+        or _is_yes_attr(d.get('is_river'))
+        or _is_yes_attr(d.get('is_sight'))
+    )
 
 # Only zebra/uncontrolled crossings get the junction penalty (cycling on main road: unmarked is not a risk, signals are separate mode)
 CROSSING_PENALTY_VALUES = frozenset(['zebra', 'uncontrolled'])
@@ -156,26 +227,18 @@ def _node_intersection_penalty(node_data):
         return INTERSECTION_PENALTY_METRES
     return 0.0
 
+
+def _node_mini_roundabout_penalty(node_data):
+    """Unsignalised mini-roundabout — same scale as zebra/give_way, separate from crossing penalty."""
+    if str(node_data.get('traffic_signals', '')).lower() == 'yes':
+        return 0.0
+    if str(node_data.get('mini_roundabout', '')).strip().lower() in ('yes', 'true', '1'):
+        return INTERSECTION_PENALTY_METRES
+    return 0.0
+
 def _edge_barrier_penalty(edge_data):
-    """Barrier on edge: passable=low, disruptive=medium, dismount=high. Scaled by barrier_confidence (0-1)."""
-    if not edge_data:
-        return 0.0
-    b = str(edge_data.get('barrier', '')).strip().lower()
-    if not b:
-        return 0.0
-    if b in ('bollard', 'cycle_barrier'):
-        base = 3.0
-    elif b in ('gate', 'lift_gate', 'swing_gate', 'chicane', 'kerb', 'planter', 'block'):
-        base = 12.0
-    elif b in ('stile', 'steps', 'kissing_gate', 'turnstile', 'height_restrictor'):
-        base = 35.0
-    else:
-        base = 8.0
-    try:
-        conf = float(edge_data.get('barrier_confidence', 1.0))
-    except (TypeError, ValueError):
-        conf = 1.0
-    return base * max(0.0, min(1.0, conf))
+    """Additive barrier cost (cluster groups 2–4). See barrier_clusters.py."""
+    return barrier_additive_penalty(edge_data)
 
 
 def _edge_give_way_penalty(edge_data):
@@ -249,6 +312,97 @@ def _junction_danger_penalty(node_id):
         return 0.0
     return 8.0
 
+
+# One junction charge per ~35 m cluster (startup grid union-find on penalty nodes only).
+JUNCTION_CLUSTER_RADIUS_M = 35.0
+JUNCTION_CLUSTER_CELL_DEG = 0.00032
+
+
+def _haversine_m(lon1, lat1, lon2, lat2):
+    r = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(min(1.0, math.sqrt(a)))
+
+
+def _junction_cluster_score(node_id):
+    """Higher = preferred representative for junction_weight penalties in a cluster."""
+    if node_id not in G.nodes:
+        return -1
+    nd = G.nodes[node_id]
+    if str(nd.get('traffic_signals', '')).lower() == 'yes':
+        return -1
+    score = 0
+    if _node_intersection_penalty(nd) > 0:
+        score += 100
+    car = _count_car_physical_roads_at_node(node_id)
+    if car >= JUNCTION_DANGER_MIN_CAR_ROADS:
+        score += car
+    if str(nd.get('mini_roundabout', '')).strip().lower() in ('yes', 'true', '1'):
+        score += 50
+    return score
+
+
+def _build_junction_cluster_suppression():
+    """Suppress duplicate junction penalties within JUNCTION_CLUSTER_RADIUS_M (once per physical junction)."""
+    candidates = [n for n in G.nodes if _junction_cluster_score(n) > 0]
+    if not candidates:
+        return frozenset()
+
+    parent = {n: n for n in candidates}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    grid = {}
+    cell = JUNCTION_CLUSTER_CELL_DEG
+    for n in candidates:
+        lon, lat = float(n[0]), float(n[1])
+        key = (int(lon / cell), int(lat / cell))
+        grid.setdefault(key, []).append(n)
+
+    r_m = JUNCTION_CLUSTER_RADIUS_M
+    for n in candidates:
+        lon1, lat1 = float(n[0]), float(n[1])
+        cx, cy = int(lon1 / cell), int(lat1 / cell)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for m in grid.get((cx + dx, cy + dy), []):
+                    if m is n:
+                        continue
+                    if _haversine_m(lon1, lat1, float(m[0]), float(m[1])) <= r_m:
+                        union(n, m)
+
+    clusters = {}
+    for n in candidates:
+        clusters.setdefault(find(n), []).append(n)
+
+    suppressed = set()
+    for members in clusters.values():
+        rep = max(members, key=_junction_cluster_score)
+        for n in members:
+            if n != rep:
+                suppressed.add(n)
+    return frozenset(suppressed)
+
+
+JUNCTION_CLUSTER_SUPPRESSED = _build_junction_cluster_suppression()
+print(
+    f"Junction cluster dedup: {len(JUNCTION_CLUSTER_SUPPRESSED)} nodes suppressed "
+    f"(radius {JUNCTION_CLUSTER_RADIUS_M:.0f} m)."
+)
+
+
 def _speed_stress_multiplier(d):
     """Mild penalty by speed difference to cyclist (Literature Table 7)."""
     maxspeed_kmh = _parse_maxspeed_kmh(d)
@@ -284,7 +438,9 @@ def _traffic_calming_additive(d, source='way'):
 
 # --- COST FUNCTIONS ---
 def weight_fastest(u, v, d):
-    return float(d.get('length', 1.0))
+    if barrier_is_hard_block(d):
+        return BARRIER_HARD_COST
+    return float(d.get('length', 1.0)) * _highway_type_multiplier(d)
 
 
 def make_weight_optimized(w):
@@ -294,6 +450,9 @@ def make_weight_optimized(w):
     to keep A* heuristic well-behaved.
     """
     def weight_fn(u, v, d):
+        if barrier_is_hard_block(d):
+            return BARRIER_HARD_COST
+
         length = float(d.get('length', 1.0))
         grade = float(d.get('grade', 0.0))
 
@@ -312,24 +471,34 @@ def make_weight_optimized(w):
         # --- Reward R: multiply by factor < 1 for preferred edges (no negative penalty) ---
         R = 1.0
         if w.get('tfl_cycleway_weight', 0.0) > 0 and _is_tfl_cycleway_or_superhighway(d):
-            R *= 0.75
+            R *= TFL_CYCLEWAY_REWARD
         if w.get('tfl_quietway_weight', 0.0) > 0 and _is_tfl_quietway(d):
-            R *= 0.75
-        if w.get('green_weight', 0.0) > 0 and _is_green_edge(d):
-            R *= 0.8
+            R *= TFL_QUIETWAY_REWARD
+        if w.get('green_weight', 0.0) > 0 and _has_attraction_edge(d):
+            R *= GREEN_REWARD
         R = max(R_MIN, R)
 
         # --- Additives A (fixed per edge/node) ---
         node_v = G.nodes[v] if v in G.nodes else {}
-        A_intersection = _node_intersection_penalty(node_v) * w.get('junction_weight', 0.0)
+        jw = w.get('junction_weight', 0.0)
+        if v in JUNCTION_CLUSTER_SUPPRESSED:
+            A_intersection = 0.0
+            A_mini_roundabout = 0.0
+            A_junction = 0.0
+        else:
+            A_intersection = _node_intersection_penalty(node_v) * jw
+            A_mini_roundabout = _node_mini_roundabout_penalty(node_v) * jw
+            A_junction = _junction_danger_penalty(v) * jw
         A_barrier = _edge_barrier_penalty(d) * w.get('barrier_weight', 0.0)
-        A_give_way = _edge_give_way_penalty(d) * w.get('junction_weight', 0.0)
-        A_stop_sign = _edge_stop_sign_penalty(d) * w.get('junction_weight', 0.0)
+        A_give_way = _edge_give_way_penalty(d) * jw
+        A_stop_sign = _edge_stop_sign_penalty(d) * jw
         A_signal = _node_signal_penalty(node_v) * w.get('signal_weight', 0.0)
-        A_junction = _junction_danger_penalty(v) * w.get('junction_weight', 0.0)
         calming_src = w.get('calming_source', 'way')
         A_calming = _traffic_calming_additive(d, calming_src) * w.get('calming_weight', 0.0)
-        A_total = A_intersection + A_barrier + A_give_way + A_stop_sign + A_signal + A_junction + A_calming
+        A_total = (
+            A_intersection + A_mini_roundabout + A_barrier + A_give_way + A_stop_sign
+            + A_signal + A_junction + A_calming
+        )
 
         # --- Hill H ---
         WORK_COEFF = 20.0
@@ -365,7 +534,8 @@ def make_weight_optimized(w):
                 if sev_mult > 1.0:
                     M_total *= sev_mult
 
-        return (length * M_total * R) + A_total + H
+        M_highway = _highway_type_multiplier(d)
+        return (length * M_total * M_highway * R) + A_total + H
     return weight_fn
 
 # --- HELPERS ---
@@ -398,6 +568,35 @@ def reconstruct_path_geometry(path_nodes):
         segment = extract_segment_geometry(path_nodes[i], path_nodes[i+1])
         full_coords.extend(segment)
     return full_coords
+
+
+def _coords_close(a, b, eps=1e-7):
+    return abs(a[0] - b[0]) < eps and abs(a[1] - b[1]) < eps
+
+
+def apply_endpoint_stubs(coords, start_snap, end_snap):
+    """Prepend/append exact edge snap points for seamless map polylines (visual only)."""
+    if not coords:
+        start_pt = [start_snap.snap_lat, start_snap.snap_lon]
+        end_pt = [end_snap.snap_lat, end_snap.snap_lon]
+        if _coords_close(start_pt, end_pt):
+            return [start_pt]
+        return [start_pt, end_pt]
+    out = list(coords)
+    start_pt = [start_snap.snap_lat, start_snap.snap_lon]
+    if not _coords_close(start_pt, out[0]):
+        out.insert(0, start_pt)
+    end_pt = [end_snap.snap_lat, end_snap.snap_lon]
+    if not _coords_close(end_pt, out[-1]):
+        out.append(end_pt)
+    return out
+
+
+def _snap_meta(snap):
+    return {
+        "distance_m": round(snap.distance_m, 1),
+        "anchor": str(snap.anchor_node),
+    }
 
 # --- STATS ---
 def calculate_path_stats(path_nodes, calming_source='way'):
@@ -437,15 +636,21 @@ def calculate_path_stats(path_nodes, calming_source='way'):
         if _is_tfl_quietway(edge_data): tfl_quietway_length += l
         if _speed_stress_multiplier(edge_data) > 0: speed_stress_length += l
         if _get_width_m(edge_data) is not None and _get_width_m(edge_data) < WIDTH_STD_M: narrow_length += l
-        if _is_green_edge(edge_data): green_length += l
+        if _has_attraction_edge(edge_data): green_length += l
         if _traffic_calming_additive(edge_data, calming_source) > 0: calming_count += 1
 
-        if _edge_barrier_penalty(edge_data) > 0: barrier_count += 1
+        if barrier_is_hard_block(edge_data) or _edge_barrier_penalty(edge_data) > 0:
+            barrier_count += 1
         if _edge_give_way_penalty(edge_data) > 0: give_way_count += 1
         if _edge_stop_sign_penalty(edge_data) > 0: stop_sign_count += 1
         node_v = G.nodes[v] if v in G.nodes else {}
         if _node_signal_penalty(node_v) > 0: signal_count += 1
-        if _node_intersection_penalty(node_v) > 0 or _junction_danger_penalty(v) > 0: junction_count += 1
+        if v not in JUNCTION_CLUSTER_SUPPRESSED and (
+            _node_intersection_penalty(node_v) > 0
+            or _node_mini_roundabout_penalty(node_v) > 0
+            or _junction_danger_penalty(v) > 0
+        ):
+            junction_count += 1
         if live_disruptions.get_edge_disruption(u, v): disruption_count += 1
 
     duration_min = total_length / (CYCLIST_SPEED_MPS * 60.0) if CYCLIST_SPEED_MPS else total_length / 266.0
@@ -510,7 +715,7 @@ def get_green_sections(path_nodes):
     for i in range(len(path_nodes) - 1):
         u, v = path_nodes[i], path_nodes[i+1]
         d = G.get_edge_data(u, v) or {}
-        if _is_green_edge(d):
+        if _has_attraction_edge(d):
             out.append(extract_segment_geometry(u, v))
     return out
 
@@ -576,11 +781,15 @@ def get_node_highlights(path_nodes, w=None):
         ed = G.get_edge_data(u, v) or {}
         key = (u, v)
 
-        if w.get('barrier_weight', 0.0) > 0 and _edge_barrier_penalty(ed) > 0 and (key, 'barrier') not in seen:
+        if w.get('barrier_weight', 0.0) > 0 and (barrier_is_hard_block(ed) or _edge_barrier_penalty(ed) > 0) and (key, 'barrier') not in seen:
             seen.add((key, 'barrier'))
             lat, lon = _edge_display_point(ed, 'barrier_lat', 'barrier_lon')
             if lat is not None and lon is not None:
-                out.append({"lat": lat, "lon": lon, "type": "barrier", "details": {"barrier": str(ed.get('barrier', '')).strip().lower()}})
+                details = {"barrier": str(ed.get('barrier', '')).strip().lower()}
+                meta = barrier_cluster_meta(ed)
+                if meta:
+                    details.update(meta)
+                out.append({"lat": lat, "lon": lon, "type": "barrier", "details": details})
 
         if w.get('junction_weight', 0.0) > 0:
             if _edge_give_way_penalty(ed) > 0 and (key, 'give_way') not in seen:
@@ -607,11 +816,14 @@ def get_node_highlights(path_nodes, w=None):
             seen.add((v, 'signal'))
             out.append({"lat": lat, "lon": lon, "type": "signal", "details": {"traffic_signals": "yes"}})
 
-        if w.get('junction_weight', 0.0) > 0:
+        if w.get('junction_weight', 0.0) > 0 and v not in JUNCTION_CLUSTER_SUPPRESSED:
             if _node_intersection_penalty(node_data) > 0 and (v, 'junction') not in seen:
                 seen.add((v, 'junction'))
                 details = {'crossing': node_data.get('crossing_type') or node_data.get('crossing') or 'zebra/uncontrolled'}
                 out.append({"lat": lat, "lon": lon, "type": "junction", "details": details})
+            if _node_mini_roundabout_penalty(node_data) > 0 and (v, 'mini_roundabout') not in seen:
+                seen.add((v, 'mini_roundabout'))
+                out.append({"lat": lat, "lon": lon, "type": "mini_roundabout", "details": {"mini_roundabout": "yes"}})
             car_road_count = _count_car_physical_roads_at_node(v)
             if _junction_danger_penalty(v) > 0 and (v, 'junction_danger') not in seen:
                 seen.add((v, 'junction_danger'))
@@ -652,41 +864,14 @@ def inspect_segment():
     try:
         lat = float(request.args.get('lat'))
         lon = float(request.args.get('lon'))
-        click_point = Point(lon, lat)
 
-        u = get_nearest_node(lat, lon)
-        if not u:
-            return jsonify({"error": "No graph data"}), 404
+        snap = tfl_live.snap_to_edge(lat, lon)
+        if not snap:
+            return jsonify({"error": "No edge found within snap distance"}), 404
 
-        best_edge_data = None
-        best_u = None
-        best_v = None
-        min_distance = float('inf')
-        
-        # Check all edges connected to nearest node
-        candidates = []
-        for v in G.neighbors(u): candidates.append((u, v))
-        for v in G.predecessors(u): candidates.append((v, u))
-            
-        for (src, dst) in candidates:
-            edge_data = G.get_edge_data(src, dst)
-            
-            # Geometry check
-            if 'geometry' in edge_data:
-                line = load_wkt(edge_data['geometry'])
-            else:
-                p1 = (float(G.nodes[src]['x']), float(G.nodes[src]['y']))
-                p2 = (float(G.nodes[dst]['x']), float(G.nodes[dst]['y']))
-                line = LineString([p1, p2])
-            
-            dist = line.distance(click_point)
-            
-            if dist < min_distance: 
-                min_distance = dist
-                best_edge_data = edge_data
-                best_u = src
-                best_v = dst
-        
+        best_u, best_v = snap.u, snap.v
+        best_edge_data = G.get_edge_data(best_u, best_v)
+
         if best_edge_data:
             # Prepare tags
             tags = {k: v for k, v in best_edge_data.items() if k != 'geometry'}
@@ -714,7 +899,8 @@ def inspect_segment():
 
             return jsonify({
                 "tags": tags,
-                "geometry": geometry
+                "geometry": geometry,
+                "snap_point": [snap.snap_lat, snap.snap_lon],
             })
         else:
             return jsonify({"error": "No edge found"}), 404
@@ -856,19 +1042,42 @@ def get_route():
             "tfl_live_weight": float(request.args.get('tfl_live_weight', 0.0)),
         }
 
-        start_node = get_nearest_node(start_lat, start_lon)
-        end_node = get_nearest_node(end_lat, end_lon)
+        t_route = time.perf_counter()
+        start_snap = tfl_live.snap_to_edge(start_lat, start_lon)
+        end_snap = tfl_live.snap_to_edge(end_lat, end_lon)
+        t_snap = time.perf_counter() - t_route
 
-        if not start_node or not end_node:
+        if not start_snap or not end_snap:
             return jsonify({"error": "Could not snap to network"}), 400
 
-        path_fastest = nx.astar_path(G, start_node, end_node, weight=weight_fastest)
-        coords_fastest = reconstruct_path_geometry(path_fastest)
+        start_node = start_snap.anchor_node
+        end_node = end_snap.anchor_node
+
+        h_fast = make_heuristic(end_node, G, cost_per_m=1.0)
+        t0 = time.perf_counter()
+        path_fastest = nx.astar_path(G, start_node, end_node, heuristic=h_fast, weight=weight_fastest)
+        t_fast = time.perf_counter() - t0
+        coords_fastest = apply_endpoint_stubs(
+            reconstruct_path_geometry(path_fastest), start_snap, end_snap
+        )
         stats_fastest = calculate_path_stats(path_fastest)
 
+        scale = compute_optimized_cost_per_metre_lower_bound(w)
+        h_opt = make_heuristic(end_node, G, cost_per_m=scale)
         weight_optimized = make_weight_optimized(w)
-        path_optimized = nx.astar_path(G, start_node, end_node, weight=weight_optimized)
-        coords_optimized = reconstruct_path_geometry(path_optimized)
+        t0 = time.perf_counter()
+        path_optimized = nx.astar_path(G, start_node, end_node, heuristic=h_opt, weight=weight_optimized)
+        t_opt = time.perf_counter() - t0
+
+        t_compute = t_snap + t_fast + t_opt
+        if os.environ.get("ROUTE_BENCHMARK", "").lower() in ("1", "true", "yes"):
+            print(
+                f"ROUTE_BENCHMARK snap={t_snap*1000:.1f}ms fastest={t_fast*1000:.1f}ms "
+                f"optimized={t_opt*1000:.1f}ms scale={scale:.3f}"
+            )
+        coords_optimized = apply_endpoint_stubs(
+            reconstruct_path_geometry(path_optimized), start_snap, end_snap
+        )
         stats_optimized = calculate_path_stats(path_optimized, calming_source=w.get('calming_source', 'way'))
 
         # Route-only overlay chunks (only segments on path_optimized that match each criterion)
@@ -883,6 +1092,19 @@ def get_route():
 
         return jsonify({
             "status": "success",
+            "meta": {
+                "cost_per_m_lower_bound": round(scale, 4),
+                "timing_ms": {
+                    "snap": round(t_snap * 1000, 1),
+                    "fastest_astar": round(t_fast * 1000, 1),
+                    "optimized_astar": round(t_opt * 1000, 1),
+                    "total": round(t_compute * 1000, 1),
+                },
+                "snap": {
+                    "start": _snap_meta(start_snap),
+                    "end": _snap_meta(end_snap),
+                },
+            },
             "fastest": {"path": coords_fastest, "stats": stats_fastest},
             "safest": {
                 "path": coords_optimized,
@@ -902,4 +1124,4 @@ def get_route():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, use_reloader=USE_RELOADER)

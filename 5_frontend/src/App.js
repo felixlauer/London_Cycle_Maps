@@ -297,6 +297,23 @@ function NodeHighlightMarkers({ nodeHighlights, useBarriers, useSignals, useJunc
   );
 }
 
+// Mirrors backend routing_heuristic.compute_optimized_cost_per_metre_lower_bound (reward toggles only).
+const R_MIN = 0.1;
+const computeMinWeightPerM = (toggles) => {
+  let r = 1.0;
+  if (toggles.tflCycleway) r *= 0.75;
+  if (toggles.tflQuietway) r *= 0.75;
+  if (toggles.green) r *= 0.8;
+  return Math.max(R_MIN, r);
+};
+
+const formatRouteStatus = (minWeight, timingMs) => {
+  const timeLabel = timingMs >= 1000
+    ? `${(timingMs / 1000).toFixed(1)}s`
+    : `${Math.round(timingMs)} ms`;
+  return `Route calculated in ${timeLabel} | min weight/m: ${minWeight.toFixed(3)}`;
+};
+
 // --- MAIN APP ---
 
 function App() {
@@ -393,7 +410,6 @@ function App() {
         setStatus("Set Destination.");
       } else if (!end) {
         setEnd([e.latlng.lat, e.latlng.lng]);
-        setStatus("Calculating...");
         fetchRoutes(start, [e.latlng.lat, e.latlng.lng]);
       } else {
         setStart([e.latlng.lat, e.latlng.lng]);
@@ -456,10 +472,18 @@ function App() {
     return null;
   }
 
+  const routeToggles = {
+    tflCycleway: useTflCycleway,
+    tflQuietway: useTflQuietway,
+    green: useGreen,
+  };
+  const minWeightPreview = computeMinWeightPerM(routeToggles);
+
   const fetchRoutes = async (s, e) => {
     const startCoord = s || start;
     const endCoord = e || end;
     if (!startCoord || !endCoord) return;
+    setStatus(`Calculating... | min weight/m: ${minWeightPreview.toFixed(3)}`);
     const params = new URLSearchParams({
       start_lat: startCoord[0], start_lon: startCoord[1], end_lat: endCoord[0], end_lon: endCoord[1],
       risk_weight: useSafetyRouting ? 1 : 0, light_weight: useLighting ? 1 : 0,
@@ -484,7 +508,10 @@ function App() {
         setNarrowChunks(data.safest.narrow_chunks || []);
         setDisruptionChunks(data.safest.disruption_chunks || []);
         setNodeHighlights(data.safest.node_highlights || []);
-        setStatus("Route Calculated.");
+        const meta = data.meta || {};
+        const minWeight = meta.cost_per_m_lower_bound ?? minWeightPreview;
+        const timingMs = meta.timing_ms?.total ?? 0;
+        setStatus(formatRouteStatus(minWeight, timingMs));
       } else { setStatus("Error: " + data.error); }
     } catch (err) { console.error(err); setStatus("Backend Error."); }
   };

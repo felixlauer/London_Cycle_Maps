@@ -31,6 +31,7 @@ import os
 import argparse
 from datetime import datetime, timezone
 import networkx as nx
+from graph_io import load_graph, fast_path
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(SCRIPT_DIR, "..", "1_data")
@@ -46,12 +47,12 @@ def main():
     input_path = os.path.normpath(os.path.abspath(args.input))
     output_path = os.path.normpath(os.path.abspath(args.output))
 
-    if not os.path.isfile(input_path):
-        print(f"ERROR: Graph not found: {input_path}")
+    if not os.path.isfile(input_path) and not os.path.isfile(fast_path(input_path)):
+        print(f"ERROR: Graph not found: {input_path} (or .gpickle)")
         return 1
 
     print("1. Loading graph...")
-    G = nx.read_graphml(input_path)
+    G = load_graph(input_path)
     print(f"   -> {G.number_of_nodes()} nodes, {G.number_of_edges()} edges.")
 
     edges_out = []

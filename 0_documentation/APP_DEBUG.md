@@ -18,20 +18,20 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 |-------|------|----------|
 | Frontend | React 19, Leaflet, react-leaflet | `8_debug/5_frontend/src/` |
 | Backend | Flask, NetworkX, Shapely, SQLAlchemy | `4_backend_engine/app_debug.py` |
-| Data | GraphML + PostgreSQL (accidents) | `1_data/london_elev_final_tfl.graphml`, DB `accidents` |
+| Data | NetworkX graph + PostgreSQL (accidents) | `1_data/london_elev_final_tfl.gpickle` (`.graphml` fallback), DB `accidents` |
 
 ### 2.2 Data flow
 
 1. **Graph:** Loaded once at startup; pre-processed into in-memory caches (steep segments, bad-surface segments, unlit segments) for fast viewport queries. The `tfl_live` module is initialized at startup (builds STRtree edge spatial index). **Live disruption data (TfL and TomTom)** is populated via `POST /admin/update_tfl` and `POST /admin/update_tomtom` (each source refreshed independently); stored in a merged in-memory lookup and source-specific caches for overlays (not as a graph cache). See `0_documentation/GRAPH.md` §9.
-2. **Overlays:** User toggles modes. Segment-based (Uphill, Surfaces, Unlit, Cycleway, HGV banned): frontend sends map bounds; backend returns segments with 20k limit when needed; Surfaces and Unlit have **subtoggles** for “no data” / “unknown” and show a 20k-limit message when truncated. Point-based: **Edge tags** — Traffic calming, Junction type (edge): points from edge midpoints, color-coded by type; left-click shows type. **Node tags** — Barriers (color-coded: cycling-relevant types, others grey), Traffic signals, Mini roundabouts, Crossing, Give way, Stop: each has its own toggle and endpoint; left-click shows type/label. Accidents: loaded once from `/accidents`; left-click shows nothing.
-3. **Inspector:** Right-click → `GET /inspect` → popup + red segment overlay. Disabled when **Modify TfL** mode is on.
-4. **Modify suite (bottom-left):** One mode, **Modify TfL cycle routes**. When active, the Debug panel collapses and is deactivated. Same TfL overlay (color-coded). Left click = add segment to TfL (tag), right click = remove tag. Programme (cycleway / quietway / superhighway) selected via buttons; route shortcode from closest TfL segment. Added segments drawn in yellow, removed in black. Edits saved to `3_pipeline/tfl_manual_edits.json`; apply with `3_pipeline/apply_tfl_manual_edits.py`.
+2. **Overlays:** User toggles modes. Segment-based (Uphill, Surfaces, Unlit, Cycleway, HGV banned): frontend sends map bounds; backend returns segments with 20k limit when needed; Surfaces and Unlit have **subtoggles** for “no data” / “unknown” and show a 20k-limit message when truncated. Point-based: **Edge tags** — Traffic calming, Junction type (edge): points from edge midpoints, color-coded by type; left-click shows type. **Node tags** — Barriers (colour by **routing cluster**, five groups — see §3.12), Traffic signals, Mini roundabouts, Crossing, Give way, Stop: each has its own toggle and endpoint; left-click shows type/label. Accidents: loaded once from `/accidents`; left-click shows nothing.
+3. **Inspector:** Right-click → `GET /inspect` → popup + red segment overlay. Disabled when **Modify TfL** or **Modify attractions** mode is on.
+4. **Modify suite (bottom-left):** **Modify TfL cycle routes** — when active, Debug panel collapses. Left click = add segment, right click = remove; programme cycleway/quietway/superhighway; yellow/black overlays; `tfl_manual_edits.json` + `apply_tfl_manual_edits.py`. **Modify attractions** (mutually exclusive with TfL modify) — draw park or river polygon (≥3 clicks + Complete), or sight (single click, 200 m radius). Faint filled overlay = tagging zone (same geometry as pipeline). OSM park polygons shown as light green outline. `attraction_manual_regions.json` + `apply_attraction_manual.py` after pipeline.
 5. **No routing:** No start/end, no `/route`; only visualization and inspection.
 
 ### 2.3 Backend (app_debug.py)
 
 - **Port:** 5001 (so it can run alongside main app on 5000).
-- **Graph:** Same file as main app: `1_data/london_elev_final_tfl.graphml`.
+- **Graph:** Same as main app: `graph_io.load_graph` on `1_data/london_elev_final_tfl.graphml` (prefers `.gpickle`).
 - **Caches (built at startup):**
   - **STEEP_CACHE** — edges with grade ≥ 3.3% (for uphill heatmap).
   - **SURFACE_CACHE** — segments with surface/quality issues or no surface data (see Surfaces below). When returning surfaces, **no_data** segments are limited to 20k per request (by distance from bbox centre); response includes `limit_reached` when truncated.
@@ -39,6 +39,7 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
   - **CYCLEWAY_GENERAL** — edges with `cycleway` / `cycleway_left` / `cycleway_right` / `cycleway_both` (non-empty).
   - **CYCLEWAY_SEGREGATED** — edges with `segregated=yes`.
   - **HGV_BANNED_CACHE** — edges with `hgv=no`.
+  - **ATTRACTION_PARK_CACHE**, **ATTRACTION_RIVER_CACHE**, **ATTRACTION_SIGHT_CACHE** — edges with `is_park` / `is_river` / `is_sight` = yes (from OSM tagging + manual regions); built in the same startup edge pass as TfL routes.
   - **TRAFFIC_CALMING_POINTS** — way-based: list of `{lat, lon, type, source: 'way'}` from edge midpoints where `traffic_calming` is set.
   - **TRAFFIC_CALMING_POINT_POINTS** — point-based: list of `{lat, lon, type, source: 'point'}` from edges with `traffic_calming_point` and stored lat/lon.
   - **JUNCTION_POINTS** — list of `{lat, lon, type}` from edge midpoints where `junction` is set (roundabout, circular, etc.).
@@ -46,14 +47,15 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 - **Live disruptions (TfL and TomTom)** — not a graph cache; uses shared `tfl_live`, `tomtom_live`, and `live_disruptions` modules. STRtree built at startup from graph edge geometries; data populated via `POST /admin/update_tfl` and `POST /admin/update_tomtom` (independent refresh per source). Merged lookup used for routing in main app; debug app exposes separate TfL and TomTom overlay toggles and status endpoints.
 - **Segment/point limits:** Surfaces, Unlit, cycleway layers, HGV banned, and all point endpoints apply a **20k limit** (prioritised by distance from viewport centre) when the result set exceeds 20k.
 - **PostgreSQL:** Used only for `GET /accidents` (all accident points).
-- **Inspector:** Same logic as main app: nearest node → nearest edge → tags + geometry; response includes `source` and `target` (node ids). No routing.
+- **Inspector:** Same logic as main app: global `tfl_live.snap_to_edge` (STRtree) → tags + geometry; response includes `source`, `target`, and `snap_point`. No routing.
 - **Modify TfL:** `GET /modify/tfl_edits` returns current edits with geometry. `POST /modify/tfl_add` and `POST /modify/tfl_remove` persist to `3_pipeline/tfl_manual_edits.json`. `POST /modify/tfl_undo` pops the last operation from a history stack and updates the file; returns new `added`/`removed` with geometry (back arrow and Ctrl+Z in the UI).
+- **Modify attractions:** `GET /modify/attraction_regions` — manual regions with Leaflet positions. `GET /modify/osm_park_polygons` — cached OSM park outlines for overlay. `POST /modify/attraction_add_region` — append region (GeoJSON geometry + type/name/buffer/radius). `POST /modify/attraction_undo` — pop history.
 
 ### 2.4 Frontend (8_debug/5_frontend)
 
 - Separate React app (copy of CRA structure); main UI in `App.js`.
-- Collapsible **Debug panel** (top-right): toggles for Uphill, Accidents, Surfaces, Unlit, Cycleway, HGV banned, TfL cycle routes, **TfL Live Disruptions**, **TomTom Live Disruptions**, Traffic calming, Junction type, **Node tags** (Barriers, Traffic signals, etc.). Left-click on point overlays shows type; right-click opens segment inspector. When **Modify TfL** is on, the Debug panel is forced collapsed and inspector is disabled.
-- **Modify suite** (bottom-left): collapsible panel; one mode **Modify TfL cycle routes**. When on: TfL overlay is shown; left click = add segment (yellow), right click = remove (black). **Undo:** back arrow button or **Ctrl+Z** / Cmd+Z; removes last operation from the map and from the edits file. Programme chosen via Cycleway / Quietway / Superhighway buttons; route from closest TfL segment. Edits saved to file automatically.
+- Collapsible **Debug panel** (top-right): toggles for Uphill, Accidents, Surfaces, Unlit, Cycleway, HGV banned, TfL cycle routes, **Attraction edges** (park / river / sight subtoggles), **TfL Live Disruptions**, **TomTom Live Disruptions**, Traffic calming, Junction type, **Node tags** (Barriers, Traffic signals, etc.). Left-click on point overlays shows type; right-click opens segment inspector. When **Modify TfL** or **Modify attractions** is on, the Debug panel is forced collapsed and inspector is disabled.
+- **Modify suite** (bottom-left): two collapsible panels — **Modify TfL cycle routes** (left) and **Modify attractions** (offset right). Only one modify mode active at a time. TfL: left add / right remove, undo Ctrl+Z. Attractions: park/river/sight type buttons, name field, Complete geometry for park/river, river buffer (m) when river selected; OSM park outline overlay while active.
 - No start/end markers, no route polylines — only overlay polylines, point markers, inspector, and modify overlays.
 
 ---
@@ -97,21 +99,38 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 - **Backend:** `GET /debug/hgv_banned?min_lat=&max_lat=&min_lon=&max_lon=` returns segments where `hgv=no`. 20k limit when truncated.
 - **Display:** Polylines in dark red/orange.
 
-### 3.7 Traffic calming (points)
+### 3.7 Graph network
+
+- **Toggle:** “Graph network”
+- **Purpose:** Visualize overall graph completeness and quickly spot coverage holes (missing mesh areas).
+- **Backend:** `GET /debug/graph_network?min_lat=&max_lat=&min_lon=&max_lon=` returns `{ segments, limit_reached }`, where each segment is `{ id, p, h }` and `h` is the edge `type` (OSM `highway`).
+- **Physical-edge dedupe:** Only one segment is returned per physical road: `(u, v)` and `(v, u)` are deduped by undirected key `(min(u,v), max(u,v))`.
+- **Limit:** 15k cap, centre-prioritised (closest to viewport centre first) to avoid overwhelming the UI.
+- **Display:** Polylines coloured by `h` (cycleway, footway/path, primary/secondary/tertiary, residential, service, other/unknown).
+
+### 3.7a Attraction edges (green mode)
+
+- **Toggle:** “Attraction edges”. **Subtoggles:** Park (`is_park`), River (`is_river`), Sight (`is_sight`) — same colours as the Modify attractions suite (green / blue / purple).
+- **Backend:** `GET /debug/attractions?min_lat=&max_lat=&min_lon=&max_lon=&layer=park|river|sight|all` returns `{ segments, limit_reached }`. Each segment is `{ id, p, kind, name }` where `p` is `[[lat, lon], ...]` and `name` is `attraction_name` when set.
+- **Caches:** Built at startup from graph edge attributes (`is_park`, `is_river`, `is_sight` = yes). Requires pipeline tagging (`tag_attractions_osm.py`, `apply_attraction_manual.py`) and graph reload.
+- **Limit:** 20k cap across the combined bbox result (centre-prioritised), same as cycleway / TfL routes.
+- **Display:** Polylines per active sublayer; an edge with multiple flags appears in each enabled layer.
+
+### 3.8 Traffic calming (points)
 
 - **Toggle:** “Traffic calming (points)”. **Source dropdown:** Way (OSM ways), Point (OSM nodes), Both — refetches with `source=way|point|both`.
 - **Backend:** `GET /debug/traffic_calming_points?min_lat=&max_lat=&min_lon=&max_lon=&source=way|point|both` returns `[{ lat, lon, type, source }, ...]` (way = edge midpoints with `traffic_calming`; point = edges with `traffic_calming_point` at stored position; both = merged list). 20k limit when truncated.
 - **Display:** Circle markers **color-coded by type** (e.g. table, cushion, choker, hump). **Left-click** on a point shows the calming type and source (way/point) in a small popup.
 
-### 3.8 Junction type (edge)
+### 3.9 Junction type (edge)
 
 - **Toggle:** “Junction type (edge)”
 - **Backend:** `GET /debug/junction_points?min_lat=&max_lat=&min_lon=&max_lon=` returns `[{ lat, lon, type }, ...]` (edge midpoints with `junction` tag: roundabout, circular, etc.). 20k limit when truncated.
 - **Display:** Circle markers **color-coded by type** (roundabout, circular, approach, etc.). **Left-click** on a point shows the junction type in a small popup.
 
-### 3.9 Node tags (point overlays)
+### 3.10 Node tags (point overlays)
 
-- **Barriers** — `GET /debug/barrier_points?min_lat=&max_lat=&min_lon=&max_lon=` returns `[{ lat, lon, type, details }, ...]` from edges with `barrier` (details include `barrier` and optionally `barrier_confidence`). **Display:** Color-coded by type; cycling-relevant types get distinct colours; others in grey. Left-click shows barrier type and confidence (if present).
+- **Barriers** — `GET /debug/barrier_points?min_lat=&max_lat=&min_lon=&max_lon=` returns `[{ lat, lon, type, details }, ...]` from edges with `barrier` (details include `barrier`, `barrier_cluster`, `barrier_cluster_label`, `barrier_cluster_color`, optional `barrier_confidence`). **Display:** One colour per routing cluster (see §3.10a). Left-click shows type, cluster label, and confidence. Legend: `GET /debug/barrier_clusters`.
 - **Traffic signals** — `GET /debug/traffic_signals_points` (same bbox). Nodes with `traffic_signals`. Red markers; left-click “Traffic signals”.
 - **Mini roundabouts** — `GET /debug/mini_roundabout_points`. Purple markers; left-click “Mini roundabout”.
 - **Crossing** — `GET /debug/crossing_points`. Blue markers; left-click “Crossing”.
@@ -119,7 +138,21 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 - **Stop** — `GET /debug/stop_points`. Dark orange markers; left-click “Stop”.
 - All node point endpoints apply 20k limit when truncated.
 
-### 3.10 Segment inspector
+### 3.10a Barrier routing clusters (overlay colours)
+
+Matches [`barrier_clusters.py`](../4_backend_engine/barrier_clusters.py) and main-app routing:
+
+| Cluster | Colour | Penalty | Examples |
+|---------|--------|---------|----------|
+| 1 Free flow | Green `#2E7D32` | 0 m | lift_gate, height_restrictor, toll_booth, gap |
+| 2 Permeable | Blue `#1976D2` | +15 m | bollard, kerb, motorcycle_barrier, planter |
+| 3 Stop/push | Orange `#F57C00` | +35 m | gate, cycle_barrier, entrance, swing_gate |
+| 4 Hostile | Red `#C62828` | +90 m | log, step, spikes, horse_stile |
+| 5 Impassable | Black `#212121` | 1e9 | stile, turnstile, kissing_gate, fence, wall |
+
+`GET /debug/barrier_clusters` returns JSON legend. *Future:* penalties may vary by bike type and user barrier tolerance.
+
+### 3.11 Segment inspector
 
 - **Trigger:** Right-click on map.
 - **Backend:** `GET /inspect?lat=&lon=` (same as main app). Returns all edge tags (including empty); `length` is rounded to the nearest metre. When the edge has live disruption data, response also includes `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` in a "Live disruptions" group.
@@ -127,7 +160,7 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 - **Hint in panel:** “Right-click any road to inspect segment tags.”
 
 
-### 3.11 TfL Live Disruptions
+### 3.12 TfL Live Disruptions
 
 - **Toggle:** "TfL Live Disruptions". **Refresh button** fetches latest data from TfL API via `POST /admin/update_tfl`; status text shows count and last update time.
 - **Backend:** `GET /debug/tfl_disruptions?min_lat=&max_lat=&min_lon=&max_lon=` returns segments from the live disruption visualization cache; 20k limit.
@@ -137,7 +170,7 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 - **Left-click on disruption:** When TfL Live Disruptions is on, **left-click** on a disruption (either the matched segments overlay, or the ground-truth point/line/polygon, with a slightly larger hit margin) opens a **TfL disruption detail window** (inspector-style) showing **all data TfL parses** for that disruption (id, status, category, severity, location, comments, point, geography, geometry, roadDisruptionLines, etc.). Hit-test uses `GET /debug/tfl_disruption_at` (tolerance ~25 m). Closing the window or right-clicking (inspector) clears it.
 - **Inspector enrichment:** When right-clicking an affected edge, the inspector shows `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` in a "Live disruptions" group; for TomTom-sourced (or merged) edges, also `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay`.
 
-### 3.12 TomTom Live Disruptions
+### 3.13 TomTom Live Disruptions
 
 - **Toggle:** "TomTom Live Disruptions". **Refresh button** fetches latest data from TomTom Traffic Incident API v5 via `POST /admin/update_tomtom`; status text shows count and last update time (from `GET /admin/tomtom_status`).
 - **Backend:** `GET /debug/tomtom_disruptions?min_lat=&max_lat=&min_lon=&max_lon=` returns segments from the TomTom visualization list (matched to graph edges via the same STRtree as TfL); 20k limit. Segments include `source: "tomtom"`, `iconCategory`, `magnitudeOfDelay`, `description`.
@@ -156,16 +189,18 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 | GET | `/debug/unlit` | same + `include_unknown` (0\|1) | `{ segments: [...], limit_reached }` — segments have `id`, `t`, `p` |
 | GET | `/debug/cycleway` | same + `layer` (general\|segregated) | `{ segments: [...], limit_reached }` — segments have `id`, `p`, optional `v` |
 | GET | `/debug/hgv_banned` | min_lat, max_lat, min_lon, max_lon | `{ segments: [{ id, p }], limit_reached }` |
+| GET | `/debug/graph_network` | min_lat, max_lat, min_lon, max_lon | `{ segments: [{ id, p, h }], limit_reached }` — `h` = edge `type` (OSM highway) |
 | GET | `/debug/traffic_calming_points` | min_lat, max_lat, min_lon, max_lon, **source** (way \| point \| both) | Array of `{ lat, lon, type, source }` (20k limit) |
 | GET | `/debug/junction_points` | same | Array of `{ lat, lon, type }` (20k limit) |
-| GET | `/debug/barrier_points` | same | Array of `{ lat, lon, type, details }` (details: barrier, optional barrier_confidence; 20k limit) |
+| GET | `/debug/barrier_points` | same | Array of `{ lat, lon, type, details }` (details: barrier, barrier_cluster, barrier_cluster_label, barrier_cluster_color, optional barrier_confidence; 20k limit) |
+| GET | `/debug/barrier_clusters` | — | Cluster legend `[{ cluster, label, color, penalty_m, hard_block }, ...]` |
 | GET | `/debug/traffic_signals_points` | same | Array of `{ lat, lon }` (20k limit) |
 | GET | `/debug/mini_roundabout_points` | same | Array of `{ lat, lon }` (20k limit) |
 | GET | `/debug/crossing_points` | same | Array of `{ lat, lon }` (20k limit) |
 | GET | `/debug/give_way_points` | same | Array of `{ lat, lon }` (20k limit) |
 | GET | `/debug/stop_points` | same | Array of `{ lat, lon }` (20k limit) |
 | GET | `/accidents` | — | Array of `[lat, lon]` (all accidents) |
-| GET | `/inspect` | `lat`, `lon` | `{ tags, geometry, source, target }` or `{ error }`; when edge has live disruption: `tfl_live_category`, `tfl_live_severity`, `tfl_live_description`; for TomTom also `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay` |
+| GET | `/inspect` | `lat`, `lon` | `{ tags, geometry, source, target, snap_point }` or `{ error }`; when edge has live disruption: `tfl_live_category`, `tfl_live_severity`, `tfl_live_description`; for TomTom also `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay` |
 | POST | `/admin/update_tfl` | — | `{ ok, message, count }` — fetch TfL Road Disruptions, rebuild master lookup |
 | POST | `/admin/update_tomtom` | — | `{ ok, message, count }` — fetch TomTom Traffic Incidents, rebuild master lookup |
 | GET | `/admin/tfl_status` | — | `{ loaded, edge_count, disruption_count, last_update, error }` (TfL only) |

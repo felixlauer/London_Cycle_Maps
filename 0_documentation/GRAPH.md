@@ -14,33 +14,55 @@ The graph is produced by a multi-stage pipeline. Order matters.
 |------|--------|--------|--------|---------|
 | 1 | `import_roads.py` | OSM shapefile | PostgreSQL `planet_osm_*` (or `ways`) | Load road network |
 | 2 | `preprocess_data.py` + `import_data.py` | UK accident CSVs | PostgreSQL `accidents` | Load cyclist collisions |
-| 3 | `calculate_risk.py` | DB: ways + accidents | DB: `accident_count` on roads | Match accidents to segments (e.g. within 15 m) |
-| 4 | **`build_graph.py`** | `planet_osm_line` + points | **`1_data/london.graphml`** | Build directed graph + intersections |
-| 5 | `Add_elevation_raster.py` | `london.graphml` + LIDAR VRT | `1_data/london_elev_raw.graphml` | Add node elevation + edge `grade` |
-| 6 | `elevation_processing_aggressive.py` | `london_elev_raw.graphml` | **`1_data/london_elev_final.graphml`** | Smooth/correct elevation, cap grades |
-| 7 | **`tag_tfl_routes.py`** | `london_elev_final.graphml` + `1_data/tfl_raw/routes/Cycle_routes.json` | **`1_data/london_elev_final_tfl.graphml`** | Tag edges with TfL Cycleways / Quietways / Cycle Superhighways |
+| 3 | `calculate_risk.py` | DB: ways + accidents | DB: `accident_count` on `ways` + sync to `planet_osm_line` | Match accidents to segments (e.g. within 15 m) |
+| 3b | **`noded_network.py`** | `planet_osm_line` (highways) | **`planet_osm_line_noded_enriched`** (materialized view) | Split lines at intersections; preserve parent `osm_id` and tags |
+| 4 | **`build_graph.py`** | `planet_osm_line_noded_enriched` + points | **`london.graphml`** + **`london.gpickle`** | Build directed graph + intersections |
+| 5 | `Add_elevation_raster.py` | `london.gpickle` (or `.graphml`) + LIDAR VRT | **`london_elev_raw.gpickle`** | Add node elevation + edge `grade` |
+| 6 | `elevation_processing_aggressive.py` | `london_elev_raw.gpickle` | **`london_elev_final.gpickle`** | DEM smooth (optional), hill-length filter, cap grades |
+| 6b | **`fetch_osm_park_polygons.py`** *(manual, once)* | Local **`1_data/*.osm.pbf`** (preferred) or Overpass | **`1_data/osm_park_polygons.geojson`** | `leisure=park` + `landuse=recreation_ground` polygons (not gardens) |
+| 6c | **`tag_attractions_osm.py`** | `london_elev_final.gpickle` + park GeoJSON | same path (in-place) | `is_park=yes` where edge ≥50% inside OSM park polygon |
+| 7 | **`tag_tfl_routes.py`** *(optional)* | `london_elev_final.gpickle` + TfL GeoJSON | `london_elev_final_tfl.*` | Geometry-based TfL tags; skip with `--skip-tagging` when export JSON is ground truth |
+| 7b | **`apply_tfl_export.py`** | `tfl_edges_from_graph.json` + legacy graph | **`london_elev_final_tfl.gpickle`** (+ `.graphml`) | Restore master export via `osm_id` fan-out (`--legacy-graph`) |
+| 7c | **`apply_tfl_manual_edits.py`** | `tfl_manual_edits.json` + legacy graph | same final graph | Layer debug-app add/remove deltas via `osm_id` |
+| 7d | **`apply_attraction_manual.py`** | `attraction_manual_regions.json` | same final graph | Manual park/river/sight regions → `is_*` flags + `attraction_name` |
 
-**The backend and debug app use `london_elev_final_tfl.graphml`** (elevation + TfL). That file is produced **only by step 7** (`tag_tfl_routes.py`). If you run steps 4–6 but skip step 7, the app keeps using the old `london_elev_final_tfl.graphml` and will not show barrier/give_way/stop (or other new edge data) until you run step 7. All attributes from `build_graph.py` are preserved through the elevation steps; elevation scripts only add/change `elevation` (nodes) and `grade` (edges).
+**Fast I/O (`3_pipeline/graph_io.py`):** Pipeline scripts and backends load via `load_graph()` — prefer a companion **`.gpickle`** when present. GraphML newer than pickle by less than **24 hours** still loads pickle (dual-save writes pickle before GraphML). Larger gaps fall back to GraphML (manual external edit). Intermediate steps (5–6) write **pickle only**. GraphML is written at **build** and **final TfL tag** for external compatibility.
 
-**Full pipeline commands (run from `3_pipeline/`):**
+**Resume:** `python run_graph_pipeline.py --start-at Add_elevation_raster.py` skips earlier steps; requires upstream `.gpickle` files in `1_data/`.
+
+**The backend and debug app load `london_elev_final_tfl.gpickle` at startup** (fallback: `london_elev_final_tfl.graphml`). Produced by the TfL final stage below. All attributes from `build_graph.py` are preserved through elevation; elevation scripts only add/change `elevation` (nodes) and `grade` (edges).
+
+**Current runtime graph (noded mesh, June 2026):** ~**1.92M** nodes, ~**4.06M** directed edges, ~**70 100 km** network length (sum of edge lengths). Pre-noding baseline was ~175k nodes / ~350k edges (~28 000 km). Keep a backup of the pre-noding graph at **`1_data/legacy_graph.graphml`** for TfL export/manual migration (`--legacy-graph`).
+
+**One command (recommended):**
 ```text
-python build_graph.py
-python Add_elevation_raster.py
-python elevation_processing_aggressive.py
-python tag_tfl_routes.py                    # required — creates london_elev_final_tfl.graphml
-python apply_tfl_export.py                  # optional — restore TfL from tfl_edges_from_graph.json
-python apply_tfl_manual_edits.py            # optional — apply manual TfL edits
+python run_graph_pipeline.py
+python run_graph_pipeline.py --skip-tagging --pickle-only
+```
+Default flow: **`tag_attractions_osm.py`** (needs `osm_park_polygons.geojson`) → optional TfL: `tag_tfl_routes.py` → **`apply_tfl_export.py`** (ground truth) → **`apply_tfl_manual_edits.py`** → **`apply_attraction_manual.py`**. Use **`--skip-tagging`** when the export JSON is authoritative. **`--skip-osm-attractions`** / **`--skip-attraction-manual`** skip attraction steps. **`--legacy-graph`** (default `1_data/legacy_graph.graphml` if present) maps old `(source,target)` node ids to **`osm_id`** and fans out tags on the noded mesh. Also: `--from-db`, `--start-at SCRIPT`, `--skip-export`, `--skip-manual`, `--pickle-only`.
+
+**Manual pipeline commands (`3_pipeline/`):**
+```text
+python fetch_osm_park_polygons.py           # once: cache OSM parks (auto-uses local .pbf if present)
+python fetch_osm_park_polygons.py --source overpass   # optional: remote Overpass (can 504)
+python tag_attractions_osm.py               # OSM parks → is_park on london_elev_final
+python tag_tfl_routes.py                    # optional geometry tags → london_elev_final_tfl
+python apply_tfl_export.py --legacy-graph ../1_data/legacy_graph.graphml
+python apply_tfl_manual_edits.py --legacy-graph ../1_data/legacy_graph.graphml
+python apply_attraction_manual.py --pickle-only
 ```
 
 ---
 
 ## 2. Data Sources
 
-### 2.1 Line data: `planet_osm_line`
+### 2.1 Line data: `planet_osm_line` → `planet_osm_line_noded_enriched`
 
-- **Filter:** `WHERE highway IS NOT NULL`
+- **Raw OSM:** `planet_osm_line` (osm2pgsql import) is **not** modified. Highways: `WHERE highway IS NOT NULL`.
+- **Noding:** [`noded_network.py`](../3_pipeline/noded_network.py) builds `planet_osm_line_noded` (split segments at intersections) and materialized view **`planet_osm_line_noded_enriched`**, joining parent tags by `osm_id`. Uses **pgRouting 4** `pgr_separateCrossing` + `pgr_separateTouching` when available (auto-`CREATE EXTENSION pgrouting`); otherwise **PostGIS** per-vertex split (`--postgis-only` to skip pgRouting).
+- **Graph build:** [`build_graph.py`](../3_pipeline/build_graph.py) reads **`planet_osm_line_noded_enriched`** by default (`--source planet_osm_line` for A/B comparison).
 - **Geometry:** WGS84 (SRID 4326), length in meters via `ST_Length(geography)`.
-- **Risk:** Column `accident_count` (e.g. from `calculate_risk.py` or equivalent) is read as `risk` on each edge.
+- **Risk:** `COALESCE(ways.accident_count, planet_osm_line.accident_count, 0)` on enriched segments (`calculate_risk.py` updates `ways` and syncs to `planet_osm_line`; `noded_network.py` refreshes propagation before the materialized view is built).
 
 ### 2.2 Point data: `planet_osm_point`
 
@@ -48,7 +70,7 @@ python apply_tfl_manual_edits.py            # optional — apply manual TfL edit
   `highway IN ('traffic_signals','mini_roundabout','crossing','give_way','stop')` **OR** `barrier IS NOT NULL`
 - **Node snap:** **Traffic_signals**, **mini_roundabout**, and **crossing** points are snapped to the **nearest graph node** (KD-tree). If distance &gt; `SNAP_THRESHOLD` (~20 m), the point is discarded. Attributes are stored on the node (see Section 4).
 - **Edge snap:** **Barrier**, **give_way**, and **stop** points are snapped to the **nearest edge** (STRtree over edge geometry). The **original OSM position** is stored on the edge so overlays plot a **point at that location**, not the whole segment. **Barrier:** both directions (u,v) and (v,u) get the same barrier and position. **Kerb** barriers are assigned **only to pedestrian ways** (footway, pedestrian, path, steps); if no such edge is within the snap threshold, the kerb is skipped. Other barriers get a **barrier_confidence** (0–1): straight segments use orthogonal distance (linear scale, 4 m threshold); curved segments get 0.5. **Give_way / stop:** only the edge that **ends** at the sign is tagged (direction rule), with a stricter threshold (`SNAP_THRESHOLD_SIGN`) so the sign hits the correct road. See Section 3.6.
-- **Traffic calming (points):** **planet_osm_point** rows with non-empty `traffic_calming` are loaded in a separate query and snapped to edges in **step 4c**. Car-allowed edges are preferred; fallback to any edge within the same snap threshold. Stored in **separate** edge fields: `traffic_calming_point`, `traffic_calming_point_lat`, `traffic_calming_point_lon` (way-based `traffic_calming` is unchanged). See Section 3.5.
+- **Traffic calming (points):** **planet_osm_point** rows with non-empty `traffic_calming` are loaded in a separate query and snapped to edges in **step 4c**. Car-allowed edges are preferred; if a cycleway is within 1.15× the distance of the nearest car-allowed edge, the cycleway is used. Fallback to any edge within threshold. Stored in **separate** edge fields: `traffic_calming_point`, `traffic_calming_point_lat`, `traffic_calming_point_lon`. **Way relay (step 4d):** `table`/`cushion`/etc. on footway/pedestrian ways are copied to **all** crossing car-allowed and cycleway edges, then cleared on the footway. See Section 3.5.
 
 ---
 
@@ -115,7 +137,7 @@ All of the following are stored on **every edge** in the graph produced by `buil
 | `traffic_calming_point` | From **planet_osm_point** (step 4c): value from point tag when snapped to this edge |
 | `traffic_calming_point_lat`, `traffic_calming_point_lon` | Original OSM position of the calming point (for plotting) |
 
-**Source:** **Way-based:** `traffic_calming` is read from **planet_osm_line** and copied onto graph edges. **Point-based:** In step 4c, **planet_osm_point** rows with non-empty `traffic_calming` are snapped to the nearest edge (STRtree); car-allowed edges are preferred, then fallback to any edge within threshold. Point data is written only to `traffic_calming_point` and the lat/lon fields so way-based calming is not overwritten.
+**Source:** **Way-based:** `traffic_calming` is read from **planet_osm_line** and copied onto graph edges; step **4d** relocates table/cushion tags from pedestrian ways onto every crossing carriageway/cycleway. **Point-based:** Step 4c snaps **planet_osm_point** rows to edges (car-allowed preferred, cycleway when closer); written only to `traffic_calming_point` and lat/lon fields.
 
 **OSM density (output of `python 6_verification/check_traffic_calming_density.py`):**
 
@@ -203,7 +225,29 @@ To re-run the check or get highway-type breakdown on lines: **`python 6_verifica
 
 **Source:** TfL GeoJSON `1_data/tfl_raw/routes/Cycle_routes.json` (Cycleways, Quietways, Cycle Superhighways). **Pass 1:** cycle-infrastructure only (excluding footway/pedestrian/steps); alignment ≥50%; **angularity only for edges &lt;20 m** (longer edges skip angular check). **Coverage:** target matched length ≥1.8× segment length (one-way); cap at 3×. **Iterative relaxed pass:** while any segment is under 1.8×, match against relaxed edge set (excluding motorway/trunk/footway/pedestrian/steps), same alignment and angular-only-if-short, without exceeding 3× per segment. Debug output: TfL network length vs matched length and ratio vs 2× one-way. Run after elevation: `python tag_tfl_routes.py --input ../1_data/london_elev_final.graphml`. Manual edits from the debug app (Modify TfL mode) are stored in **`3_pipeline/tfl_manual_edits.json`** (includes a `history` array for undo). Apply them with **`python apply_tfl_manual_edits.py`**; that script tags both edge directions (u,v) and (v,u) when the reverse edge exists in the directed graph.
 
-**Export and re-apply (after re-running build/elevation):** Re-running `build_graph.py` (and elevation) loses TfL tags. To preserve the current TfL state (algorithm + manual edits) before a rebuild, run **`python extract_tfl_from_graph.py`** — it writes every edge that has `tfl_cycle_programme` or `tfl_cycle_route` to **`3_pipeline/tfl_edges_from_graph.json`** (source, target, programme, route). After a fresh build and **`tag_tfl_routes.py`**, run **`python apply_tfl_export.py`** to re-apply those tags from the JSON; then optionally run **`apply_tfl_manual_edits.py`** again if you have further manual add/remove edits. Export format: `{ "source_graph", "exported_at", "edges": [ { "source", "target", "tfl_cycle_programme", "tfl_cycle_route" }, ... ] }`.
+**Export and re-apply (after re-running build/elevation):** Re-running the graph build loses TfL tags. **`3_pipeline/tfl_edges_from_graph.json`** is the **master export / ground truth** (create with **`extract_tfl_from_graph.py`**). After a fresh build, run **`apply_tfl_export.py`** with **`--legacy-graph`** pointing at the pre-noding graph backup (e.g. `1_data/legacy_graph.graphml`). The script resolves each export `(source, target)` to parent **`osm_id`** via the legacy graph and applies merged tags to **all** split sub-edges on the new mesh (`tfl_osm_translate.py`). Then run **`apply_tfl_manual_edits.py`** (same legacy lookup) for add/remove deltas from the debug app.
+
+**TfL pipeline tradeoffs (ground truth = export JSON):**
+
+| Topic | Behaviour |
+|-------|-----------|
+| **Export vs geometry tagging** | When `tfl_edges_from_graph.json` exists, use **`--skip-tagging`** in `run_graph_pipeline.py`. Export **zeros all** TfL tags then restores from JSON — any tags from `tag_tfl_routes.py` in the same run are discarded. |
+| **osm_id fan-out** | One old coarse edge → all directed sub-edges with the same `osm_id`. Coarser than per-segment restore; consistent with manual edit migration. |
+| **Removals not in export** | Export only lists edges **with** TfL tags. Tags removed in the debug app (right-click remove) are **not** stored as “negative” records in the JSON — only **`tfl_manual_edits.json`** `removed` list captures those. After rebuild, removals are re-applied via **`apply_tfl_manual_edits.py`**, not the export file. |
+| **Legacy graph** | Required after noded rebuild: must be the graph whose node ids match the export / manual JSON (backup before re-noding). |
+
+Export format: `{ "source_graph", "exported_at", "edges": [ { "source", "target", "tfl_cycle_programme", "tfl_cycle_route" }, ... ] }`. Future exports may add `osm_id` per record to drop the legacy dependency.
+
+### 3.8 Scenic / attraction zones (green mode)
+
+| Tag | Description |
+|-----|-------------|
+| `is_park` | `yes` if ≥50% of edge length lies inside an OSM park polygon (`leisure=park`, `landuse=recreation_ground`; not `leisure=garden`) or a manual park polygon. Private/restricted polygons excluded at fetch (`access=private/no/customers`). |
+| `is_river` | `yes` if edge ≥50% inside a manual river polygon (drawn in debug app, same workflow as park) |
+| `is_sight` | `yes` if edge intersects a manual sight circle (point + radius in metres, default 200) |
+| `attraction_name` | Semicolon-separated names from matching OSM/manual regions (may list multiple) |
+
+**Source:** **`fetch_osm_park_polygons.py`** (Overpass → `1_data/osm_park_polygons.geojson`) then **`tag_attractions_osm.py`** on `london_elev_final` (clears `is_park`, re-tags from cache). **`attraction_manual_regions.json`** from debug **Modify attractions** mode; apply with **`apply_attraction_manual.py`** on the final graph (adds flags, does not clear OSM `is_park`). Spatial matching: [`attraction_spatial.py`](../3_pipeline/attraction_spatial.py) (STRtree + length ratio, EPSG:27700 for buffers). Main app **Green/scenic** toggle uses any of `is_park` / `is_river` / `is_sight` (`_has_attraction_edge` in `app.py`).
 
 **Manual edit apply run totals** (graph 175 490 nodes, 350 283 edges):
 
@@ -286,10 +330,11 @@ Nodes are **coordinates** `(lon, lat)` rounded to 6 decimals. Every node has at 
 ### 5.3 Cleanup
 
 - **Largest component only:** After building the graph, only the **largest weakly connected component** is kept. All other nodes/edges (islands) are removed.
+- **Topology:** Without noding, many suburbs are falsely disconnected (T-junctions on long OSM ways) and removed as “islands.” After `noded_network.py`, island removal should drop sharply; final node/edge counts should rise versus the pre-noding baseline (~175k nodes / ~542k islands removed).
 
 ### 5.4 Debug output
 
-- **`1_data/graph_debug_report.txt`** — Generated every run. Contains:
+- **`1_data/graph_debug_reports/graph_debug_report_YYYY-MM-DD.txt`** — Generated every `build_graph.py` run (time suffix if multiple runs on the same day). Contains:
   - Total nodes, edges, raw segments, banned motorways, one-ways, contraflows, islands removed.
   - Per-edge-tag: non-empty count, total, coverage %.
   - Value distributions for categorical edge tags.
@@ -322,7 +367,7 @@ After running `python build_graph.py` from `3_pipeline/`, you should see somethi
    -> Missed 70626 features (no node within 0.0002 deg).
 5. Saving to ..\1_data\london.graphml...
    -> Graph saved.
-6. Generating debug report -> ..\1_data\graph_debug_report.txt
+6. Generating debug report -> ..\1_data\graph_debug_reports\graph_debug_report_YYYY-MM-DD.txt
    -> Report written: 336 lines.
 SUCCESS! Enhanced directed graph built.
 ```
@@ -338,9 +383,9 @@ SUCCESS! Enhanced directed graph built.
 | Islands removed | Small disconnected components dropped; only the largest connected graph is kept. |
 | Point features | Intersection/barrier points from OSM (signals, crossings, barriers, etc.). |
 | Snapped / Missed | Points within ~20 m of a graph node get attributes on that node; the rest are discarded (often off-network or duplicate). |
-| Report | Tag coverage and value distributions written to `1_data/graph_debug_report.txt`. |
+| Report | Tag coverage and value distributions written to `1_data/graph_debug_reports/` (dated filename). |
 
-### 6.2 Interpreting the debug report (`graph_debug_report.txt`)
+### 6.2 Interpreting the debug report (`graph_debug_reports/graph_debug_report_*.txt`)
 
 The report has six parts. Use it to check data quality and coverage.
 
@@ -395,7 +440,7 @@ A run is **successful** if:
 - Script hangs (e.g. at point snapping) → see Section 5.4 / spatial index (KD-tree) in `build_graph.py`.
 - Zero nodes or edges after cleanup → check DB and highway filter.
 - No intersections snapped → check SNAP_THRESHOLD and that `planet_osm_point` has data in your area.
-- Report file missing or empty → check write permissions and REPORT_PATH.
+- Report file missing or empty → check write permissions and `1_data/graph_debug_reports/`.
 
 ### 6.4 Example: was this build successful?
 
@@ -409,24 +454,93 @@ For the run that produced the terminal output and report above:
 
 So the pipeline ran correctly and the resulting graph is suitable for routing and for adding intersection-based penalties when you implement that (see `TASKS.md`).
 
+### 6.5 Tag coverage (verification script)
+
+Output from **`python 6_verification/verify_tag_coverage.py`** on **`london_elev_final_tfl.graphml`** (175,490 nodes, 350,283 edges). Every possible edge and node tag is reported; low or 0% coverage means OSM or the pipeline rarely populate those tags.
+
+**Edge tag coverage**
+
+| TAG | NON-EMPTY | TOTAL | COVERAGE |
+|-----|-----------|-------|----------|
+| `osm_id` | 350,283 | 350,283 | 100.0% |
+| `name` | 187,019 | 350,283 | 53.4% |
+| `type` | 350,283 | 350,283 | 100.0% |
+| `length` | 350,283 | 350,283 | 100.0% |
+| `risk` | 30,729 | 350,283 | 8.8% |
+| `geometry` | 350,283 | 350,283 | 100.0% |
+| `surface` | 246,652 | 350,283 | 70.4% |
+| `lit` | 200,314 | 350,283 | 57.2% |
+| `maxspeed` | 139,317 | 350,283 | 39.8% |
+| `width` | 4,952 | 350,283 | 1.4% |
+| `bridge` | 9,146 | 350,283 | 2.6% |
+| `tunnel` | 3,105 | 350,283 | 0.9% |
+| `junction` | 3,655 | 350,283 | 1.0% |
+| `smoothness` | 11,511 | 350,283 | 3.3% |
+| `cycleway` | 23,900 | 350,283 | 6.8% |
+| `cycleway_left` | 22,058 | 350,283 | 6.3% |
+| `cycleway_right` | 16,643 | 350,283 | 4.8% |
+| `cycleway_both` | 24,309 | 350,283 | 6.9% |
+| `segregated` | 40,307 | 350,283 | 11.5% |
+| `cycleway_separation` | 16 | 350,283 | 0.0% |
+| `cycleway_left_separation` | 0 | 350,283 | 0.0% |
+| `cycleway_right_separation` | 2 | 350,283 | 0.0% |
+| `cycleway_buffer` | 8 | 350,283 | 0.0% |
+| `cycleway_width` | 283 | 350,283 | 0.1% |
+| `cycleway_surface` | 2,698 | 350,283 | 0.8% |
+| `cycleway_smoothness` | 0 | 350,283 | 0.0% |
+| `lcn_ref` | 0 | 350,283 | 0.0% |
+| `rcn_ref` | 25 | 350,283 | 0.0% |
+| `ncn_ref` | 0 | 350,283 | 0.0% |
+| `cycle_network` | 244 | 350,283 | 0.1% |
+| `hgv` | 1,474 | 350,283 | 0.4% |
+| `traffic_calming` | 3,180 | 350,283 | 0.9% |
+| `traffic_calming_point` | 29,702 | 350,283 | 8.5% |
+| `traffic_calming_point_lat` | 29,702 | 350,283 | 8.5% |
+| `traffic_calming_point_lon` | 29,702 | 350,283 | 8.5% |
+| `barrier` | 61,067 | 350,283 | 17.4% |
+| `barrier_lat` | 61,067 | 350,283 | 17.4% |
+| `barrier_lon` | 61,067 | 350,283 | 17.4% |
+| `barrier_confidence` | 41,586 | 350,283 | 11.9% |
+| `give_way` | 13,394 | 350,283 | 3.8% |
+| `give_way_lat` | 13,394 | 350,283 | 3.8% |
+| `give_way_lon` | 13,394 | 350,283 | 3.8% |
+| `stop_sign` | 197 | 350,283 | 0.1% |
+| `stop_sign_lat` | 197 | 350,283 | 0.1% |
+| `stop_sign_lon` | 197 | 350,283 | 0.1% |
+| `tfl_cycle_programme` | 21,586 | 350,283 | 6.2% |
+| `tfl_cycle_route` | 21,586 | 350,283 | 6.2% |
+| `grade` | 199,744 | 350,283 | 57.0% |
+
+**Node tag coverage**
+
+| TAG | NON-EMPTY | TOTAL | COVERAGE |
+|-----|-----------|-------|----------|
+| `x` | 175,489 | 175,490 | 100.0% |
+| `y` | 175,490 | 175,490 | 100.0% |
+| `traffic_signals` | 10,815 | 175,490 | 6.2% |
+| `mini_roundabout` | 1,072 | 175,490 | 0.6% |
+| `crossing` | 34,095 | 175,490 | 19.4% |
+| `crossing_type` | 31,682 | 175,490 | 18.1% |
+| `elevation` | 175,350 | 175,490 | 99.9% |
+
 ---
 
 ## 7. Elevation processing (after build)
 
 1. **`Add_elevation_raster.py`**  
-   Reads `london.graphml`, samples LIDAR at each node, sets `elevation`; computes `grade` per edge. Writes **`london_elev_raw.graphml`**.
+   Loads `london` via `graph_io` (pickle preferred). Samples LIDAR at each node, sets `elevation`; computes `grade` per edge. Writes **`london_elev_raw.gpickle`** only.
 
 2. **`elevation_processing_aggressive.py`**  
-   Reads `london_elev_raw.graphml`. Applies 5×5 median smoothing on suspicious nodes, recalculates grades, applies cluster logic (flatten noise, preserve real steep chains), caps extreme grades (e.g. 20%). Writes **`london_elev_final.graphml`**.  
+   Loads `london_elev_raw.gpickle`. Applies 5×5 median smoothing on suspicious nodes, recalculates grades, pedestrian/micro pre-filters, then **connected hill-length filter** on ascent-steep edges: flatten chains **&lt;50 m**, halve **50–100 m**, keep **≥100 m** (union-find on steep subgraph). Caps extreme grades at ±20%. Writes **`london_elev_final.gpickle`** only.  
    All non-elevation attributes from the graph are unchanged; only `elevation` and `grade` are modified.
 
 ---
 
 ## 8. Routing use
 
-- **File used:** `1_data/london_elev_final_tfl.graphml` (elevation + TfL cycle routes; see pipeline step 7).
+- **File used:** `1_data/london_elev_final_tfl.gpickle` at runtime (canonical path `london_elev_final_tfl.graphml` for `graph_io` fallback; see pipeline step 7).
 - **Graph type:** `networkx.DiGraph`; node id = `(lon, lat)` tuple.
-- **Cost function:** Currently uses edge attributes only (e.g. `length`, `risk`, `lit`, `surface`, `grade`). Node attributes (e.g. `traffic_signals`, `barrier`) are **not** used in routing yet; they are available for future cost/penalty logic.
+- **Cost function:** Edge attributes (`length`, `risk`, `lit`, `surface`, `grade`, barriers, calming, etc.) plus **node** penalties at the head of each edge (`traffic_signals`, zebra/uncontrolled `crossing`, `mini_roundabout`, junction danger). See `0_documentation/APP_MAIN.md` §5.5. Junction cluster dedup (35 m) limits stacked penalties at one physical junction.
 
 ---
 
@@ -436,7 +550,7 @@ Live road disruption data (**TfL** and **TomTom**) is **not** stored in the grap
 
 ### 9.1 Why it is outsourced from the graph pipeline
 
-- The graph pipeline (steps 1–7) produces a **static** snapshot: OSM roads, elevation, and TfL cycle route tags. The output file (`london_elev_final_tfl.graphml`) is written once and reused.
+- The graph pipeline (steps 1–7) produces a **static** snapshot: OSM roads, elevation, and TfL cycle route tags. The runtime artifact (`london_elev_final_tfl.gpickle`; plus `.graphml` export) is written once and reused.
 - Live disruptions (road closures, works, incidents, diversions) change constantly and come from **external APIs**. They do not belong in a static GraphML build; they belong in the **runtime** layer that already loads that graph for routing.
 - So disruption data is **logistically outsourced**: the same graph is loaded by the backend; a spatial index over edge geometries is built once at startup; APIs are called on demand (e.g. via `POST /admin/update_tfl` and `POST /admin/update_tomtom`); matches are stored in in-memory lookups. Routing and overlays then use this dynamic data alongside the static graph. Conceptually, “what affects routing” still includes these disruptions—they are just supplied by a separate system that consumes the graph rather than being part of the graph file.
 

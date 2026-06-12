@@ -2,7 +2,7 @@
 Tag graph edges with TfL cycle route data (Cycleways, Quietways, Cycle Superhighways).
 Reads: 1_data/tfl_raw/routes/Cycle_routes.json (GeoJSON)
 Reads: 1_data/london_elev_final.graphml (or --input path)
-Writes: new graph with _tfl before .graphml and edge attributes tfl_cycle_programme, tfl_cycle_route.
+Writes: london_elev_final_tfl.graphml + .gpickle with tfl_cycle_programme, tfl_cycle_route.
 
 Strategy (avoid over-tagging, fill gaps where OSM has no cycleway tags):
 - TfL data: one feature per route (e.g. C40), geometry = MultiLineString. We explode to segments; same route can have many segments.
@@ -19,6 +19,7 @@ import math
 import os
 import argparse
 import networkx as nx
+from graph_io import load_graph, save_graph, fast_path
 from shapely.wkt import loads as wkt_loads
 from shapely.geometry import LineString
 from shapely.strtree import STRtree
@@ -169,8 +170,8 @@ def main():
     if not os.path.isfile(tfl_path):
         print(f"ERROR: TfL routes file not found: {tfl_path}")
         return 1
-    if not os.path.isfile(input_path):
-        print(f"ERROR: Graph not found: {input_path}")
+    if not os.path.isfile(input_path) and not os.path.isfile(fast_path(input_path)):
+        print(f"ERROR: Graph not found: {input_path} (or .gpickle)")
         return 1
 
     print("--- TfL CYCLE ROUTE TAGGING ---")
@@ -179,7 +180,7 @@ def main():
     print(f"   -> {len(tfl_segments)} TfL segment lines loaded.")
 
     print(f"2. Loading graph from {input_path}...")
-    G = nx.read_graphml(input_path)
+    G = load_graph(input_path)
     n_edges = G.number_of_edges()
     print(f"   -> {G.number_of_nodes()} nodes, {n_edges} edges.")
 
@@ -352,8 +353,8 @@ def main():
 
     print(f"   -> Tagged {tagged} edges with TfL routes.")
 
-    print(f"8. Saving graph to {output_path}...")
-    nx.write_graphml(G, output_path)
+    print(f"8. Saving graph to {output_path} (+ fast pickle)...")
+    save_graph(G, output_path, write_graphml=True, write_fast=True)
     print("SUCCESS! TfL cycle route tags added (tfl_cycle_programme, tfl_cycle_route).")
     return 0
 

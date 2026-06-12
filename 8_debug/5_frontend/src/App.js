@@ -267,13 +267,28 @@ const JUNCTION_COLORS = {
 };
 const getJunctionColor = (type) => JUNCTION_COLORS[String(type).toLowerCase()] || '#9C27B0';
 
-// Cycling-relevant barrier types get colors; rest grey (stile, height_restrictor, turnstile, yes, motorcycle_barrier)
-const BARRIER_COLORS = {
-    cycle_barrier: '#E53935', bollard: '#1976D2', gate: '#388E3C', kerb: '#F57C00',
-    lift_gate: '#7B1FA2', kissing_gate: '#00838F', swing_gate: '#558B2F', planter: '#5D4037',
-    block: '#795548', entrance: '#6D4C41',
+// Barrier clusters (barrier_clusters.py) — one colour per routing group.
+const BARRIER_CLUSTER_COLORS = {
+    1: '#2E7D32',  // free flow
+    2: '#1976D2',  // permeable slow-down
+    3: '#F57C00',  // stop & push
+    4: '#C62828',  // lift / squeeze / hostile
+    5: '#212121',  // impassable
 };
-const getBarrierColor = (type) => BARRIER_COLORS[String(type).toLowerCase()] || '#9E9E9E';
+const BARRIER_CLUSTER_LABELS = {
+    1: 'Free flow (0m)',
+    2: 'Permeable (+15m)',
+    3: 'Stop/push (+35m)',
+    4: 'Hostile (+90m)',
+    5: 'Impassable',
+};
+const getBarrierColor = (point) => {
+    const d = point?.details || {};
+    if (d.barrier_cluster_color) return d.barrier_cluster_color;
+    const c = d.barrier_cluster;
+    if (c != null) return BARRIER_CLUSTER_COLORS[c] || '#9E9E9E';
+    return '#9E9E9E';
+};
 
 // TfL live disruption type → color
 const TFL_DISRUPTION_COLORS = {
@@ -295,6 +310,13 @@ const TOMTOM_DISRUPTION_COLORS = {
 };
 const getTomtomDisruptionColor = (type) => TOMTOM_DISRUPTION_COLORS[String(type).toLowerCase()] || '#757575';
 
+const ATTRACTION_TYPE_COLORS = { park: '#2E7D32', river: '#1565C0', sight: '#6A1B9A' };
+
+const attractionZonePathOptions = (type, { fillOpacity = 0.18, weight = 1.5, lineOpacity = 0.85 } = {}) => {
+    const color = ATTRACTION_TYPE_COLORS[type] || '#00796B';
+    return { color, fillColor: color, fillOpacity, weight, opacity: lineOpacity };
+};
+
 // Subtoggle (smaller, indented)
 const Subtoggle = ({ label, isOn, setIsOn, activeColor }) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', marginLeft: '12px', cursor: 'pointer' }} onClick={() => setIsOn(!isOn)}>
@@ -313,7 +335,13 @@ const DebugPanel = ({
     unlitOn, setUnlitOn, unlitNoDataOn, setUnlitNoDataOn, unlitLimitReached,
     cyclewayOn, setCyclewayOn, cyclewayGeneralOn, setCyclewayGeneralOn, cyclewaySegregatedOn, setCyclewaySegregatedOn,
     hgvBannedOn, setHgvBannedOn,
+    graphNetworkOn, setGraphNetworkOn, graphNetworkLimitReached,
     tflRoutesOn, setTflRoutesOn,
+    attractionsOn, setAttractionsOn,
+    attractionParkOn, setAttractionParkOn,
+    attractionRiverOn, setAttractionRiverOn,
+    attractionSightOn, setAttractionSightOn,
+    attractionLimitReached,
     tflDisruptionsOn, setTflDisruptionsOn, onRefreshTfl, tflDisruptionStatus,
     tomtomDisruptionsOn, setTomtomDisruptionsOn, onRefreshTomtom, tomtomDisruptionStatus,
     tflGroundTruthOn, setTflGroundTruthOn,
@@ -440,7 +468,64 @@ const DebugPanel = ({
                     )}
 
                     <Toggle label="HGV banned" isOn={hgvBannedOn} setIsOn={setHgvBannedOn} activeColor="#BF360C" />
+
+                    <Toggle label="Graph network" isOn={graphNetworkOn} setIsOn={setGraphNetworkOn} activeColor="#607D8B" />
+                    {graphNetworkOn && graphNetworkLimitReached && <div style={{ fontSize: '10px', color: '#E65100', marginLeft: 12, marginBottom: 8 }}>15k limit — zoom in to see more</div>}
+                    {graphNetworkOn && (
+                        <div style={{ marginTop: '5px', marginBottom: '15px', fontSize: '11px', color: '#666' }}>
+                            <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>Graph network legend (highway type):</div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                <div style={{ width: 12, height: 12, background: '#1976D2', marginRight: 5 }}></div> Cycleway
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                <div style={{ width: 12, height: 12, background: '#7B1FA2', marginRight: 5 }}></div> Footway / Path
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                <div style={{ width: 12, height: 12, background: '#D32F2F', marginRight: 5 }}></div> Primary
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                <div style={{ width: 12, height: 12, background: '#F57C00', marginRight: 5 }}></div> Secondary
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                <div style={{ width: 12, height: 12, background: '#FBC02D', marginRight: 5 }}></div> Tertiary
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                <div style={{ width: 12, height: 12, background: '#2E7D32', marginRight: 5 }}></div> Residential
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                <div style={{ width: 12, height: 12, background: '#5D4037', marginRight: 5 }}></div> Service
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
+                                <div style={{ width: 12, height: 12, background: '#9E9E9E', marginRight: 5 }}></div> Other / Unknown
+                            </div>
+                        </div>
+                    )}
+
                     <Toggle label="TfL cycle routes" isOn={tflRoutesOn} setIsOn={setTflRoutesOn} activeColor="#2E7D32" />
+                    <Toggle label="Attraction edges" isOn={attractionsOn} setIsOn={setAttractionsOn} activeColor="#00796B" />
+                    {attractionsOn && (
+                        <div style={{ marginTop: '5px', marginBottom: '10px', fontSize: '10px', color: '#666' }}>
+                            <Subtoggle label="Park (is_park)" isOn={attractionParkOn} setIsOn={setAttractionParkOn} />
+                            <Subtoggle label="River (is_river)" isOn={attractionRiverOn} setIsOn={setAttractionRiverOn} />
+                            <Subtoggle label="Sight (is_sight)" isOn={attractionSightOn} setIsOn={setAttractionSightOn} />
+                            <div style={{ fontWeight: 'bold', marginTop: '6px', marginBottom: '4px' }}>Colours:</div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+                                <div style={{ width: 10, height: 10, background: ATTRACTION_TYPE_COLORS.park, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
+                                Park
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+                                <div style={{ width: 10, height: 10, background: ATTRACTION_TYPE_COLORS.river, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
+                                River
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+                                <div style={{ width: 10, height: 10, background: ATTRACTION_TYPE_COLORS.sight, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
+                                Sight
+                            </div>
+                            {attractionLimitReached && (
+                                <div style={{ marginTop: '6px', color: '#c62828' }}>20k limit — zoom in</div>
+                            )}
+                        </div>
+                    )}
                     {tflRoutesOn && (
                         <div style={{ marginTop: '5px', marginBottom: '10px', fontSize: '10px', color: '#666' }}>
                             <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>TfL programme:</div>
@@ -583,17 +668,13 @@ const DebugPanel = ({
                     <Toggle label="Barriers" isOn={barriersOn} setIsOn={setBarriersOn} activeColor="#5D4037" />
                     {barriersOn && (
                         <div style={{ marginTop: '5px', marginBottom: '10px', fontSize: '10px', color: '#666' }}>
-                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Barriers (cycling-relevant):</div>
-                            {Object.entries(BARRIER_COLORS).map(([t, c]) => (
-                                <div key={t} style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Barrier clusters (routing):</div>
+                            {Object.entries(BARRIER_CLUSTER_COLORS).map(([id, c]) => (
+                                <div key={id} style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
                                     <div style={{ width: 10, height: 10, background: c, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
-                                    {t.replace('_', ' ')}
+                                    {BARRIER_CLUSTER_LABELS[id]}
                                 </div>
                             ))}
-                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
-                                <div style={{ width: 10, height: 10, background: '#9E9E9E', borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
-                                Other (stile, turnstile, etc.)
-                            </div>
                         </div>
                     )}
                     <Toggle label="Traffic signals" isOn={trafficSignalsOn} setIsOn={setTrafficSignalsOn} activeColor="#D32F2F" />
@@ -705,6 +786,143 @@ const ModifyPanel = ({
                             </div>
                             <div style={{ marginTop: '10px', fontSize: '10px', color: '#888' }}>
                                 Added = yellow; Removed = black. Edits are saved to <code style={{ background: '#f0f0f0', padding: '1px 4px' }}>3_pipeline/tfl_manual_edits.json</code>. Run <code style={{ background: '#f0f0f0', padding: '1px 4px' }}>apply_tfl_manual_edits.py</code> to apply to the graph.
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// --- MODIFY ATTRACTIONS PANEL (bottom-left, stacked below TfL modify) ---
+const ModifyAttractionsPanel = ({
+    modifyAttractionOn,
+    setModifyAttractionOn,
+    attractionType,
+    setAttractionType,
+    attractionName,
+    setAttractionName,
+    onCompleteGeometry,
+    onUndo,
+    canUndo,
+    scratchCount,
+}) => {
+    const [collapsed, setCollapsed] = useState(true);
+    return (
+        <div style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '290px',
+            background: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+            zIndex: 1999,
+            transition: 'width 0.3s',
+            width: collapsed ? '44px' : '280px',
+            overflow: 'hidden',
+            transform: 'translateY(0)',
+        }}>
+            <div
+                onClick={() => setCollapsed(!collapsed)}
+                style={{
+                    padding: '10px',
+                    cursor: 'pointer',
+                    background: '#00796B',
+                    color: 'white',
+                    display: 'flex',
+                    justifyContent: collapsed ? 'center' : 'space-between',
+                    alignItems: 'center',
+                }}
+            >
+                {!collapsed && <span style={{ fontWeight: 'bold', fontSize: '12px' }}>MODIFY ATTRACTIONS</span>}
+                <span>{collapsed ? '◎' : '▼'}</span>
+            </div>
+            {!collapsed && (
+                <div style={{ padding: '14px', maxHeight: '70vh', overflowY: 'auto' }}>
+                    <Toggle
+                        label="Modify attractions"
+                        isOn={modifyAttractionOn}
+                        setIsOn={setModifyAttractionOn}
+                        activeColor="#00796B"
+                    />
+                    {modifyAttractionOn && (
+                        <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => canUndo && onUndo && onUndo()}
+                                    disabled={!canUndo}
+                                    title={canUndo ? 'Undo last region (Ctrl+Z)' : 'Nothing to undo'}
+                                    style={{
+                                        padding: '6px 10px',
+                                        fontSize: '14px',
+                                        background: canUndo ? '#f5f5f5' : '#eee',
+                                        border: '1px solid #ccc',
+                                        borderRadius: '6px',
+                                        cursor: canUndo ? 'pointer' : 'not-allowed',
+                                    }}
+                                >
+                                    ← Undo
+                                </button>
+                                <span style={{ fontSize: '10px', color: '#888' }}>Ctrl+Z</span>
+                            </div>
+                            <div style={{ marginBottom: '8px', fontSize: '11px', color: '#555', lineHeight: 1.4 }}>
+                                Park / River: click polygon corners (≥3), then Complete. River uses the drawn box as the tagging zone.
+                                Sight: one click saves a 200 m radius. Faint fill = tagging zone. Light green = OSM parks.
+                            </div>
+                            <div style={{ fontWeight: 'bold', fontSize: '11px', marginBottom: '4px' }}>Name (used for all new regions):</div>
+                            <input
+                                type="text"
+                                value={attractionName}
+                                onChange={(e) => setAttractionName(e.target.value)}
+                                placeholder="e.g. Hyde Park, Thames, Tower Bridge"
+                                style={{ width: '100%', boxSizing: 'border-box', marginBottom: '10px', padding: '6px', fontSize: '12px' }}
+                            />
+                            <div style={{ fontWeight: 'bold', fontSize: '11px', marginBottom: '6px' }}>Type:</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+                                {['park', 'river', 'sight'].map((t) => (
+                                    <button
+                                        key={t}
+                                        type="button"
+                                        onClick={() => setAttractionType(t)}
+                                        style={{
+                                            padding: '6px 12px',
+                                            fontSize: '11px',
+                                            fontWeight: attractionType === t ? 'bold' : 'normal',
+                                            background: attractionType === t ? ATTRACTION_TYPE_COLORS[t] : '#eee',
+                                            color: attractionType === t ? '#fff' : '#333',
+                                            border: attractionType === t ? `2px solid ${ATTRACTION_TYPE_COLORS[t]}` : '1px solid #ccc',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                                    </button>
+                                ))}
+                            </div>
+                            {(attractionType === 'park' || attractionType === 'river') && (
+                                <button
+                                    type="button"
+                                    onClick={() => onCompleteGeometry && onCompleteGeometry()}
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px',
+                                        marginBottom: '10px',
+                                        fontSize: '12px',
+                                        fontWeight: 'bold',
+                                        background: '#E0F2F1',
+                                        border: '2px solid #00796B',
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    Complete geometry ({scratchCount} points)
+                                </button>
+                            )}
+                            <div style={{ fontSize: '10px', color: '#888' }}>
+                                Saved to <code style={{ background: '#f0f0f0', padding: '1px 4px' }}>attraction_manual_regions.json</code>.
+                                Run <code style={{ background: '#f0f0f0', padding: '1px 4px' }}>apply_attraction_manual.py</code> after pipeline.
                             </div>
                         </>
                     )}
@@ -887,6 +1105,63 @@ const HgvBannedLayer = ({ isOn, setSegments, setStatus }) => {
     return null;
 };
 
+// --- GRAPH NETWORK (all physical edges; 15k centre cap) ---
+const GRAPH_NETWORK_TYPE_COLORS = {
+    // Cycling / pedestrian
+    cycleway: '#1976D2',
+    footway: '#7B1FA2',
+    path: '#7B1FA2',
+    pedestrian: '#7B1FA2',
+    steps: '#7B1FA2',
+    bridleway: '#6A1B9A',
+    // Roads
+    primary: '#D32F2F',
+    secondary: '#F57C00',
+    tertiary: '#FBC02D',
+    trunk: '#424242',
+    motorway: '#212121',
+    residential: '#2E7D32',
+    living_street: '#388E3C',
+    unclassified: '#33691E',
+    service: '#5D4037',
+    track: '#8D6E63',
+};
+const getGraphNetworkColor = (highwayType) => {
+    const key = String(highwayType || '').toLowerCase();
+    return GRAPH_NETWORK_TYPE_COLORS[key] || '#9E9E9E';
+};
+
+const GraphNetworkLayer = ({ isOn, setSegments, setLimitReached, setStatus }) => {
+    const map = useMapEvents({
+        moveend: () => {
+            if (!isOn) return;
+            fetchData();
+        }
+    });
+
+    const fetchData = () => {
+        const bounds = map.getBounds();
+        setStatus("Loading graph network...");
+        fetch(`http://127.0.0.1:5001/debug/graph_network?min_lat=${bounds.getSouth()}&max_lat=${bounds.getNorth()}&min_lon=${bounds.getWest()}&max_lon=${bounds.getEast()}`)
+            .then(res => res.json())
+            .then(data => {
+                const segs = (data && data.segments) ? data.segments : [];
+                setSegments(Array.isArray(segs) ? segs : []);
+                if (typeof setLimitReached === 'function') setLimitReached(Boolean(data && data.limit_reached));
+                const n = Array.isArray(segs) ? segs.length : 0;
+                setStatus(data && data.limit_reached ? `Graph network: ${n} segments (15k limit — zoom in)` : `Graph network: ${n} segments`);
+            })
+            .catch(() => setStatus("Connection Error"));
+    };
+
+    useEffect(() => {
+        if (isOn) fetchData();
+        else { setSegments([]); if (typeof setLimitReached === 'function') setLimitReached(false); }
+    }, [isOn]);
+
+    return null;
+};
+
 // TfL programme -> color (cycleway, quietway, superhighway)
 const TFL_PROGRAMME_COLORS = { cycleway: '#2E7D32', quietway: '#1565C0', superhighway: '#E65100' };
 const getTflProgrammeColor = (programme) => TFL_PROGRAMME_COLORS[String(programme).toLowerCase()] || '#757575';
@@ -917,6 +1192,57 @@ const TflRoutesLayer = ({ isOn, setSegments, setStatus }) => {
         if (isOn) fetchData();
         else setSegments([]);
     }, [isOn]);
+
+    return null;
+};
+
+// --- ATTRACTION EDGES (is_park / is_river / is_sight) ---
+const AttractionsLayer = ({ isOn, layers, setSegmentsByKind, setLimitReached, setStatus }) => {
+    const map = useMapEvents({
+        moveend: () => {
+            if (!isOn) return;
+            fetchAll();
+        }
+    });
+
+    const fetchAll = () => {
+        const bounds = map.getBounds();
+        const q = `min_lat=${bounds.getSouth()}&max_lat=${bounds.getNorth()}&min_lon=${bounds.getWest()}&max_lon=${bounds.getEast()}`;
+        setStatus("Loading attraction edges...");
+        const order = ['park', 'river', 'sight'];
+        const active = order.filter(k => layers[k]);
+        if (active.length === 0) {
+            setSegmentsByKind({});
+            if (typeof setLimitReached === 'function') setLimitReached(false);
+            setStatus("Attraction edges: 0 segments");
+            return;
+        }
+        Promise.all(active.map(kind =>
+            fetch(`http://127.0.0.1:5001/debug/attractions?${q}&layer=${kind}`).then(r => r.json())
+        )).then(results => {
+            const out = {};
+            let total = 0;
+            let limitReached = false;
+            active.forEach((kind, i) => {
+                const d = results[i];
+                const segs = (d && d.segments) ? d.segments : [];
+                out[kind] = segs;
+                total += segs.length;
+                if (d && d.limit_reached) limitReached = true;
+            });
+            setSegmentsByKind(out);
+            if (typeof setLimitReached === 'function') setLimitReached(limitReached);
+            setStatus(limitReached ? `Attraction edges: ${total} (20k limit)` : `Attraction edges: ${total}`);
+        }).catch(() => setStatus("Connection Error"));
+    };
+
+    useEffect(() => {
+        if (isOn) fetchAll();
+        else {
+            setSegmentsByKind({});
+            if (typeof setLimitReached === 'function') setLimitReached(false);
+        }
+    }, [isOn, layers.park, layers.river, layers.sight]);
 
     return null;
 };
@@ -1114,6 +1440,7 @@ const PointPopup = ({ position, type, source, dataSource, details, onClose }) =>
     let text = showText ? type : null;
     if (source === 'barrier' && details && (details.barrier_confidence != null || details.barrier)) {
         const parts = [details.barrier || type].filter(Boolean);
+        if (details.barrier_cluster_label) parts.push(`[${details.barrier_cluster_label}]`);
         if (details.barrier_confidence != null) parts.push(`conf: ${Number(details.barrier_confidence).toFixed(2)}`);
         text = parts.join(' ');
     }
@@ -1174,9 +1501,28 @@ const MapEvents = ({
     setTflEditsAdded,
     setTflEditsRemoved,
     pushTflSessionUndo,
+    modifyAttractionOn,
+    attractionType,
+    setAttractionScratchPoints,
+    attractionName,
+    onAttractionSightClick,
+    onAttractionScratchClick,
 }) => {
     const map = useMapEvents({
         click(e) {
+            if (modifyAttractionOn) {
+                setPointPopup(null);
+                setTflDisruptionDetail(null);
+                setTomtomDisruptionDetail(null);
+                const lat = e.latlng.lat;
+                const lon = e.latlng.lng;
+                if (attractionType === 'sight') {
+                    if (onAttractionSightClick) onAttractionSightClick(lat, lon);
+                } else if (onAttractionScratchClick) {
+                    onAttractionScratchClick(lat, lon);
+                }
+                return;
+            }
             if (modifyTflOn) {
                 setPointPopup(null);
                 setTflDisruptionDetail(null);
@@ -1281,6 +1627,9 @@ const MapEvents = ({
             setPointPopup(null);
             if (setTflDisruptionDetail) setTflDisruptionDetail(null);
             if (setTomtomDisruptionDetail) setTomtomDisruptionDetail(null);
+            if (modifyAttractionOn) {
+                return;
+            }
             if (modifyTflOn) {
                 const lat = e.latlng.lat, lon = e.latlng.lng;
                 fetch('http://127.0.0.1:5001/modify/tfl_remove', {
@@ -1331,8 +1680,17 @@ function App() {
     const [cyclewaySegmentsByLayer, setCyclewaySegmentsByLayer] = useState({});
     const [hgvBannedOn, setHgvBannedOn] = useState(false);
     const [hgvBannedSegments, setHgvBannedSegments] = useState([]);
+    const [graphNetworkOn, setGraphNetworkOn] = useState(false);
+    const [graphNetworkLimitReached, setGraphNetworkLimitReached] = useState(false);
+    const [graphNetworkSegments, setGraphNetworkSegments] = useState([]);
     const [tflRoutesOn, setTflRoutesOn] = useState(false);
     const [tflRoutesSegments, setTflRoutesSegments] = useState([]);
+    const [attractionsOn, setAttractionsOn] = useState(false);
+    const [attractionParkOn, setAttractionParkOn] = useState(true);
+    const [attractionRiverOn, setAttractionRiverOn] = useState(true);
+    const [attractionSightOn, setAttractionSightOn] = useState(true);
+    const [attractionLimitReached, setAttractionLimitReached] = useState(false);
+    const [attractionSegmentsByKind, setAttractionSegmentsByKind] = useState({});
     const [tflDisruptionsOn, setTflDisruptionsOn] = useState(false);
     const [tflDisruptionSegments, setTflDisruptionSegments] = useState([]);
     const [tflDisruptionStatus, setTflDisruptionStatus] = useState('');
@@ -1378,6 +1736,24 @@ function App() {
     // Undo only for current session (since mode was turned on): stack of { type: 'add'|'remove', ... }
     const [tflSessionUndoStack, setTflSessionUndoStack] = useState([]);
 
+    const [modifyAttractionOn, setModifyAttractionOn] = useState(false);
+    const [attractionType, setAttractionType] = useState('park');
+    const [attractionName, setAttractionName] = useState('');
+    const [attractionScratchPoints, setAttractionScratchPoints] = useState([]);
+    const [attractionManualRegions, setAttractionManualRegions] = useState([]);
+    const [osmParkPolygons, setOsmParkPolygons] = useState([]);
+    const [attractionScratchZonePositions, setAttractionScratchZonePositions] = useState([]);
+    const [attractionSessionUndoStack, setAttractionSessionUndoStack] = useState([]);
+
+    const setModifyTflOnExclusive = (on) => {
+        if (on) setModifyAttractionOn(false);
+        setModifyTflOn(on);
+    };
+    const setModifyAttractionOnExclusive = (on) => {
+        if (on) setModifyTflOn(false);
+        setModifyAttractionOn(on);
+    };
+
     const getSegmentColor = (grade) => {
         if (grade >= 0.40) return '#800080';
         if (grade > 0.075) return '#FF0000';
@@ -1414,6 +1790,111 @@ function App() {
             setTflSessionUndoStack([]);
         }
     }, [modifyTflOn]);
+
+    useEffect(() => {
+        if (modifyAttractionOn || attractionsOn) {
+            fetch('http://127.0.0.1:5001/modify/attraction_regions')
+                .then((r) => r.json())
+                .then((d) => setAttractionManualRegions(d.regions || []))
+                .catch(() => setAttractionManualRegions([]));
+        } else {
+            setAttractionManualRegions([]);
+        }
+        if (modifyAttractionOn) {
+            setAttractionScratchPoints([]);
+            setAttractionSessionUndoStack([]);
+            setAttractionScratchZonePositions([]);
+            setStatus('Modify attractions: park/river = draw polygon (≥3 clicks), Complete; sight = one click');
+            fetch('http://127.0.0.1:5001/modify/osm_park_polygons')
+                .then((r) => r.json())
+                .then((d) => setOsmParkPolygons(d.polygons || []))
+                .catch(() => setOsmParkPolygons([]));
+        } else {
+            setAttractionScratchPoints([]);
+            setAttractionSessionUndoStack([]);
+            setAttractionScratchZonePositions([]);
+            setOsmParkPolygons([]);
+        }
+    }, [modifyAttractionOn, attractionsOn]);
+
+    useEffect(() => {
+        if (!modifyAttractionOn) {
+            setAttractionScratchZonePositions([]);
+            return;
+        }
+        const pts = attractionScratchPoints;
+        if ((attractionType === 'park' || attractionType === 'river') && pts.length >= 3) {
+            setAttractionScratchZonePositions([[...pts, pts[0]]]);
+            return;
+        }
+        setAttractionScratchZonePositions([]);
+    }, [modifyAttractionOn, attractionType, attractionScratchPoints]);
+
+    useEffect(() => {
+        if (!modifyAttractionOn) return;
+        setAttractionScratchPoints([]);
+    }, [attractionType, modifyAttractionOn]);
+
+    const postAttractionRegion = (body) => {
+        fetch('http://127.0.0.1:5001/modify/attraction_add_region', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        })
+            .then((r) => r.json())
+            .then((d) => {
+                if (d.error) return;
+                const reg = d.region;
+                if (reg) {
+                    setAttractionManualRegions((prev) => [...prev, reg]);
+                    if (reg.id) setAttractionSessionUndoStack((prev) => [...prev, { type: 'add', id: reg.id }]);
+                }
+                setAttractionScratchPoints([]);
+            });
+    };
+
+    const handleAttractionSightClick = (lat, lon) => {
+        postAttractionRegion({
+            type: 'sight',
+            name: attractionName,
+            radius_m: 200,
+            geometry: { type: 'Point', coordinates: [lon, lat] },
+        });
+    };
+
+    const handleAttractionScratchClick = (lat, lon) => {
+        setAttractionScratchPoints((prev) => [...prev, [lat, lon]]);
+    };
+
+    const handleAttractionCompleteGeometry = () => {
+        const pts = attractionScratchPoints;
+        if (attractionType !== 'park' && attractionType !== 'river') return;
+        if (pts.length < 3) return;
+        const ring = pts.map(([la, lo]) => [lo, la]);
+        if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
+            ring.push(ring[0]);
+        }
+        postAttractionRegion({
+            type: attractionType,
+            name: attractionName,
+            geometry: { type: 'Polygon', coordinates: [ring] },
+        });
+    };
+
+    const handleAttractionUndo = () => {
+        if (attractionSessionUndoStack.length === 0) return;
+        const last = attractionSessionUndoStack[attractionSessionUndoStack.length - 1];
+        setAttractionSessionUndoStack((prev) => prev.slice(0, -1));
+        if (last.type === 'add' && last.id) {
+            setAttractionManualRegions((prev) => prev.filter((r) => r.id !== last.id));
+        }
+        fetch('http://127.0.0.1:5001/modify/attraction_undo', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+            .then((r) => r.json())
+            .then((d) => {
+                if (d.regions) setAttractionManualRegions(d.regions);
+            })
+            .catch(() => {});
+    };
 
     // Undo: only for current session; pop from session stack, update overlay, then call backend so file stays in sync
     const handleTflUndo = () => {
@@ -1470,8 +1951,21 @@ function App() {
         return () => window.removeEventListener('keydown', handler);
     }, [modifyTflOn, tflSessionUndoStack.length]);
 
-    const anyOverlayOn = heatmapOn || accidentsOn || surfacesOn || unlitOn || cyclewayOn || hgvBannedOn || tflRoutesOn || tflDisruptionsOn || tomtomDisruptionsOn || trafficCalmingOn || junctionOn ||
-        barriersOn || trafficSignalsOn || miniRoundaboutOn || crossingOn || giveWayOn || stopOn || modifyTflOn;
+    useEffect(() => {
+        if (!modifyAttractionOn) return;
+        const handler = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                if (attractionSessionUndoStack.length > 0) handleAttractionUndo();
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [modifyAttractionOn, attractionSessionUndoStack.length]);
+
+    const modifySuiteActive = modifyTflOn || modifyAttractionOn;
+    const anyOverlayOn = heatmapOn || accidentsOn || surfacesOn || unlitOn || cyclewayOn || hgvBannedOn || graphNetworkOn || tflRoutesOn || attractionsOn || tflDisruptionsOn || tomtomDisruptionsOn || trafficCalmingOn || junctionOn ||
+        barriersOn || trafficSignalsOn || miniRoundaboutOn || crossingOn || giveWayOn || stopOn || modifySuiteActive;
     const tileFilter = anyOverlayOn ? 'grayscale(100%) contrast(90%) brightness(110%)' : 'none';
 
     return (
@@ -1498,7 +1992,14 @@ function App() {
                 cyclewayGeneralOn={cyclewayGeneralOn} setCyclewayGeneralOn={setCyclewayGeneralOn}
                 cyclewaySegregatedOn={cyclewaySegregatedOn} setCyclewaySegregatedOn={setCyclewaySegregatedOn}
                 hgvBannedOn={hgvBannedOn} setHgvBannedOn={setHgvBannedOn}
+                graphNetworkOn={graphNetworkOn} setGraphNetworkOn={setGraphNetworkOn}
+                graphNetworkLimitReached={graphNetworkLimitReached}
                 tflRoutesOn={tflRoutesOn} setTflRoutesOn={setTflRoutesOn}
+                attractionsOn={attractionsOn} setAttractionsOn={setAttractionsOn}
+                attractionParkOn={attractionParkOn} setAttractionParkOn={setAttractionParkOn}
+                attractionRiverOn={attractionRiverOn} setAttractionRiverOn={setAttractionRiverOn}
+                attractionSightOn={attractionSightOn} setAttractionSightOn={setAttractionSightOn}
+                attractionLimitReached={attractionLimitReached}
                 tflDisruptionsOn={tflDisruptionsOn} setTflDisruptionsOn={setTflDisruptionsOn}
                 onRefreshTfl={handleRefreshTfl} tflDisruptionStatus={tflDisruptionStatus}
                 tomtomDisruptionsOn={tomtomDisruptionsOn} setTomtomDisruptionsOn={setTomtomDisruptionsOn}
@@ -1513,21 +2014,33 @@ function App() {
                 crossingOn={crossingOn} setCrossingOn={setCrossingOn}
                 giveWayOn={giveWayOn} setGiveWayOn={setGiveWayOn}
                 stopOn={stopOn} setStopOn={setStopOn}
-                forceCollapsed={modifyTflOn}
+                forceCollapsed={modifySuiteActive}
             />
 
             {/* MODIFY SUITE (bottom-left) */}
             <ModifyPanel
                 modifyTflOn={modifyTflOn}
-                setModifyTflOn={setModifyTflOn}
+                setModifyTflOn={setModifyTflOnExclusive}
                 modifyTflProgramme={modifyTflProgramme}
                 setModifyTflProgramme={setModifyTflProgramme}
                 onUndo={modifyTflOn ? handleTflUndo : undefined}
                 canUndo={modifyTflOn && tflSessionUndoStack.length > 0}
             />
+            <ModifyAttractionsPanel
+                modifyAttractionOn={modifyAttractionOn}
+                setModifyAttractionOn={setModifyAttractionOnExclusive}
+                attractionType={attractionType}
+                setAttractionType={setAttractionType}
+                attractionName={attractionName}
+                setAttractionName={setAttractionName}
+                onCompleteGeometry={handleAttractionCompleteGeometry}
+                onUndo={modifyAttractionOn ? handleAttractionUndo : undefined}
+                canUndo={modifyAttractionOn && attractionSessionUndoStack.length > 0}
+                scratchCount={attractionScratchPoints.length}
+            />
 
             {/* INSPECTOR WINDOW */}
-            {inspectorData && inspectorPos && (
+            {inspectorData && inspectorPos && !modifyAttractionOn && (
                 <InspectorWindow
                     data={inspectorData}
                     position={inspectorPos}
@@ -1573,7 +2086,15 @@ function App() {
                 <UnlitLayer isOn={unlitOn} includeUnknown={unlitNoDataOn} setSegments={setUnlitSegments} setLimitReached={setUnlitLimitReached} setStatus={setStatus} />
                 <CyclewayLayer isOn={cyclewayOn} layers={{ general: cyclewayGeneralOn, segregated: cyclewaySegregatedOn }} setSegmentsByLayer={setCyclewaySegmentsByLayer} setStatus={setStatus} />
                 <HgvBannedLayer isOn={hgvBannedOn} setSegments={setHgvBannedSegments} setStatus={setStatus} />
+                <GraphNetworkLayer isOn={graphNetworkOn} setSegments={setGraphNetworkSegments} setLimitReached={setGraphNetworkLimitReached} setStatus={setStatus} />
                 <TflRoutesLayer isOn={tflRoutesOn || modifyTflOn} setSegments={setTflRoutesSegments} setStatus={setStatus} />
+                <AttractionsLayer
+                    isOn={attractionsOn}
+                    layers={{ park: attractionParkOn, river: attractionRiverOn, sight: attractionSightOn }}
+                    setSegmentsByKind={setAttractionSegmentsByKind}
+                    setLimitReached={setAttractionLimitReached}
+                    setStatus={setStatus}
+                />
                 <TflDisruptionsLayer isOn={tflDisruptionsOn} setSegments={setTflDisruptionSegments} setStatus={setStatus} />
                 <TflDisruptionsRawLayer isOn={tflDisruptionsOn && tflGroundTruthOn} setPoints={setTflRawPoints} setLines={setTflRawLines} setPolygons={setTflRawPolygons} setStatus={setStatus} />
                 <TomtomDisruptionsLayer isOn={tomtomDisruptionsOn} setSegments={setTomtomDisruptionSegments} setStatus={setTomtomDisruptionStatus} />
@@ -1619,10 +2140,87 @@ function App() {
                     setTflEditsAdded={setTflEditsAdded}
                     setTflEditsRemoved={setTflEditsRemoved}
                     pushTflSessionUndo={modifyTflOn ? (op) => setTflSessionUndoStack((prev) => [...prev, op]) : undefined}
+                    modifyAttractionOn={modifyAttractionOn}
+                    attractionType={attractionType}
+                    setAttractionScratchPoints={setAttractionScratchPoints}
+                    attractionName={attractionName}
+                    onAttractionSightClick={handleAttractionSightClick}
+                    onAttractionScratchClick={handleAttractionScratchClick}
                 />
 
+                {/* OSM park polygons (algorithm-tagged areas) while modifying attractions */}
+                {modifyAttractionOn && osmParkPolygons.map((poly, idx) => (
+                    <Polygon
+                        key={`osm-park-${idx}`}
+                        positions={poly.positions}
+                        pathOptions={{ color: '#81C784', fillColor: '#A5D6A7', fillOpacity: 0.15, weight: 1 }}
+                    />
+                ))}
+
+                {/* Manual attraction tagging zones (same geometry as apply_attraction_manual) */}
+                {(modifyAttractionOn || attractionsOn) && attractionManualRegions.map((reg) => (
+                    <React.Fragment key={`man-${reg.id}`}>
+                        {(reg.zone_positions || []).map((ring, zi) => (
+                            <Polygon
+                                key={`man-${reg.id}-zone-${zi}`}
+                                positions={ring}
+                                pathOptions={attractionZonePathOptions(reg.type)}
+                            />
+                        ))}
+                        {reg.type === 'sight' && reg.positions?.[0]?.length === 2 && (
+                            <CircleMarker
+                                key={`man-${reg.id}-pt`}
+                                center={reg.positions[0]}
+                                radius={4}
+                                pathOptions={{
+                                    color: ATTRACTION_TYPE_COLORS.sight,
+                                    fillColor: '#fff',
+                                    fillOpacity: 1,
+                                    weight: 2,
+                                }}
+                            />
+                        )}
+                    </React.Fragment>
+                ))}
+
+                {/* Scratch tagging zone preview while drawing */}
+                {modifyAttractionOn && attractionScratchZonePositions.map((ring, idx) => (
+                    <Polygon
+                        key={`scratch-zone-${idx}`}
+                        positions={ring}
+                        pathOptions={attractionZonePathOptions(attractionType, { fillOpacity: 0.12, weight: 1, lineOpacity: 0.65 })}
+                    />
+                ))}
+
+                {/* Scratch points while drawing park/river */}
+                {modifyAttractionOn && attractionType !== 'sight' && attractionScratchPoints.map((pt, idx) => (
+                    <CircleMarker
+                        key={`scratch-${idx}`}
+                        center={pt}
+                        radius={5}
+                        pathOptions={{ color: '#FF6F00', fillColor: '#FFB74D', fillOpacity: 0.9, weight: 2 }}
+                    />
+                ))}
+                {modifyAttractionOn && attractionType !== 'sight' && attractionScratchPoints.length >= 2 && (
+                    <Polyline
+                        positions={attractionScratchPoints}
+                        color="#0277BD"
+                        weight={3}
+                        opacity={0.9}
+                        dashArray="6 4"
+                    />
+                )}
+                {modifyAttractionOn && attractionType !== 'sight' && attractionScratchPoints.length >= 3 && (
+                    <Polyline
+                        positions={[...attractionScratchPoints, attractionScratchPoints[0]]}
+                        color={ATTRACTION_TYPE_COLORS[attractionType] || '#0277BD'}
+                        weight={2}
+                        opacity={0.7}
+                    />
+                )}
+
                 {/* INSPECTOR RED OVERLAY */}
-                {inspectorGeo && (
+                {inspectorGeo && !modifyAttractionOn && (
                     <Polyline positions={inspectorGeo} color="red" weight={6} opacity={0.8} />
                 )}
 
@@ -1679,10 +2277,28 @@ function App() {
                     <Polyline key={seg.id} positions={seg.p} color="#BF360C" weight={3} opacity={0.8} />
                 ))}
 
+                {/* GRAPH NETWORK */}
+                {graphNetworkOn && graphNetworkSegments.map((seg) => (
+                    <Polyline key={seg.id} positions={seg.p} color={getGraphNetworkColor(seg.h)} weight={2} opacity={0.75} />
+                ))}
+
                 {/* TfL CYCLE ROUTES (color by programme) */}
                 {(tflRoutesOn || modifyTflOn) && tflRoutesSegments.map((seg) => (
                     <Polyline key={seg.id} positions={seg.p} color={getTflProgrammeColor(seg.programme)} weight={3} opacity={0.85} />
                 ))}
+
+                {/* ATTRACTION EDGES (park / river / sight) */}
+                {attractionsOn && ['park', 'river', 'sight'].map((kind) => {
+                    const segs = attractionSegmentsByKind[kind] || [];
+                    const color = ATTRACTION_TYPE_COLORS[kind] || '#00796B';
+                    return (
+                        <React.Fragment key={`attr-${kind}`}>
+                            {segs.map((seg) => (
+                                <Polyline key={`${kind}-${seg.id}`} positions={seg.p} color={color} weight={4} opacity={0.85} />
+                            ))}
+                        </React.Fragment>
+                    );
+                })}
 
                 {/* MODIFY: added (yellow) and removed (black) */}
                 {modifyTflOn && tflEditsAdded.map((seg, idx) => (
@@ -1734,9 +2350,9 @@ function App() {
                     <CircleMarker key={`jn-${idx}`} center={[p.lat, p.lon]} radius={4} pathOptions={{ color: getJunctionColor(p.type), fillColor: getJunctionColor(p.type), fillOpacity: 0.9, weight: 1 }} />
                 ))}
 
-                {/* NODE: BARRIERS (color cycling-relevant; rest grey) */}
+                {/* NODE: BARRIERS (colour by routing cluster) */}
                 {barriersOn && barrierPoints.map((p, idx) => (
-                    <CircleMarker key={`bar-${idx}`} center={[p.lat, p.lon]} radius={3.5} pathOptions={{ color: getBarrierColor(p.type), fillColor: getBarrierColor(p.type), fillOpacity: 0.9, weight: 1 }} />
+                    <CircleMarker key={`bar-${idx}`} center={[p.lat, p.lon]} radius={3.5} pathOptions={{ color: getBarrierColor(p), fillColor: getBarrierColor(p), fillOpacity: 0.9, weight: 1 }} />
                 ))}
                 {/* NODE: TRAFFIC SIGNALS, MINI ROUNDABOUT, CROSSING, GIVE WAY, STOP */}
                 {trafficSignalsOn && trafficSignalsPoints.map((p, idx) => (

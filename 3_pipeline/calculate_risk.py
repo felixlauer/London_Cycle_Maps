@@ -80,6 +80,24 @@ def main():
         conn.execute(sql, {"ids": ids_tuple})
         conn.commit()
 
+    # --- PHASE 4: SYNC TO planet_osm_line (used by graph build / enriched noded view) ---
+    print("\n[PHASE 4] Syncing accident_count to planet_osm_line...")
+    conn.execute(text(
+        "ALTER TABLE planet_osm_line ADD COLUMN IF NOT EXISTS accident_count INTEGER DEFAULT 0"
+    ))
+    conn.execute(text("UPDATE planet_osm_line SET accident_count = 0"))
+    conn.execute(text("""
+        UPDATE planet_osm_line p
+        SET accident_count = w.accident_count
+        FROM ways w
+        WHERE w.osm_id::bigint = p.osm_id
+    """))
+    conn.commit()
+    synced = conn.execute(text(
+        "SELECT COUNT(*) FROM planet_osm_line WHERE COALESCE(accident_count, 0) > 0"
+    )).scalar()
+    print(f"   -> {synced} planet_osm_line rows with accident_count > 0.")
+
     print("\nSUCCESS! Risk calculation complete.")
     conn.close()
 

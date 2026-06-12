@@ -1,12 +1,13 @@
 """
 Add node elevation and edge grade to london.graphml using LIDAR VRT.
-Output: 1_data/london_elev_raw.graphml.
+Output: 1_data/london_elev_raw.gpickle (fast lane; no intermediate GraphML).
 If you change output attributes or file names, update 0_documentation/GRAPH.md
 """
 import os
 import sys
 import networkx as nx
 import rasterio
+from graph_io import load_graph, save_graph, fast_path
 from pyproj import Transformer
 
 # --- SILENCE THE NOISE ---
@@ -24,10 +25,10 @@ BNG_WKT = 'PROJCS["OSGB 1936 / British National Grid",GEOGCS["OSGB 1936",DATUM["
 
 def main():
     print("--- 1. LOADING GRAPH ---")
-    if not os.path.exists(INPUT_GRAPH):
-        print(f"Error: {INPUT_GRAPH} not found.")
+    if not os.path.exists(INPUT_GRAPH) and not os.path.exists(fast_path(INPUT_GRAPH)):
+        print(f"Error: {INPUT_GRAPH} (or .gpickle) not found.")
         return
-    G = nx.read_graphml(INPUT_GRAPH)
+    G = load_graph(INPUT_GRAPH)
     print(f"   -> Graph loaded ({len(G.nodes())} nodes).")
 
     # Initialize the Transformer with hardcoded strings
@@ -112,8 +113,8 @@ def main():
     print("="*40)
     
     # --- 5. SAVING ---
-    nx.write_graphml(G, OUTPUT_GRAPH)
-    print(f"\nSUCCESS! High-precision graph saved to: {OUTPUT_GRAPH}")
+    save_graph(G, OUTPUT_GRAPH, write_graphml=False, write_fast=True)
+    print(f"\nSUCCESS! High-precision graph saved to: {OUTPUT_GRAPH.replace('.graphml', '.gpickle')}")
 
 if __name__ == "__main__":
     main()

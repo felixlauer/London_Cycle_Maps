@@ -1,12 +1,13 @@
 """
-Build directed routing graph from PostgreSQL (planet_osm_line + planet_osm_point).
-Output: 1_data/london.graphml (+ graph_debug_report.txt).
+Build directed routing graph from PostgreSQL (planet_osm_line_noded_enriched + planet_osm_point).
+Output: 1_data/london.graphml + london.gpickle (+ dated report in 1_data/graph_debug_reports/).
 Barrier, give_way, and stop_sign are snapped to EDGES (with original position stored).
 Traffic_signals, mini_roundabout, crossing remain on NODES.
 
 When changing parsed tags, build rules, or pipeline steps, update:
   0_documentation/GRAPH.md
 """
+import argparse
 import networkx as nx
 import pandas as pd
 from sqlalchemy import create_engine
@@ -18,21 +19,10 @@ from shapely.wkt import loads as wkt_loads
 from shapely.geometry import Point, LineString
 from shapely.strtree import STRtree
 
-# Load DB credentials from backend .env (gitignored) so it works locally
-try:
-    from dotenv import load_dotenv
-    _env = os.path.join(os.path.dirname(__file__), "..", "4_backend_engine", ".env")
-    load_dotenv(_env)
-except ImportError:
-    pass
-
-# --- CONFIGURATION (set DB_PASS etc. via env or .env; do not commit secrets) ---
-DB_USER = os.environ.get("DB_USER", "postgres")
-DB_PASS = os.environ.get("DB_PASS", "")
-DB_NAME = os.environ.get("DB_NAME", "london_routing")
-DB_HOST = os.environ.get("DB_HOST", "localhost")
+from db_config import DEFAULT_ROAD_SOURCE, db_url
+from graph_debug_report import new_debug_report_path
+from graph_io import save_graph
 OUTPUT_PATH = os.path.join("..", "1_data", "london.graphml")
-REPORT_PATH = os.path.join("..", "1_data", "graph_debug_report.txt")
 
 # Snap threshold for matching point features to graph nodes (degrees ~20m at London latitude)
 SNAP_THRESHOLD = 0.0002
@@ -53,15 +43,29 @@ HIGHWAY_TYPES_NO_CARS = frozenset([
     'footway', 'cycleway', 'path', 'pedestrian', 'steps', 'bridleway', 'corridor',
     'proposed', 'construction', 'cycleway:left', 'cycleway:right', 'cycleway:both',
 ])
+# Way-based table/cushion on pedestrian OSM ways → relay to all crossing carriageways/cycleways
+TC_WAY_RELOCATE_TYPES = frozenset(['table', 'cushion', 'hump', 'bump', 'raised'])
+TC_WAY_CROSS_BUFFER_DEG = 0.00005  # ~5 m — edge must intersect buffered footway to count as crossing
 
 def main():
-    print("--- BUILDING DIRECTED ROUTING GRAPH (ENHANCED) ---")
+    parser = argparse.ArgumentParser(description="Build directed routing graph from PostgreSQL.")
+    parser.add_argument(
+        "--source",
+        default=DEFAULT_ROAD_SOURCE,
+        help="Line table or materialized view (default: planet_osm_line_noded_enriched)",
+    )
+    args = parser.parse_args()
+    road_source = args.source
+    if not road_source.replace("_", "").isalnum():
+        raise ValueError(f"Invalid --source table name: {road_source}")
 
-    db_url = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:5432/{DB_NAME}"
-    engine = create_engine(db_url)
+    print("--- BUILDING DIRECTED ROUTING GRAPH (ENHANCED) ---")
+    print(f"   Road source: {road_source}")
+
+    engine = create_engine(db_url())
 
     # =====================================================================
-    # STEP 1: FETCH ROAD NETWORK (planet_osm_line)
+    # STEP 1: FETCH ROAD NETWORK (noded enriched view or raw planet_osm_line)
     # =====================================================================
     print("1. Fetching road network with all tags...")
 
@@ -113,9 +117,9 @@ def main():
         ST_Y(ST_StartPoint(ST_Transform(way, 4326))) as u_y,
         ST_X(ST_EndPoint(ST_Transform(way, 4326)))   as v_x,
         ST_Y(ST_EndPoint(ST_Transform(way, 4326)))   as v_y
-    FROM planet_osm_line
+    FROM {road_source}
     WHERE highway IS NOT NULL;
-    """
+    """.format(road_source=road_source)
 
     df = pd.read_sql(sql_lines, engine)
 
@@ -519,6 +523,11 @@ def main():
     tc_point_snap = 0
     tc_point_car_allowed = 0
     tc_point_fallback = 0
+    tc_point_cycleway_preferred = 0
+    tc_way_on_graph_before = 0
+    tc_way_sources_relocated = 0
+    tc_way_additional_tags = 0
+    tc_way_on_graph_after = 0
     df_tc_points = pd.DataFrame()
     sql_tc_points = """
     SELECT
@@ -544,6 +553,19 @@ def main():
             t = str(G.edges[u, v].get('type', '')).strip().lower()
             return t not in HIGHWAY_TYPES_NO_CARS
 
+        def _is_cycleway_edge(idx):
+            u, v, _ = edge_list[idx]
+            return str(G.edges[u, v].get('type', '')).strip().lower() == 'cycleway'
+
+        def _nearest_in(idxs, pt, thresh):
+            best_dist, best_idx = float('inf'), None
+            for idx in idxs:
+                _, _, line = edge_list[idx]
+                d = pt.distance(line)
+                if d < best_dist and d <= thresh:
+                    best_dist, best_idx = d, idx
+            return best_idx, best_dist
+
         for i, row in df_tc_points.iterrows():
             lon, lat = float(row['lon']), float(row['lat'])
             pt = Point(lon, lat)
@@ -551,24 +573,32 @@ def main():
             candidates = strtree_tc.query(buf)
             if len(candidates) == 0:
                 continue
-            car_allowed_idx = [idx for idx in candidates if _is_car_allowed_edge(idx)]
-            search_idx = car_allowed_idx if car_allowed_idx else list(candidates)
-            best_dist = float('inf')
+            cand_list = list(candidates)
+            car_allowed_idx = [idx for idx in cand_list if _is_car_allowed_edge(idx)]
+            cycleway_idx = [idx for idx in cand_list if _is_cycleway_edge(idx)]
+            best_car, dist_car = _nearest_in(car_allowed_idx, pt, SNAP_THRESHOLD_TC_POINT)
+            best_cw, dist_cw = _nearest_in(cycleway_idx, pt, SNAP_THRESHOLD_TC_POINT)
             best_idx = None
-            for idx in search_idx:
-                u, v, line = edge_list[idx]
-                d = pt.distance(line)
-                if d < best_dist and d <= SNAP_THRESHOLD_TC_POINT:
-                    best_dist = d
-                    best_idx = idx
+            if best_car is not None and best_cw is not None:
+                if dist_cw <= dist_car * 1.15:
+                    best_idx = best_cw
+                    tc_point_cycleway_preferred += 1
+                else:
+                    best_idx = best_car
+            elif best_car is not None:
+                best_idx = best_car
+            elif best_cw is not None:
+                best_idx = best_cw
+                tc_point_cycleway_preferred += 1
+            else:
+                best_idx, _ = _nearest_in(cand_list, pt, SNAP_THRESHOLD_TC_POINT)
             if best_idx is None:
                 continue
             u, v, _ = edge_list[best_idx]
             tc_val = str(row['traffic_calming']).strip().lower()
-            used_car = car_allowed_idx and best_idx in car_allowed_idx
-            if used_car:
+            if best_idx in car_allowed_idx and best_idx not in cycleway_idx:
                 tc_point_car_allowed += 1
-            else:
+            elif best_idx not in car_allowed_idx:
                 tc_point_fallback += 1
             G.edges[u, v]['traffic_calming_point'] = tc_val
             G.edges[u, v]['traffic_calming_point_lon'] = lon
@@ -578,37 +608,125 @@ def main():
                 G.edges[v, u]['traffic_calming_point_lon'] = lon
                 G.edges[v, u]['traffic_calming_point_lat'] = lat
             tc_point_snap += 1
-        print(f"   -> Traffic calming (points) snapped: {tc_point_snap} (car-allowed: {tc_point_car_allowed}, fallback: {tc_point_fallback}).")
+        print(
+            f"   -> Traffic calming (points) snapped: {tc_point_snap} "
+            f"(car-allowed: {tc_point_car_allowed}, cycleway-preferred: {tc_point_cycleway_preferred}, "
+            f"fallback: {tc_point_fallback})."
+        )
+
+    # =====================================================================
+    # STEP 4d: RELAY way-based table/cushion from pedestrian ways to crossing carriageways
+    # =====================================================================
+    tc_way_on_graph_before = sum(
+        1 for _u, _v, d in G.edges(data=True) if str(d.get('traffic_calming', '')).strip()
+    )
+    tc_way_sources_relocated = 0
+    tc_way_additional_tags = 0
+    if edge_list:
+        print("4d. Relaying way-based table/cushion off pedestrian/crossing edges...")
+        geoms_tc = [item[2] for item in edge_list]
+        strtree_tc_way = STRtree(geoms_tc)
+        edge_idx_by_uv = {(u, v): i for i, (u, v, _) in enumerate(edge_list)}
+        cross_buf_m = TC_WAY_CROSS_BUFFER_DEG
+
+        def _is_car_allowed_idx(idx):
+            u, v, _ = edge_list[idx]
+            t = str(G.edges[u, v].get('type', '')).strip().lower()
+            return t not in HIGHWAY_TYPES_NO_CARS
+
+        def _is_cycleway_idx(idx):
+            u, v, _ = edge_list[idx]
+            return str(G.edges[u, v].get('type', '')).strip().lower() == 'cycleway'
+
+        def _apply_tc_to_edge(tu, tv, tc_val):
+            nonlocal tc_way_additional_tags
+            prev = str(G.edges[tu, tv].get('traffic_calming', '')).strip().lower()
+            if not prev or prev != tc_val:
+                tc_way_additional_tags += 1
+            G.edges[tu, tv]['traffic_calming'] = tc_val
+            if G.has_edge(tv, tu):
+                G.edges[tv, tu]['traffic_calming'] = tc_val
+
+        for u, v, foot_line in edge_list:
+            tc_val = str(G.edges[u, v].get('traffic_calming', '')).strip().lower()
+            if not tc_val or tc_val not in TC_WAY_RELOCATE_TYPES:
+                continue
+            hw = str(G.edges[u, v].get('type', '')).strip().lower()
+            if hw not in PEDESTRIAN_HIGHWAY_TYPES:
+                continue
+            foot_buf = foot_line.buffer(SNAP_THRESHOLD)
+            cand = strtree_tc_way.query(foot_buf)
+            if len(cand) == 0:
+                continue
+            source_idx = edge_idx_by_uv.get((u, v))
+            target_idxs = set()
+            for idx in cand:
+                if idx == source_idx:
+                    continue
+                tu, tv, tline = edge_list[idx]
+                if not (_is_car_allowed_idx(idx) or _is_cycleway_idx(idx)):
+                    continue
+                if not foot_line.buffer(cross_buf_m).intersects(tline):
+                    continue
+                target_idxs.add(idx)
+            if not target_idxs:
+                continue
+            for idx in target_idxs:
+                tu, tv, _ = edge_list[idx]
+                _apply_tc_to_edge(tu, tv, tc_val)
+            G.edges[u, v]['traffic_calming'] = ''
+            if G.has_edge(v, u):
+                G.edges[v, u]['traffic_calming'] = ''
+            tc_way_sources_relocated += 1
+        tc_way_on_graph_after = sum(
+            1 for _u, _v, d in G.edges(data=True) if str(d.get('traffic_calming', '')).strip()
+        )
+        print(
+            f"   -> Way calming on graph: {tc_way_on_graph_before} before, {tc_way_on_graph_after} after; "
+            f"footway sources cleared: {tc_way_sources_relocated}; "
+            f"additional carriageway/cycleway tags introduced: {tc_way_additional_tags}."
+        )
 
     # =====================================================================
     # STEP 5: SAVE GRAPH
     # =====================================================================
-    print(f"5. Saving to {OUTPUT_PATH}...")
-    nx.write_graphml(G, OUTPUT_PATH)
+    print(f"5. Saving to {OUTPUT_PATH} (+ fast pickle)...")
+    save_graph(G, OUTPUT_PATH, write_graphml=True, write_fast=True)
     print("   -> Graph saved.")
 
     # =====================================================================
     # STEP 6: GENERATE DEBUG REPORT
     # =====================================================================
-    print(f"6. Generating debug report -> {REPORT_PATH}")
+    report_path = new_debug_report_path()
+    print(f"6. Generating debug report -> {report_path}")
     generate_report(G, df, df_points, snap_count, snap_miss,
                     count_motorway_banned, count_oneway, count_contraflow, nodes_removed,
+                    report_path=report_path,
                     barrier_snap=barrier_snap, give_way_snap=give_way_snap, stop_snap=stop_snap,
                     kerb_snap=kerb_snap, kerb_no_pedestrian_way=kerb_no_pedestrian_way,
                     confidence_band_0=confidence_band_0, confidence_band_low=confidence_band_low,
                     confidence_band_mid=confidence_band_mid, confidence_band_1=confidence_band_1,
                     tc_point_snap=tc_point_snap, tc_point_car_allowed=tc_point_car_allowed,
-                    tc_point_fallback=tc_point_fallback)
+                    tc_point_fallback=tc_point_fallback,
+                    tc_point_cycleway_preferred=tc_point_cycleway_preferred,
+                    tc_way_on_graph_before=tc_way_on_graph_before,
+                    tc_way_sources_relocated=tc_way_sources_relocated,
+                    tc_way_additional_tags=tc_way_additional_tags,
+                    tc_way_on_graph_after=tc_way_on_graph_after)
 
     print("SUCCESS! Enhanced directed graph built.")
 
 
 def generate_report(G, df_lines, df_points, snap_count, snap_miss,
                     motorway_banned, oneway_count, contraflow_count, islands_removed,
+                    report_path: str,
                     barrier_snap=0, give_way_snap=0, stop_snap=0,
                     kerb_snap=0, kerb_no_pedestrian_way=0,
                     confidence_band_0=0, confidence_band_low=0, confidence_band_mid=0, confidence_band_1=0,
-                    tc_point_snap=0, tc_point_car_allowed=0, tc_point_fallback=0):
+                    tc_point_snap=0, tc_point_car_allowed=0, tc_point_fallback=0,
+                    tc_point_cycleway_preferred=0,
+                    tc_way_on_graph_before=0, tc_way_sources_relocated=0,
+                    tc_way_additional_tags=0, tc_way_on_graph_after=0):
     """Writes a comprehensive debug report covering every tag."""
 
     lines = []
@@ -718,7 +836,13 @@ def generate_report(G, df_lines, df_points, snap_count, snap_miss,
     w(f"  Barrier confidence bands:    0: {confidence_band_0}, (0,0.5): {confidence_band_low}, [0.5,1): {confidence_band_mid}, 1: {confidence_band_1}")
     w(f"  Edge-snapped give_way:        {give_way_snap:>10,}")
     w(f"  Edge-snapped stop_sign:       {stop_snap:>10,}")
-    w(f"  Traffic calming (points) snapped: {tc_point_snap:>10,} (car-allowed: {tc_point_car_allowed}, fallback: {tc_point_fallback})")
+    w(f"  Traffic calming (points) snapped: {tc_point_snap:>10,} (car-allowed: {tc_point_car_allowed}, cycleway-pref: {tc_point_cycleway_preferred}, fallback: {tc_point_fallback})")
+    w(f"  Traffic calming (way) on graph before relay: {tc_way_on_graph_before:>10,}")
+    w(f"  Footway table/cushion sources relocated:   {tc_way_sources_relocated:>10,}")
+    w(f"  Additional way tags introduced (relay):    {tc_way_additional_tags:>10,}")
+    w(f"  Traffic calming (way) on graph after relay: {tc_way_on_graph_after:>10,}")
+    implied_osm = tc_way_on_graph_before - tc_way_sources_relocated + tc_way_additional_tags
+    w(f"  Implied OSM-equivalent way count (before - sources + added): {implied_osm:>10,}")
     w("")
 
     node_tag_counts = {tag: 0 for tag in node_tags}
@@ -814,7 +938,7 @@ def generate_report(G, df_lines, df_points, snap_count, snap_miss,
     w("  END OF REPORT")
     w("=" * 80)
 
-    with open(REPORT_PATH, 'w', encoding='utf-8') as f:
+    with open(report_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
     print(f"   -> Report written: {len(lines)} lines.")

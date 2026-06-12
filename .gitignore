@@ -10,6 +10,7 @@
 # --- Documentation: exclude internal / protocol / feature-request only ---
 0_documentation/development_protocols/
 0_documentation/feature_requests/
+0_documentation/summary_files/
 
 # --- Large data & unused ---
 1_data/

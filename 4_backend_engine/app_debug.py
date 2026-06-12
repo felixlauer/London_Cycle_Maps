@@ -1,5 +1,5 @@
 """
-Debug backend: overlay endpoints (/debug/heatmap, /debug/surfaces, /debug/unlit, /accidents) and /inspect. Port 5001.
+Debug backend: overlay endpoints and /inspect. Port 5001. Graph: london_elev_final_tfl.gpickle (fast) or .graphml fallback.
 When changing, update 0_documentation/APP_DEBUG.md
 """
 from flask import Flask, jsonify, request
@@ -9,11 +9,22 @@ from shapely.wkt import loads as load_wkt
 from shapely.geometry import Point, LineString
 from sqlalchemy import create_engine, text
 import os
+import sys
+import time
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "3_pipeline"))
+from graph_io import load_graph, fast_path
+from attraction_spatial import (
+    region_tagging_zone,
+    zone_to_leaflet_rings,
+)
+
 import tfl_live
 import live_disruptions
+from barrier_clusters import barrier_cluster_meta, cluster_legend
 
 # --- CONFIGURATION (set DB_PASS etc. via env or .env; do not commit secrets) ---
 GRAPH_PATH = os.path.join("..", "1_data", "london_elev_final_tfl.graphml")
@@ -25,22 +36,46 @@ DB_HOST = os.environ.get("DB_HOST", "localhost")
 app = Flask(__name__)
 CORS(app)
 
-print("--- STARTING DEBUG ENGINE (PORT 5001) ---")
-if not os.path.exists(GRAPH_PATH):
-    print(f"CRITICAL ERROR: {GRAPH_PATH} not found.")
-    exit()
+# Flask debug reloader imports this module twice (parent watcher + child server).
+# Default off — set FLASK_USE_RELOADER=1 only if you need auto-reload on code changes.
+USE_RELOADER = os.environ.get("FLASK_USE_RELOADER", "").lower() in ("1", "true", "yes")
 
-print(f"Loading graph from {GRAPH_PATH}...")
-G = nx.read_graphml(GRAPH_PATH)
-print(f"Graph Loaded with {len(G.nodes())} nodes.")
-
-# Build Node Index for inspector
+G = None
 node_data = []
-for node, data in G.nodes(data=True):
-    if 'x' in data and 'y' in data:
-        node_data.append({'id': node, 'x': float(data['x']), 'y': float(data['y'])})
 
-live_disruptions.init(G)
+
+def _should_run_bootstrap():
+    if not USE_RELOADER:
+        return True
+    return os.environ.get("WERKZEUG_RUN_MAIN") == "true"
+
+
+def bootstrap_debug_engine():
+    global G, node_data
+    t_boot = time.perf_counter()
+    print("--- STARTING DEBUG ENGINE (PORT 5001) ---")
+    if not os.path.exists(GRAPH_PATH) and not os.path.exists(fast_path(GRAPH_PATH)):
+        print(f"CRITICAL ERROR: {GRAPH_PATH} (or .gpickle) not found.")
+        exit()
+
+    print(f"Loading graph (fast pickle preferred): {GRAPH_PATH}...")
+    t0 = time.perf_counter()
+    G = load_graph(GRAPH_PATH)
+    print(f"Graph ready with {len(G.nodes())} nodes ({time.perf_counter() - t0:.1f}s).")
+
+    node_data = []
+    for node, data in G.nodes(data=True):
+        if 'x' in data and 'y' in data:
+            node_data.append({'id': node, 'x': float(data['x']), 'y': float(data['y'])})
+
+    t0 = time.perf_counter()
+    live_disruptions.init(G)
+    print(f"--> Live disruption index: {time.perf_counter() - t0:.1f}s")
+
+    t0 = time.perf_counter()
+    build_all_debug_caches()
+    print(f"--> Debug cache build: {time.perf_counter() - t0:.1f}s")
+    print(f"--- Bootstrap complete in {time.perf_counter() - t_boot:.1f}s ---")
 
 def get_nearest_node(lat, lon):
     best_node = None
@@ -109,9 +144,10 @@ def make_bounds(coords):
     lons = [p[1] for p in coords]
     return (min(lats), max(lats), min(lons), max(lons))
 
-def get_edge_midpoint(u, v, data):
+def get_edge_midpoint(u, v, data, coords=None):
     """Return (lat, lon) of edge midpoint for point-based overlays."""
-    coords = get_edge_coords(u, v, data)
+    if coords is None:
+        coords = get_edge_coords(u, v, data)
     if not coords:
         return None
     n = len(coords)
@@ -127,7 +163,7 @@ def get_edge_midpoint(u, v, data):
         lat, lon = coords[mid][0], coords[mid][1]
     return (lat, lon)
 
-# Caches for cycleway, HGV, and point-based overlays (filled in pre_process_graph)
+# Caches for cycleway, HGV, and point-based overlays (filled in build_all_debug_caches)
 CYCLEWAY_GENERAL = []   # has cycleway / cycleway_left / right / both (non-empty)
 CYCLEWAY_SEGREGATED = []
 HGV_BANNED_CACHE = []
@@ -135,7 +171,7 @@ TRAFFIC_CALMING_POINTS = []       # way-based: [{lat, lon, type, source: 'way'},
 TRAFFIC_CALMING_POINT_POINTS = [] # point-based: [{lat, lon, type, source: 'point'}, ...]
 JUNCTION_POINTS = []             # [{lat, lon, type}, ...] (edge-based: roundabout, circular, etc.)
 
-# Node-based point caches (filled in build_node_point_caches); graph node: x=lon, y=lat
+# Node-based point caches (filled in build_all_debug_caches); graph node: x=lon, y=lat
 BARRIER_POINTS = []          # [{lat, lon, type}, ...]
 TRAFFIC_SIGNALS_POINTS = []  # [{lat, lon}, ...]
 MINI_ROUNDABOUT_POINTS = []
@@ -146,10 +182,58 @@ STOP_POINTS = []
 # TfL cycle routes (edges with tfl_cycle_programme); programme = first category for color
 TFL_ROUTES_CACHE = []  # [{id, p, b, programme, route}, ...]
 
-MAX_SEGMENTS_LIMIT = 20000
+# Attraction / green mode (is_park, is_river, is_sight on graph edges)
+ATTRACTION_PARK_CACHE = []   # [{id, p, b, name}, ...]
+ATTRACTION_RIVER_CACHE = []
+ATTRACTION_SIGHT_CACHE = []
 
-def pre_process_graph():
-    print("--- PRE-PROCESSING GRAPH FOR DEBUGGING ---")
+MAX_SEGMENTS_LIMIT = 20000
+GRAPH_NETWORK_LIMIT = 15000
+GRAPH_NETWORK_CACHE = []  # [{id, p, b, h}, ...] one entry per physical edge (undirected)
+
+def _edge_display_point(edge_data, lat_key, lon_key, coords=None):
+    """Return (lat, lon) for edge point feature: stored position or edge geometry midpoint."""
+    lat = edge_data.get(lat_key)
+    lon = edge_data.get(lon_key)
+    if lat is not None and lon is not None:
+        try:
+            return float(lat), float(lon)
+        except (TypeError, ValueError):
+            pass
+    if coords:
+        n = len(coords)
+        if n == 0:
+            return None, None
+        if n == 1:
+            return coords[0][0], coords[0][1]
+        mid = n // 2
+        if n % 2 == 0:
+            return (coords[mid - 1][0] + coords[mid][0]) / 2.0, (coords[mid - 1][1] + coords[mid][1]) / 2.0
+        return coords[mid][0], coords[mid][1]
+    wkt = edge_data.get('geometry')
+    if wkt:
+        try:
+            line = load_wkt(wkt)
+            if line and hasattr(line, 'interpolate'):
+                mid = line.interpolate(0.5, normalized=True)
+                return float(mid.y), float(mid.x)
+        except Exception:
+            pass
+    return None, None
+
+
+def _is_yes_attr(val) -> bool:
+    return str(val or "").strip().lower() in ("yes", "true", "1")
+
+
+def build_all_debug_caches():
+    """One pass over edges for overlay caches, graph network, and edge point features."""
+    global GRAPH_NETWORK_CACHE, ATTRACTION_PARK_CACHE, ATTRACTION_RIVER_CACHE, ATTRACTION_SIGHT_CACHE
+    ATTRACTION_PARK_CACHE = []
+    ATTRACTION_RIVER_CACHE = []
+    ATTRACTION_SIGHT_CACHE = []
+    print("--- PRE-PROCESSING GRAPH FOR DEBUGGING (single edge pass) ---")
+    print(f"--> Scanning {G.number_of_edges()} edges...")
     steep_ignored = 0
     steep_error = 0
     surface_count = 0
@@ -160,6 +244,10 @@ def pre_process_graph():
     tc_points = 0
     jn_points = 0
     tfl_count = 0
+    attr_park = attr_river = attr_sight = 0
+    n_barrier = n_gw = n_stop = n_tc_pt = 0
+    seen_physical = set()
+    GRAPH_NETWORK_CACHE = []
 
     for u, v, data in G.edges(data=True):
         coords = None
@@ -216,7 +304,6 @@ def pre_process_graph():
                     "p": coords, "b": make_bounds(coords)
                 })
         elif not has_surface_info and not has_cycleway_surface_info:
-            # No surface or cycleway_surface tag — show as "no data"
             if coords is None:
                 coords = get_edge_coords(u, v, data)
             if coords:
@@ -232,7 +319,6 @@ def pre_process_graph():
                 coords = get_edge_coords(u, v, data)
             if coords:
                 unlit_count += 1
-                # Classify: explicit no vs no data
                 lit_type = "no" if lit_raw in ['no', 'limited'] else "unknown"
                 UNLIT_CACHE.append({
                     "id": f"l-{u}-{v}",
@@ -280,13 +366,13 @@ def pre_process_graph():
         # Traffic calming: way-based (midpoint) and point-based (stored position)
         tc = str(data.get('traffic_calming', '')).strip()
         if tc:
-            pt = get_edge_midpoint(u, v, data)
+            pt = get_edge_midpoint(u, v, data, coords)
             if pt:
                 tc_points += 1
                 TRAFFIC_CALMING_POINTS.append({"lat": pt[0], "lon": pt[1], "type": tc, "source": "way"})
         jn = str(data.get('junction', '')).strip()
         if jn:
-            pt = get_edge_midpoint(u, v, data)
+            pt = get_edge_midpoint(u, v, data, coords)
             if pt:
                 jn_points += 1
                 JUNCTION_POINTS.append({"lat": pt[0], "lon": pt[1], "type": jn})
@@ -298,13 +384,85 @@ def pre_process_graph():
                 coords = get_edge_coords(u, v, data)
             if coords:
                 tfl_count += 1
-                # First programme for color; store route label too
                 programme = tfl_prog.split(';')[0].strip().lower() if tfl_prog else ''
                 route = str(data.get('tfl_cycle_route', '')).strip()
                 TFL_ROUTES_CACHE.append({
                     "id": f"tfl-{u}-{v}", "p": coords, "b": make_bounds(coords),
                     "programme": programme, "route": route
                 })
+
+        name = str(data.get("attraction_name", "") or "").strip()
+        if _is_yes_attr(data.get("is_park")):
+            if coords is None:
+                coords = get_edge_coords(u, v, data)
+            if coords:
+                attr_park += 1
+                ATTRACTION_PARK_CACHE.append({
+                    "id": f"park-{u}-{v}", "p": coords, "b": make_bounds(coords), "name": name,
+                })
+        if _is_yes_attr(data.get("is_river")):
+            if coords is None:
+                coords = get_edge_coords(u, v, data)
+            if coords:
+                attr_river += 1
+                ATTRACTION_RIVER_CACHE.append({
+                    "id": f"river-{u}-{v}", "p": coords, "b": make_bounds(coords), "name": name,
+                })
+        if _is_yes_attr(data.get("is_sight")):
+            if coords is None:
+                coords = get_edge_coords(u, v, data)
+            if coords:
+                attr_sight += 1
+                ATTRACTION_SIGHT_CACHE.append({
+                    "id": f"sight-{u}-{v}", "p": coords, "b": make_bounds(coords), "name": name,
+                })
+
+        # Graph network: one segment per physical road (dedupe u,v and v,u)
+        physical = (min(u, v), max(u, v))
+        if physical not in seen_physical:
+            if coords is None:
+                coords = get_edge_coords(u, v, data)
+            if coords:
+                seen_physical.add(physical)
+                h = str(data.get('type', '')).strip().lower() or 'unknown'
+                GRAPH_NETWORK_CACHE.append({
+                    "id": f"gn-{physical[0]}-{physical[1]}",
+                    "p": coords,
+                    "b": make_bounds(coords),
+                    "h": h,
+                })
+
+        # Edge point features: barrier, give_way, stop_sign, traffic_calming_point
+        if data.get('barrier'):
+            lat, lon = _edge_display_point(data, 'barrier_lat', 'barrier_lon', coords)
+            if lat is not None and lon is not None:
+                details = {"barrier": str(data['barrier']).strip().lower()}
+                if data.get('barrier_confidence') is not None:
+                    try:
+                        details["barrier_confidence"] = float(data['barrier_confidence'])
+                    except (TypeError, ValueError):
+                        pass
+                meta = barrier_cluster_meta(data)
+                if meta:
+                    details.update(meta)
+                BARRIER_POINTS.append({"lat": lat, "lon": lon, "type": details["barrier"], "details": details})
+                n_barrier += 1
+        tc_pt = str(data.get('traffic_calming_point', '')).strip()
+        if tc_pt:
+            lat, lon = _edge_display_point(data, 'traffic_calming_point_lat', 'traffic_calming_point_lon', coords)
+            if lat is not None and lon is not None:
+                TRAFFIC_CALMING_POINT_POINTS.append({"lat": lat, "lon": lon, "type": tc_pt, "source": "point"})
+                n_tc_pt += 1
+        if str(data.get('give_way', '')).strip().lower() in ('yes', 'true', '1'):
+            lat, lon = _edge_display_point(data, 'give_way_lat', 'give_way_lon', coords)
+            if lat is not None and lon is not None:
+                GIVE_WAY_POINTS.append({"lat": lat, "lon": lon})
+                n_gw += 1
+        if str(data.get('stop_sign', '')).strip().lower() in ('yes', 'true', '1'):
+            lat, lon = _edge_display_point(data, 'stop_sign_lat', 'stop_sign_lon', coords)
+            if lat is not None and lon is not None:
+                STOP_POINTS.append({"lat": lat, "lon": lon})
+                n_stop += 1
 
     print(f"--> Steep cache: {len(STEEP_CACHE)} (errors: {steep_error}, ignored: {steep_ignored})")
     print(f"--> Surface cache: {surface_count} bad-surface segments")
@@ -313,35 +471,11 @@ def pre_process_graph():
     print(f"--> HGV banned: {hgv_count}")
     print(f"--> Traffic calming points: {tc_points}, Junction points: {jn_points}")
     print(f"--> TfL cycle routes: {tfl_count} edges")
+    print(f"--> Attraction edges: park={attr_park}, river={attr_river}, sight={attr_sight}")
+    print(f"--> Graph network cache: {len(GRAPH_NETWORK_CACHE)} physical edges")
 
-pre_process_graph()
-
-
-def _edge_display_point(edge_data, lat_key, lon_key):
-    """Return (lat, lon) for edge point feature: stored position or edge geometry midpoint."""
-    lat = edge_data.get(lat_key)
-    lon = edge_data.get(lon_key)
-    if lat is not None and lon is not None:
-        try:
-            return float(lat), float(lon)
-        except (TypeError, ValueError):
-            pass
-    wkt = edge_data.get('geometry')
-    if wkt:
-        try:
-            line = load_wkt(wkt)
-            if line and hasattr(line, 'interpolate'):
-                mid = line.interpolate(0.5, normalized=True)
-                return float(mid.y), float(mid.x)
-        except Exception:
-            pass
-    return None, None
-
-
-def build_node_point_caches():
-    """Build point caches: nodes for traffic_signals/crossing/mini_roundabout; EDGES for barrier/give_way/stop (stored position); traffic_calming point-based."""
-    n_barrier = n_ts = n_mr = n_cross = n_gw = n_stop = n_tc_pt = 0
-    # From NODES: traffic_signals, mini_roundabout, crossing
+    n_ts = n_mr = n_cross = 0
+    print(f"--> Scanning {G.number_of_nodes()} nodes for point overlays...")
     for node_id, data in G.nodes(data=True):
         if 'x' not in data or 'y' not in data:
             continue
@@ -357,38 +491,11 @@ def build_node_point_caches():
         if data.get('crossing'):
             CROSSING_POINTS.append(pt)
             n_cross += 1
-    # From EDGES: barrier, give_way, stop_sign (plot point at stored original position only)
-    for u, v, data in G.edges(data=True):
-        if data.get('barrier'):
-            lat, lon = _edge_display_point(data, 'barrier_lat', 'barrier_lon')
-            if lat is not None and lon is not None:
-                details = {"barrier": str(data['barrier']).strip().lower()}
-                if data.get('barrier_confidence') is not None:
-                    try:
-                        details["barrier_confidence"] = float(data['barrier_confidence'])
-                    except (TypeError, ValueError):
-                        pass
-                BARRIER_POINTS.append({"lat": lat, "lon": lon, "type": details["barrier"], "details": details})
-                n_barrier += 1
-        tc_pt = str(data.get('traffic_calming_point', '')).strip()
-        if tc_pt:
-            lat, lon = _edge_display_point(data, 'traffic_calming_point_lat', 'traffic_calming_point_lon')
-            if lat is not None and lon is not None:
-                TRAFFIC_CALMING_POINT_POINTS.append({"lat": lat, "lon": lon, "type": tc_pt, "source": "point"})
-                n_tc_pt += 1
-        if str(data.get('give_way', '')).strip().lower() in ('yes', 'true', '1'):
-            lat, lon = _edge_display_point(data, 'give_way_lat', 'give_way_lon')
-            if lat is not None and lon is not None:
-                GIVE_WAY_POINTS.append({"lat": lat, "lon": lon})
-                n_gw += 1
-        if str(data.get('stop_sign', '')).strip().lower() in ('yes', 'true', '1'):
-            lat, lon = _edge_display_point(data, 'stop_sign_lat', 'stop_sign_lon')
-            if lat is not None and lon is not None:
-                STOP_POINTS.append({"lat": lat, "lon": lon})
-                n_stop += 1
     print(f"--> Point caches: barrier={n_barrier} (edges), give_way={n_gw} (edges), stop={n_stop} (edges), traffic_calming_point={n_tc_pt}, traffic_signals={n_ts}, mini_roundabout={n_mr}, crossing={n_cross}")
 
-build_node_point_caches()
+
+if _should_run_bootstrap():
+    bootstrap_debug_engine()
 
 @app.route('/debug/heatmap', methods=['GET'])
 def get_elevation_heatmap():
@@ -520,35 +627,13 @@ def inspect_segment():
     try:
         lat = float(request.args.get('lat'))
         lon = float(request.args.get('lon'))
-        click_point = Point(lon, lat)
 
-        u = get_nearest_node(lat, lon)
-        if not u:
-            return jsonify({"error": "No graph data"}), 404
+        snap = tfl_live.snap_to_edge(lat, lon)
+        if not snap:
+            return jsonify({"error": "No edge found within snap distance"}), 404
 
-        best_edge_data = None
-        best_u = None
-        best_v = None
-        min_distance = float('inf')
-
-        candidates = []
-        for v in G.neighbors(u): candidates.append((u, v))
-        for v in G.predecessors(u): candidates.append((v, u))
-
-        for (src, dst) in candidates:
-            edge_data = G.get_edge_data(src, dst)
-            if 'geometry' in edge_data:
-                line = load_wkt(edge_data['geometry'])
-            else:
-                p1 = (float(G.nodes[src]['x']), float(G.nodes[src]['y']))
-                p2 = (float(G.nodes[dst]['x']), float(G.nodes[dst]['y']))
-                line = LineString([p1, p2])
-            dist = line.distance(click_point)
-            if dist < min_distance:
-                min_distance = dist
-                best_edge_data = edge_data
-                best_u = src
-                best_v = dst
+        best_u, best_v = snap.u, snap.v
+        best_edge_data = G.get_edge_data(best_u, best_v)
 
         if best_edge_data:
             tags = {k: v for k, v in best_edge_data.items() if k != 'geometry'}
@@ -577,6 +662,7 @@ def inspect_segment():
                 "geometry": geometry,
                 "source": str(best_u),
                 "target": str(best_v),
+                "snap_point": [snap.snap_lat, snap.snap_lon],
             })
         else:
             return jsonify({"error": "No edge found"}), 404
@@ -586,32 +672,12 @@ def inspect_segment():
 
 def _get_edge_at_point(lat, lon):
     """Return (best_u, best_v, edge_data, geometry) for the edge nearest to (lat, lon), or (None, None, None, None)."""
-    click_point = Point(lon, lat)
-    u = get_nearest_node(lat, lon)
-    if not u:
+    snap = tfl_live.snap_to_edge(lat, lon)
+    if not snap:
         return (None, None, None, None)
-    best_u = best_v = None
-    best_data = None
-    min_distance = float('inf')
-    candidates = []
-    for v in G.neighbors(u):
-        candidates.append((u, v))
-    for v in G.predecessors(u):
-        candidates.append((v, u))
-    for (src, dst) in candidates:
-        edge_data = G.get_edge_data(src, dst)
-        if 'geometry' in edge_data:
-            line = load_wkt(edge_data['geometry'])
-        else:
-            p1 = (float(G.nodes[src]['x']), float(G.nodes[src]['y']))
-            p2 = (float(G.nodes[dst]['x']), float(G.nodes[dst]['y']))
-            line = LineString([p1, p2])
-        dist = line.distance(click_point)
-        if dist < min_distance:
-            min_distance = dist
-            best_data = edge_data
-            best_u, best_v = src, dst
-    if best_u is None:
+    best_u, best_v = snap.u, snap.v
+    best_data = G.get_edge_data(best_u, best_v)
+    if best_data is None:
         return (None, None, None, None)
     geom = extract_segment_geometry(best_u, best_v)
     return (best_u, best_v, best_data, geom)
@@ -798,6 +864,192 @@ def modify_tfl_undo():
             if geom:
                 removed_out.append({"source": str(u), "target": str(v), "geometry": geom})
         return jsonify({"ok": True, "undone": last, "added": added_out, "removed": removed_out})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# --- ATTRACTION MANUAL REGIONS (modify suite) ---
+import uuid as _uuid
+
+ATTRACTION_MANUAL_PATH = os.path.join(os.path.dirname(__file__), "..", "3_pipeline", "attraction_manual_regions.json")
+OSM_PARKS_GEOJSON_PATH = os.path.join(os.path.dirname(__file__), "..", "1_data", "osm_park_polygons.geojson")
+
+
+def _load_attraction_manual():
+    if os.path.isfile(ATTRACTION_MANUAL_PATH):
+        try:
+            with open(ATTRACTION_MANUAL_PATH, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+            if "history" not in data:
+                data["history"] = []
+            if "regions" not in data:
+                data["regions"] = []
+            return data
+        except Exception:
+            pass
+    return {"regions": [], "history": []}
+
+
+def _save_attraction_manual(data):
+    os.makedirs(os.path.dirname(ATTRACTION_MANUAL_PATH), exist_ok=True)
+    with open(ATTRACTION_MANUAL_PATH, "w", encoding="utf-8") as f:
+        _json.dump(data, f, indent=2)
+
+
+def _ring_to_leaflet(ring):
+    """GeoJSON ring [lon,lat] -> Leaflet [[lat,lon],...]."""
+    out = []
+    for c in ring:
+        if len(c) >= 2:
+            out.append([float(c[1]), float(c[0])])
+    return out
+
+
+def _geom_to_leaflet_positions(geom):
+    """Convert GeoJSON geometry to Leaflet overlay position(s)."""
+    if not geom:
+        return []
+    gtype = geom.get("type")
+    coords = geom.get("coordinates")
+    if gtype == "Polygon" and coords:
+        return [_ring_to_leaflet(r) for r in coords if r]
+    if gtype == "MultiPolygon" and coords:
+        polys = []
+        for poly in coords:
+            if poly:
+                polys.append(_ring_to_leaflet(poly[0]))
+        return polys
+    if gtype == "LineString" and coords:
+        return [_ring_to_leaflet(coords)]
+    if gtype == "Point" and coords and len(coords) >= 2:
+        return [[float(coords[1]), float(coords[0])]]
+    return []
+
+
+def _attraction_region_payload(rec: dict) -> dict:
+    """Region for debug UI: source geometry + tagging zone (matches apply_attraction_manual)."""
+    geom = rec.get("geometry")
+    zone = region_tagging_zone(rec)
+    return {
+        "id": rec.get("id", ""),
+        "type": rec.get("type", ""),
+        "name": rec.get("name", ""),
+        "buffer_m": rec.get("buffer_m"),
+        "radius_m": rec.get("radius_m"),
+        "positions": _geom_to_leaflet_positions(geom),
+        "zone_positions": zone_to_leaflet_rings(zone),
+    }
+
+
+@app.route('/modify/attraction_regions', methods=['GET'])
+def get_attraction_regions():
+    try:
+        data = _load_attraction_manual()
+        out = [_attraction_region_payload(rec) for rec in data.get("regions", [])]
+        return jsonify({"regions": out})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/modify/attraction_zone_preview', methods=['POST'])
+def attraction_zone_preview():
+    """Tagging zone for scratch geometry (same thresholds as pipeline)."""
+    try:
+        body = request.get_json() or {}
+        rtype = str(body.get("type", "")).strip().lower()
+        if rtype not in ("park", "river", "sight"):
+            return jsonify({"error": "type must be park, river, or sight"}), 400
+        geometry = body.get("geometry")
+        if not geometry or not geometry.get("type"):
+            return jsonify({"error": "geometry required"}), 400
+        region = {"type": rtype, "geometry": geometry}
+        if rtype == "river" and geometry.get("type") == "LineString":
+            region["buffer_m"] = float(body.get("buffer_m") or 200)
+        if rtype == "sight":
+            region["radius_m"] = float(body.get("radius_m") or 200)
+        zone = region_tagging_zone(region)
+        return jsonify({
+            "zone_positions": zone_to_leaflet_rings(zone),
+            "buffer_m": region.get("buffer_m"),
+            "radius_m": region.get("radius_m"),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/modify/osm_park_polygons', methods=['GET'])
+def get_osm_park_polygons():
+    """Cached OSM park polygons for overlay while drawing manual regions."""
+    try:
+        if not os.path.isfile(OSM_PARKS_GEOJSON_PATH):
+            return jsonify({"polygons": [], "message": "Run fetch_osm_park_polygons.py"})
+        with open(OSM_PARKS_GEOJSON_PATH, "r", encoding="utf-8") as f:
+            collection = _json.load(f)
+        polygons = []
+        for feat in collection.get("features", []):
+            geom = feat.get("geometry")
+            if not geom or geom.get("type") not in ("Polygon", "MultiPolygon"):
+                continue
+            props = feat.get("properties") or {}
+            for ring_set in _geom_to_leaflet_positions(geom):
+                if ring_set:
+                    polygons.append({
+                        "name": props.get("name", ""),
+                        "positions": ring_set,
+                    })
+        return jsonify({"polygons": polygons})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/modify/attraction_add_region', methods=['POST'])
+def modify_attraction_add_region():
+    try:
+        body = request.get_json() or {}
+        rtype = str(body.get("type", "")).strip().lower()
+        if rtype not in ("park", "river", "sight"):
+            return jsonify({"error": "type must be park, river, or sight"}), 400
+        geometry = body.get("geometry")
+        if not geometry or not geometry.get("type"):
+            return jsonify({"error": "geometry required"}), 400
+        name = str(body.get("name", "") or "").strip()
+        region = {
+            "id": str(body.get("id") or _uuid.uuid4()),
+            "type": rtype,
+            "name": name,
+            "geometry": geometry,
+        }
+        if rtype == "river" and geometry.get("type") == "LineString":
+            region["buffer_m"] = float(body.get("buffer_m") or 200)
+        if rtype == "sight":
+            region["radius_m"] = float(body.get("radius_m") or 200)
+        data = _load_attraction_manual()
+        data["regions"].append(region)
+        data.setdefault("history", []).append({"type": "add", "id": region["id"]})
+        _save_attraction_manual(data)
+        return jsonify({
+            "ok": True,
+            "region": _attraction_region_payload(region),
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/modify/attraction_undo', methods=['POST'])
+def modify_attraction_undo():
+    try:
+        data = _load_attraction_manual()
+        history = data.get("history", [])
+        if not history:
+            return jsonify({"error": "Nothing to undo", "regions": []}), 400
+        last = history.pop()
+        if last.get("type") == "add":
+            rid = last.get("id")
+            data["regions"] = [r for r in data.get("regions", []) if r.get("id") != rid]
+        data["history"] = history
+        _save_attraction_manual(data)
+        out = [_attraction_region_payload(rec) for rec in data.get("regions", [])]
+        return jsonify({"ok": True, "undone": last, "regions": out})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -995,6 +1247,79 @@ def get_hgv_banned():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/debug/graph_network', methods=['GET'])
+def get_graph_network():
+    """All graph edges in bbox (one per physical road), coloured by highway type; 15k centre cap."""
+    try:
+        if not request.args.get('min_lat'):
+            return jsonify({"segments": [], "limit_reached": False})
+        min_lat = float(request.args.get('min_lat'))
+        max_lat = float(request.args.get('max_lat'))
+        min_lon = float(request.args.get('min_lon'))
+        max_lon = float(request.args.get('max_lon'))
+        center_lat = (min_lat + max_lat) / 2.0
+        center_lon = (min_lon + max_lon) / 2.0
+        in_bbox = [
+            {"id": s['id'], "p": s['p'], "h": s['h'], "b": s['b']}
+            for s in GRAPH_NETWORK_CACHE
+            if (s['b'][0] < max_lat and s['b'][1] > min_lat and
+                s['b'][2] < max_lon and s['b'][3] > min_lon)
+        ]
+        limited, limit_reached = _limit_segments_by_center(
+            in_bbox, center_lat, center_lon, GRAPH_NETWORK_LIMIT)
+        for s in limited:
+            s.pop('b', None)
+        return jsonify({"segments": limited, "limit_reached": limit_reached})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+_ATTRACTION_LAYER_POOLS = {
+    "park": lambda: ATTRACTION_PARK_CACHE,
+    "river": lambda: ATTRACTION_RIVER_CACHE,
+    "sight": lambda: ATTRACTION_SIGHT_CACHE,
+}
+
+
+@app.route('/debug/attractions', methods=['GET'])
+def get_attractions():
+    """Edges tagged is_park / is_river / is_sight. layer=park|river|sight|all (default all)."""
+    try:
+        if not request.args.get("min_lat"):
+            return jsonify({"segments": [], "limit_reached": False})
+        min_lat = float(request.args.get("min_lat"))
+        max_lat = float(request.args.get("max_lat"))
+        min_lon = float(request.args.get("min_lon"))
+        max_lon = float(request.args.get("max_lon"))
+        center_lat = (min_lat + max_lat) / 2.0
+        center_lon = (min_lon + max_lon) / 2.0
+        layer = (request.args.get("layer", "all") or "all").strip().lower()
+        if layer not in _ATTRACTION_LAYER_POOLS and layer != "all":
+            layer = "all"
+        kinds = list(_ATTRACTION_LAYER_POOLS.keys()) if layer == "all" else [layer]
+        in_bbox = []
+        for kind in kinds:
+            for s in _ATTRACTION_LAYER_POOLS[kind]():
+                b = s["b"]
+                if b[0] < max_lat and b[1] > min_lat and b[2] < max_lon and b[3] > min_lon:
+                    in_bbox.append({
+                        "id": s["id"],
+                        "p": s["p"],
+                        "kind": kind,
+                        "name": s.get("name", ""),
+                        "b": b,
+                    })
+        limited, limit_reached = _limit_segments_by_center(
+            in_bbox, center_lat, center_lon, MAX_SEGMENTS_LIMIT
+        )
+        for s in limited:
+            s.pop("b", None)
+        return jsonify({"segments": limited, "limit_reached": limit_reached})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/debug/tfl_routes', methods=['GET'])
 def get_tfl_routes():
     try:
@@ -1098,6 +1423,12 @@ def get_barrier_points():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/debug/barrier_clusters', methods=['GET'])
+def get_barrier_clusters():
+    """Cluster legend for barrier overlay colours (matches barrier_clusters.py)."""
+    return jsonify(cluster_legend())
+
 @app.route('/debug/traffic_signals_points', methods=['GET'])
 def get_traffic_signals_points():
     try:
@@ -1169,4 +1500,4 @@ def get_accidents():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=5001, use_reloader=USE_RELOADER)

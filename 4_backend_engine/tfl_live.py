@@ -1,7 +1,7 @@
 """
 Shared module: live TfL disruption data (fetch, spatial match, lookup table).
 Imported by app.py and app_debug.py. Call init(G) once at startup to build
-the edge spatial index; call update_disruptions() to fetch + match.
+the edge spatial index (also used by snap_to_edge); call update_disruptions() to fetch + match.
 Matching uses alignment ratio (>= 50% edge length in zone) and angularity for short edges.
 When changing, update 0_documentation/APP_MAIN.md and APP_DEBUG.md.
 """
@@ -10,7 +10,10 @@ import json
 import math
 import time
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
+
+import numpy as np
 
 import requests
 from shapely.wkt import loads as load_wkt
@@ -32,6 +35,9 @@ API_TIMEOUT_S = 15
 
 # Matching refinement (aligned with 3_pipeline/tag_tfl_routes.py)
 POINT_BUFFER_DEG = 0.0001          # ~11 m at London — only edges with BOTH endpoints within this (tighter)
+SNAP_MAX_DISTANCE_M_DEFAULT = 50.0
+SNAP_QUERY_BUFFER_DEG = 0.00045    # ~50 m candidate search at London latitudes
+SNAP_QUERY_BUFFER_WIDE_DEG = 0.001 # ~111 m fallback if sparse local mesh
 LINE_BUFFER_DEG = 0.0001           # ~10 m corridor for LineString/MultiLineString
 POLYGON_EDGE_BUFFER_DEG = 0.00005 # ~5 m tolerance for polygon boundary
 ALIGNMENT_THRESHOLD = 0.5          # >= 50% of edge length must lie in disruption zone (tag_tfl_routes)
@@ -93,6 +99,89 @@ def init(G):
     _edge_tree = STRtree(geoms)
     elapsed = time.time() - t0
     log.info("tfl_live: STRtree built from %d edges in %.1f s", len(geoms), elapsed)
+
+
+@dataclass
+class EdgeSnapResult:
+    u: object
+    v: object
+    snap_lon: float
+    snap_lat: float
+    anchor_node: object
+    distance_m: float
+    edge_fraction: float
+
+
+def _haversine_m(lon1, lat1, lon2, lat2):
+    r = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(min(1.0, math.sqrt(a)))
+
+
+def is_snap_ready():
+    return _edge_tree is not None and _graph_ref is not None
+
+
+def snap_to_edge(lat, lon, max_distance_m=SNAP_MAX_DISTANCE_M_DEFAULT):
+    """
+    Globally nearest point on any graph edge (STRtree + exact project).
+    anchor_node is whichever terminal (u or v) is closer to the snap point.
+    """
+    if not is_snap_ready():
+        return None
+
+    G = _graph_ref
+    click = Point(float(lon), float(lat))
+    best_idx = None
+    best_dist_deg = float("inf")
+
+    for buffer_deg in (SNAP_QUERY_BUFFER_DEG, SNAP_QUERY_BUFFER_WIDE_DEG):
+        candidate_idxs = _edge_tree.query(click.buffer(buffer_deg))
+        if np.isscalar(candidate_idxs):
+            candidate_idxs = [int(candidate_idxs)]
+        else:
+            candidate_idxs = [int(i) for i in candidate_idxs]
+        if not candidate_idxs:
+            continue
+        for idx in candidate_idxs:
+            d = _edge_geoms[idx].distance(click)
+            if d < best_dist_deg:
+                best_dist_deg = d
+                best_idx = idx
+        if best_idx is not None:
+            break
+
+    if best_idx is None:
+        return None
+
+    line = _edge_geoms[best_idx]
+    u, v = _edge_keys[best_idx]
+    frac = float(line.project(click, normalized=True))
+    snap_pt = line.interpolate(frac, normalized=True)
+    snap_lon, snap_lat = float(snap_pt.x), float(snap_pt.y)
+    distance_m = _haversine_m(float(lon), float(lat), snap_lon, snap_lat)
+
+    if distance_m > max_distance_m:
+        return None
+
+    nu = G.nodes[u]
+    nv = G.nodes[v]
+    dist_u = _haversine_m(snap_lon, snap_lat, float(nu["x"]), float(nu["y"]))
+    dist_v = _haversine_m(snap_lon, snap_lat, float(nv["x"]), float(nv["y"]))
+    anchor_node = u if dist_u <= dist_v else v
+
+    return EdgeSnapResult(
+        u=u,
+        v=v,
+        snap_lon=snap_lon,
+        snap_lat=snap_lat,
+        anchor_node=anchor_node,
+        distance_m=distance_m,
+        edge_fraction=frac,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -298,6 +387,35 @@ def _is_roughly_parallel(edge_geom, ref_line, max_angle_deg=MAX_ANGLE_DEG):
     return dev <= max_angle_deg
 
 
+def _polygon_reference_line(geom):
+    """Longest side of minimum rotated rectangle — axis of a TfL area polygon."""
+    if geom.geom_type == "MultiPolygon":
+        parts = [g for g in geom.geoms if not g.is_empty]
+        if not parts:
+            return None
+        geom = max(parts, key=lambda g: g.area)
+    if geom.geom_type != "Polygon" or geom.is_empty:
+        return None
+    try:
+        mrr = geom.minimum_rotated_rectangle
+    except Exception:
+        return None
+    if mrr is None or mrr.is_empty:
+        return None
+    coords = list(mrr.exterior.coords)
+    if len(coords) < 3:
+        return None
+    best_line = None
+    best_len = 0.0
+    n = len(coords) - 1
+    for i in range(n):
+        seg = LineString([coords[i], coords[i + 1]])
+        if seg.length > best_len:
+            best_len = seg.length
+            best_line = seg
+    return best_line
+
+
 def _match_geometry_to_edges(geom):
     """Return set of indices into _edge_geoms that match the disruption geometry.
     Uses alignment ratio (>= 50% edge length in zone) and angularity for short edges."""
@@ -337,7 +455,10 @@ def _match_geometry_to_edges(geom):
             matched.add(idx)
 
     elif geom.geom_type in ("Polygon", "MultiPolygon"):
-        # Match edges where >= 50% of edge length lies inside the polygon
+        # Match edges where >= 50% of edge length lies inside the polygon.
+        # Parallel adjacent carriageways inside a TfL box are intentionally kept (all are affected).
+        # Orientation filter drops edges that only clip the box at a sharp angle.
+        ref_line = _polygon_reference_line(geom)
         try:
             zone = geom.buffer(POLYGON_EDGE_BUFFER_DEG) if geom.is_valid else geom
         except Exception:
@@ -356,8 +477,11 @@ def _match_geometry_to_edges(geom):
                 overlap_len = overlap.length if overlap and not overlap.is_empty else 0.0
             except Exception:
                 overlap_len = edge_len
-            if overlap_len / edge_len >= ALIGNMENT_THRESHOLD:
-                matched.add(idx)
+            if overlap_len / edge_len < ALIGNMENT_THRESHOLD:
+                continue
+            if ref_line is not None and not _is_roughly_parallel(edge_geom, ref_line):
+                continue
+            matched.add(idx)
     else:
         # Other geometry: match any edge that intersects the buffer (same as Point)
         buffered = geom.buffer(POINT_BUFFER_DEG)

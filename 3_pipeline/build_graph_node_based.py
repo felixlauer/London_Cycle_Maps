@@ -2,11 +2,12 @@
 BACKUP: Node-based point snap (barrier, give_way, stop on nodes).
 Original build_graph.py before edge-based barrier/give_way/stop implementation.
 Build directed routing graph from PostgreSQL (planet_osm_line + planet_osm_point).
-Output: 1_data/london.graphml (+ graph_debug_report.txt).
+Output: 1_data/london.graphml + london.gpickle (+ dated report in 1_data/graph_debug_reports/).
 
 When changing parsed tags, build rules, or pipeline steps, update:
   0_documentation/GRAPH.md
 """
+import argparse
 import networkx as nx
 import pandas as pd
 from sqlalchemy import create_engine
@@ -15,33 +16,29 @@ from scipy.spatial import cKDTree
 import numpy as np
 import os
 
-# Load DB credentials from backend .env (gitignored) so it works locally
-try:
-    from dotenv import load_dotenv
-    _env = os.path.join(os.path.dirname(__file__), "..", "4_backend_engine", ".env")
-    load_dotenv(_env)
-except ImportError:
-    pass
-
-# --- CONFIGURATION (set DB_PASS etc. via env or .env; do not commit secrets) ---
-DB_USER = os.environ.get("DB_USER", "postgres")
-DB_PASS = os.environ.get("DB_PASS", "")
-DB_NAME = os.environ.get("DB_NAME", "london_routing")
-DB_HOST = os.environ.get("DB_HOST", "localhost")
+from db_config import DEFAULT_ROAD_SOURCE, db_url
+from graph_debug_report import new_debug_report_path
+from graph_io import save_graph
 OUTPUT_PATH = os.path.join("..", "1_data", "london.graphml")
-REPORT_PATH = os.path.join("..", "1_data", "graph_debug_report.txt")
 
 # Snap threshold for matching point features to graph nodes (degrees ~20m at London latitude)
 SNAP_THRESHOLD = 0.0002
 
 def main():
-    print("--- BUILDING DIRECTED ROUTING GRAPH (ENHANCED) ---")
+    parser = argparse.ArgumentParser(description="Build directed routing graph (node-based snap backup).")
+    parser.add_argument("--source", default=DEFAULT_ROAD_SOURCE)
+    args = parser.parse_args()
+    road_source = args.source
+    if not road_source.replace("_", "").isalnum():
+        raise ValueError(f"Invalid --source table name: {road_source}")
 
-    db_url = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:5432/{DB_NAME}"
-    engine = create_engine(db_url)
+    print("--- BUILDING DIRECTED ROUTING GRAPH (ENHANCED) ---")
+    print(f"   Road source: {road_source}")
+
+    engine = create_engine(db_url())
 
     # =====================================================================
-    # STEP 1: FETCH ROAD NETWORK (planet_osm_line)
+    # STEP 1: FETCH ROAD NETWORK
     # =====================================================================
     print("1. Fetching road network with all tags...")
 
@@ -93,9 +90,9 @@ def main():
         ST_Y(ST_StartPoint(ST_Transform(way, 4326))) as u_y,
         ST_X(ST_EndPoint(ST_Transform(way, 4326)))   as v_x,
         ST_Y(ST_EndPoint(ST_Transform(way, 4326)))   as v_y
-    FROM planet_osm_line
+    FROM {road_source}
     WHERE highway IS NOT NULL;
-    """
+    """.format(road_source=road_source)
 
     df = pd.read_sql(sql_lines, engine)
 
@@ -311,22 +308,25 @@ def main():
     # =====================================================================
     # STEP 5: SAVE GRAPH
     # =====================================================================
-    print(f"5. Saving to {OUTPUT_PATH}...")
-    nx.write_graphml(G, OUTPUT_PATH)
+    print(f"5. Saving to {OUTPUT_PATH} (+ fast pickle)...")
+    save_graph(G, OUTPUT_PATH, write_graphml=True, write_fast=True)
     print("   -> Graph saved.")
 
     # =====================================================================
     # STEP 6: GENERATE DEBUG REPORT
     # =====================================================================
-    print(f"6. Generating debug report -> {REPORT_PATH}")
+    report_path = new_debug_report_path()
+    print(f"6. Generating debug report -> {report_path}")
     generate_report(G, df, df_points, snap_count, snap_miss,
-                    count_motorway_banned, count_oneway, count_contraflow, nodes_removed)
+                    count_motorway_banned, count_oneway, count_contraflow, nodes_removed,
+                    report_path=report_path)
 
     print("SUCCESS! Enhanced directed graph built.")
 
 
 def generate_report(G, df_lines, df_points, snap_count, snap_miss,
-                    motorway_banned, oneway_count, contraflow_count, islands_removed):
+                    motorway_banned, oneway_count, contraflow_count, islands_removed,
+                    report_path: str):
     """Writes a comprehensive debug report covering every tag."""
 
     lines = []
@@ -504,7 +504,7 @@ def generate_report(G, df_lines, df_points, snap_count, snap_miss,
     w("  END OF REPORT")
     w("=" * 80)
 
-    with open(REPORT_PATH, 'w', encoding='utf-8') as f:
+    with open(report_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 
     print(f"   -> Report written: {len(lines)} lines.")

@@ -1,77 +1,41 @@
 """
 Apply manual TfL cycle route edits from the debug app to the graph.
-Reads: 3_pipeline/tfl_manual_edits.json (produced by the Modify TfL mode in the debug app)
-Reads: 1_data/london_elev_final_tfl.graphml (or --input)
-Writes: same path (overwrites) or --output.
+Reads: 3_pipeline/tfl_manual_edits.json
+Uses tfl_osm_translate for legacy (source,target) -> osm_id fan-out after noded rebuilds.
 
-File format (tfl_manual_edits.json):
-  {
-    "added": [ { "source": "<node_id>", "target": "<node_id>", "programme": "cycleway|quietway|superhighway", "route": "Q15" } ],
-    "removed": [ { "source": "<node_id>", "target": "<node_id>" } ],
-    "history": [ { "type": "add"|"remove", ... } ]  // used by debug app for undo
-  }
-
-- Duplicates: before applying, added and removed lists are deduplicated (same segment can be clicked multiple times). Removed: unique by (source, target). Added: unique by (source, target), with programme and route merged from all occurrences.
-- Removed: edges in "removed" get tfl_cycle_programme and tfl_cycle_route set to "". For a directed graph,
-  if the reverse edge (target, source) exists, it is also cleared (same physical road, other direction).
-- Added: edges in "added" get the given programme and route merged with existing (semicolon-separated).
-  If the reverse edge (target, source) exists, it gets the same tags (both directions of the road).
-Run after tag_tfl_routes.py. When changing paths or format, update 0_documentation/GRAPH.md.
+Run after apply_tfl_export.py when export is ground truth. When changing paths, update GRAPH.md.
 """
+from __future__ import annotations
+
+import argparse
 import json
 import os
-import argparse
-import networkx as nx
+
+from graph_io import load_graph, save_graph, fast_path
+from tfl_osm_translate import (
+    build_osm_index,
+    dedupe_preserve_order,
+    edges_for_record,
+    load_legacy_graph,
+    split_semicolons,
+)
+
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(SCRIPT_DIR, "..", "1_data")
 EDITS_PATH = os.path.join(SCRIPT_DIR, "tfl_manual_edits.json")
 DEFAULT_GRAPH = os.path.join(DATA_DIR, "london_elev_final_tfl.graphml")
 
-def _split_semicolons(val):
-    """Split a semicolon-separated tag string into a list of stripped non-empty items."""
-    if val is None:
-        return []
-    s = str(val)
-    if not s.strip():
-        return []
-    return [p.strip() for p in s.split(";") if p.strip()]
-
-
-def _dedupe_preserve_order(items, key_fn=None):
-    """Deduplicate while preserving first-seen order."""
-    if key_fn is None:
-        key_fn = lambda x: x
-    seen = set()
-    out = []
-    for it in items:
-        k = key_fn(it)
-        if k in seen:
-            continue
-        seen.add(k)
-        out.append(it)
-    return out
-
 
 def _normalize_edge_tfl_tags(G, u, v):
-    """
-    Remove accidental duplicates already present in graph tags (semicolon lists).
-    Returns True if a change was applied.
-    """
     if not G.has_edge(u, v):
         return False
     ed = G.edges[u, v]
     before_prog = str(ed.get("tfl_cycle_programme", "")).strip()
     before_route = str(ed.get("tfl_cycle_route", "")).strip()
-
-    # programme: normalize to lowercase
-    prog_items = [p.lower() for p in _split_semicolons(before_prog)]
-    prog_items = _dedupe_preserve_order(prog_items)
-
-    # route: keep original case, but dedupe by stripped value
-    route_items = _split_semicolons(before_route)
-    route_items = _dedupe_preserve_order(route_items)
-
+    prog_items = [p.lower() for p in split_semicolons(before_prog)]
+    prog_items = dedupe_preserve_order(prog_items)
+    route_items = dedupe_preserve_order(split_semicolons(before_route))
     after_prog = ";".join(prog_items)
     after_route = ";".join(route_items)
     changed = (after_prog != before_prog) or (after_route != before_route)
@@ -82,38 +46,23 @@ def _normalize_edge_tfl_tags(G, u, v):
 
 
 def _merge_into_edge(G, u, v, programmes, routes):
-    """
-    Merge programme(s) and route(s) into an edge's TfL tags if missing.
-    Assumes edge tags are already normalized (no duplicates).
-    Returns True if edge tags changed.
-    """
     if not G.has_edge(u, v):
         return False
     ed = G.edges[u, v]
-
-    prog_items = [p.lower() for p in _split_semicolons(ed.get("tfl_cycle_programme", ""))]
-    route_items = _split_semicolons(ed.get("tfl_cycle_route", ""))
-
+    prog_items = [p.lower() for p in split_semicolons(ed.get("tfl_cycle_programme", ""))]
+    route_items = split_semicolons(ed.get("tfl_cycle_route", ""))
     prog_before = list(prog_items)
     route_before = list(route_items)
-
     for p in programmes:
         p = str(p).strip().lower()
-        if not p:
-            continue
-        if p not in prog_items:
+        if p and p not in prog_items:
             prog_items.append(p)
-
     for r in routes:
         r = str(r).strip()
-        if not r:
-            continue
-        if r not in route_items:
+        if r and r not in route_items:
             route_items.append(r)
-
-    prog_items = _dedupe_preserve_order(prog_items)
-    route_items = _dedupe_preserve_order(route_items)
-
+    prog_items = dedupe_preserve_order(prog_items)
+    route_items = dedupe_preserve_order(route_items)
     changed = (prog_items != prog_before) or (route_items != route_before)
     if changed:
         ed["tfl_cycle_programme"] = ";".join(prog_items)
@@ -122,14 +71,6 @@ def _merge_into_edge(G, u, v, programmes, routes):
 
 
 def _deduplicate_edits(added, removed):
-    """
-    Remove duplicates before applying. Same segment can be clicked multiple times.
-    - removed: unique by (source, target); keep first occurrence.
-    - added: unique by (source, target); merge programme and route from all occurrences
-      (semicolon-separated, unique values) so repeated clicks don't add the same edge twice.
-    Returns (added_deduped, removed_deduped).
-    """
-    # Removed: unique (source, target)
     seen_removed = set()
     removed_deduped = []
     for rec in removed:
@@ -142,7 +83,6 @@ def _deduplicate_edits(added, removed):
         seen_removed.add(key)
         removed_deduped.append(rec)
 
-    # Added: unique (source, target), merge programme and route
     added_by_edge = {}
     for rec in added:
         u, v = rec.get("source"), rec.get("target")
@@ -159,22 +99,33 @@ def _deduplicate_edits(added, removed):
             added_by_edge[key]["programmes"].append(programme)
         if route not in added_by_edge[key]["routes"]:
             added_by_edge[key]["routes"].append(route)
-    added_deduped = []
-    for key, agg in added_by_edge.items():
-        added_deduped.append({
+    added_deduped = [
+        {
             "source": agg["source"],
             "target": agg["target"],
             "programme": ";".join(agg["programmes"]),
             "route": ";".join(agg["routes"]),
-        })
+        }
+        for agg in added_by_edge.values()
+    ]
     return added_deduped, removed_deduped
 
 
 def main():
     parser = argparse.ArgumentParser(description="Apply manual TfL edits to the graph")
-    parser.add_argument("--input", default=DEFAULT_GRAPH, help="Input GraphML path")
-    parser.add_argument("--output", default=None, help="Output GraphML path (default: overwrite input)")
+    parser.add_argument("--input", default=DEFAULT_GRAPH, help="Input graph path")
+    parser.add_argument("--output", default=None, help="Output graph path (default: overwrite input)")
     parser.add_argument("--edits", default=EDITS_PATH, help="Path to tfl_manual_edits.json")
+    parser.add_argument(
+        "--legacy-graph",
+        default=None,
+        help="Pre-noding graph for osm_id lookup when node ids no longer exist on the new mesh",
+    )
+    parser.add_argument(
+        "--pickle-only",
+        action="store_true",
+        help="Save .gpickle only (skip GraphML write)",
+    )
     args = parser.parse_args()
     input_path = os.path.normpath(os.path.join(SCRIPT_DIR, args.input))
     edits_path = os.path.normpath(os.path.join(SCRIPT_DIR, args.edits))
@@ -183,8 +134,8 @@ def main():
     if not os.path.isfile(edits_path):
         print(f"ERROR: Edits file not found: {edits_path}")
         return 1
-    if not os.path.isfile(input_path):
-        print(f"ERROR: Graph not found: {input_path}")
+    if not os.path.isfile(input_path) and not os.path.isfile(fast_path(input_path)):
+        print(f"ERROR: Graph not found: {input_path} (or .gpickle)")
         return 1
 
     with open(edits_path, "r", encoding="utf-8") as f:
@@ -192,81 +143,81 @@ def main():
     added_raw = data.get("added", [])
     removed_raw = data.get("removed", [])
     added, removed = _deduplicate_edits(added_raw, removed_raw)
-    n_dup_added = len(added_raw) - len(added)
-    n_dup_removed = len(removed_raw) - len(removed)
 
     print("--- APPLY TfL MANUAL EDITS ---")
-    if n_dup_added or n_dup_removed:
-        print(f"   Duplicate cleaner: {n_dup_added} duplicate add(s), {n_dup_removed} duplicate remove(s) -> {len(added)} add(s), {len(removed)} remove(s) to apply.")
     print(f"1. Loading graph from {input_path}...")
-    G = nx.read_graphml(input_path)
+    G = load_graph(input_path)
     print(f"   -> {G.number_of_nodes()} nodes, {G.number_of_edges()} edges.")
 
-    # Pre-normalize existing tags on all touched edges (and their reverse if present)
-    touched = set()
-    for rec in removed:
-        u, v = rec.get("source"), rec.get("target")
-        if u is None or v is None:
-            continue
-        touched.add((u, v))
-        touched.add((v, u))
-    for rec in added:
-        u, v = rec.get("source"), rec.get("target")
-        if u is None or v is None:
-            continue
-        touched.add((u, v))
-        touched.add((v, u))
-    n_norm = 0
-    for (u, v) in touched:
-        if _normalize_edge_tfl_tags(G, u, v):
-            n_norm += 1
-    if n_norm:
-        print(f"   -> Normalized duplicate semicolon tags on {n_norm} edge(s) before applying edits.")
+    G_legacy = None
+    if args.legacy_graph:
+        try:
+            G_legacy = load_legacy_graph(args.legacy_graph, SCRIPT_DIR)
+        except FileNotFoundError as e:
+            print(f"ERROR: {e}")
+            return 1
 
-    print("2. Applying removals (including reverse direction when present)...")
-    n_removed = 0
+    osm_index = build_osm_index(G)
+    print(f"   -> osm_id index: {len(osm_index)} parent way(s).")
+
+    touched = set()
+    for rec in added + removed:
+        for u, v in edges_for_record(rec, G, osm_index, G_legacy)[0]:
+            touched.add((u, v))
+    n_norm = sum(1 for u, v in touched if _normalize_edge_tfl_tags(G, u, v))
+    if n_norm:
+        print(f"   -> Normalized tags on {n_norm} edge(s) before applying edits.")
+
+    print("2. Applying removals (osm_id fan-out)...")
+    n_removed = n_remove_osm = n_remove_direct = n_remove_skipped = 0
     for rec in removed:
-        u, v = rec.get("source"), rec.get("target")
-        if u is None or v is None:
+        edges, mode = edges_for_record(rec, G, osm_index, G_legacy)
+        if not edges:
+            n_remove_skipped += 1
             continue
-        for (a, b) in [(u, v), (v, u)]:
-            if G.has_edge(a, b):
-                ed = G.edges[a, b]
-                # Only write if not already empty
+        if mode == "osm_id":
+            n_remove_osm += 1
+        else:
+            n_remove_direct += 1
+        for u, v in edges:
+            if G.has_edge(u, v):
+                ed = G.edges[u, v]
                 if str(ed.get("tfl_cycle_programme", "")).strip() or str(ed.get("tfl_cycle_route", "")).strip():
                     ed["tfl_cycle_programme"] = ""
                     ed["tfl_cycle_route"] = ""
                     n_removed += 1
-    print(f"   -> Cleared TfL tags on {n_removed} edge(s).")
+    print(
+        f"   -> Cleared {n_removed} edge(s) "
+        f"({n_remove_osm} via osm_id, {n_remove_direct} direct, {n_remove_skipped} skipped)."
+    )
 
-    print("3. Applying additions (merge with existing; both directions when reverse edge exists)...")
-    n_added = 0
+    print("3. Applying additions (osm_id fan-out)...")
+    n_added = n_add_osm = n_add_direct = n_add_skipped = 0
     for rec in added:
-        u, v = rec.get("source"), rec.get("target")
-        if u is None or v is None:
+        edges, mode = edges_for_record(rec, G, osm_index, G_legacy)
+        if not edges:
+            n_add_skipped += 1
             continue
+        if mode == "osm_id":
+            n_add_osm += 1
+        else:
+            n_add_direct += 1
         programmes = [p.strip().lower() for p in (rec.get("programme") or "").split(";") if p.strip()]
         routes = [r.strip() or "manual" for r in (rec.get("route") or "").split(";") if r.strip()]
-        programmes = [p for p in programmes if p in ("cycleway", "quietway", "superhighway")]
-        if not programmes:
-            programmes = ["cycleway"]
-        if not routes:
-            routes = ["manual"]
-        # Apply to (u,v) and, if present, (v,u) so both directions of the same road get the tag
-        for (a, b) in [(u, v), (v, u)]:
-            # Skip if edge doesn't exist
-            if not G.has_edge(a, b):
-                continue
-            # Ensure normalized before merge (defensive; should already be done above)
-            _normalize_edge_tfl_tags(G, a, b)
-            # Only merge if it would actually change something (idempotent across repeated runs)
-            if _merge_into_edge(G, a, b, programmes, routes):
+        programmes = [p for p in programmes if p in ("cycleway", "quietway", "superhighway")] or ["cycleway"]
+        routes = routes or ["manual"]
+        for u, v in edges:
+            _normalize_edge_tfl_tags(G, u, v)
+            if _merge_into_edge(G, u, v, programmes, routes):
                 n_added += 1
-    print(f"   -> Set/merged TfL tags on {n_added} edge(s).")
+    print(
+        f"   -> Set/merged {n_added} edge(s) "
+        f"({n_add_osm} via osm_id, {n_add_direct} direct, {n_add_skipped} skipped)."
+    )
 
     print(f"4. Saving graph to {output_path}...")
-    nx.write_graphml(G, output_path)
-    print("SUCCESS. Re-run debug app to see updated TfL overlay.")
+    save_graph(G, output_path, write_graphml=not args.pickle_only, write_fast=True)
+    print("SUCCESS.")
     return 0
 
 
