@@ -46,6 +46,8 @@ Default flow: **`tag_attractions_osm.py`** (needs `osm_park_polygons.geojson`) �
 python fetch_osm_park_polygons.py           # once: cache OSM parks (auto-uses local .pbf if present)
 python fetch_osm_park_polygons.py --source overpass   # optional: remote Overpass (can 504)
 python tag_attractions_osm.py               # OSM parks → is_park on london_elev_final
+python elevation_processing_aggressive.py --skip-dem   # fast: hill filter only (see §7)
+python elevation_processing_aggressive.py              # full: DEM smooth + hill filter (slow at 4M edges)
 python tag_tfl_routes.py                    # optional geometry tags → london_elev_final_tfl
 python apply_tfl_export.py --legacy-graph ../1_data/legacy_graph.graphml
 python apply_tfl_manual_edits.py --legacy-graph ../1_data/legacy_graph.graphml
@@ -284,11 +286,13 @@ Export format: `{ "source_graph", "exported_at", "edges": [ { "source", "target"
 - Segments under 1.8× after Pass 1: 146; still under after 2 relaxed iterations: 53.
 - **Tagged edges:** 18 578.
 
-### 3.7 Added by elevation pipeline (not by `build_graph.py`)
+### 3.9 Added by elevation pipeline (not by `build_graph.py`)
 
 | Tag | Set by | Description |
 |-----|--------|-------------|
-| `grade` | Elevation scripts | Slope (rise/run) for the edge; used for hill routing |
+| `grade` | Elevation scripts | Slope (rise/run) for the edge; used for hill routing and debug uphill overlay |
+
+See **Section 7** for how `grade` is computed and filtered on the noded mesh.
 
 ---
 
@@ -330,7 +334,19 @@ Nodes are **coordinates** `(lon, lat)` rounded to 6 decimals. Every node has at 
 ### 5.3 Cleanup
 
 - **Largest component only:** After building the graph, only the **largest weakly connected component** is kept. All other nodes/edges (islands) are removed.
-- **Topology:** Without noding, many suburbs are falsely disconnected (T-junctions on long OSM ways) and removed as “islands.” After `noded_network.py`, island removal should drop sharply; final node/edge counts should rise versus the pre-noding baseline (~175k nodes / ~542k islands removed).
+- **Topology:** Without noding, many suburbs are falsely disconnected (T-junctions on long OSM ways) and removed as “islands.” After `noded_network.py`, island removal drops sharply.
+
+**Pre-noding vs post-noding (typical successful run):**
+
+| Metric | Pre-noding | Post-noding (noded mesh) |
+|--------|------------|---------------------------|
+| Raw SQL segments | ~546k | ~2.2M |
+| Final nodes | ~175k | ~1.92M |
+| Final directed edges | ~350k | ~4.06M |
+| Island nodes removed | ~542k | ~30k |
+| Median edge length | ~28 m | ~9 m |
+
+Source: pre-noding from §6.1 example; post-noding from `graph_debug_reports/graph_debug_report_2026-06-03.txt` (see Development_Protocol_2026_06_01-03.md §2).
 
 ### 5.4 Debug output
 
@@ -346,7 +362,9 @@ Nodes are **coordinates** `(lon, lat)` rounded to 6 decimals. Every node has at 
 
 ## 6. Example build output and report interpretation
 
-### 6.1 Example terminal output (successful run)
+### 6.1 Pre-noding example (legacy — June 2026 and earlier)
+
+This terminal output is from a **pre-noding** build (`planet_osm_line` endpoint-only graph). It remains useful as a regression reference; **current production uses the noded mesh** (~4M edges — see §1 and §6.1b).
 
 After running `python build_graph.py` from `3_pipeline/`, you should see something like:
 
@@ -430,7 +448,8 @@ A run is **successful** if:
 
 **Typical “healthy” signs from a report like the example:**
 
-- ~175k nodes, ~350k edges after cleanup — one large connected component.
+- **Pre-noding:** ~175k nodes, ~350k edges after cleanup — one large connected component (§6.1).
+- **Post-noding:** ~1.9M nodes, ~4M edges; ~30k islands removed — see §6.1b.
 - ~102k of 172k points snapped — many intersections attached to the graph; the rest are off-network or beyond 20 m.
 - Core tags (name, surface, lit, type) have good coverage; optional tags (cycleway details, strategic refs) are sparse — expected for OSM.
 - Risk on ~9% of edges, mean ~1.3 — reasonable for accident-based weighting.
@@ -454,9 +473,24 @@ For the run that produced the terminal output and report above:
 
 So the pipeline ran correctly and the resulting graph is suitable for routing and for adding intersection-based penalties when you implement that (see `TASKS.md`).
 
+### 6.1b Post-noding runtime graph (current)
+
+After **`noded_network.py`** + default **`build_graph.py`** (June 2026):
+
+| Metric | Typical value |
+|--------|----------------|
+| Nodes | ~1,924,143 |
+| Directed edges | ~4,061,445 |
+| Network length (sum of edge lengths) | ~70,111 km |
+| Island nodes removed | ~30,327 |
+| Edges &lt;10 m | ~52% |
+| Debug report | `1_data/graph_debug_reports/graph_debug_report_2026-06-03.txt` |
+
+**Healthy signs:** island removal &lt;&lt; pre-noding (~542k); outer-borough coverage fills former “holes” (verify with debug **Graph network** overlay). Startup and cold-load times increase with graph size — use **`.gpickle`** (see §1).
+
 ### 6.5 Tag coverage (verification script)
 
-Output from **`python 6_verification/verify_tag_coverage.py`** on **`london_elev_final_tfl.graphml`** (175,490 nodes, 350,283 edges). Every possible edge and node tag is reported; low or 0% coverage means OSM or the pipeline rarely populate those tags.
+**Legacy snapshot (pre-noding mesh):** Output from **`python 6_verification/verify_tag_coverage.py`** on **`london_elev_final_tfl.graphml`** (**175,490** nodes, **350,283** edges). Re-run the script on the current **`london_elev_final_tfl.gpickle`** after major rebuilds; percentages shift with mesh scale (e.g. barrier tags fan out to more directed edges per OSM way).
 
 **Edge tag coverage**
 
@@ -527,12 +561,62 @@ Output from **`python 6_verification/verify_tag_coverage.py`** on **`london_elev
 
 ## 7. Elevation processing (after build)
 
+Noding splits OSM ways into many **short edges** (~9 m median). Raw LIDAR grades on micro-segments over-count steep climbs. Step 6 applies a **connected hill-length filter** so only sustained ascents survive.
+
+### 7.1 Scripts
+
 1. **`Add_elevation_raster.py`**  
-   Loads `london` via `graph_io` (pickle preferred). Samples LIDAR at each node, sets `elevation`; computes `grade` per edge. Writes **`london_elev_raw.gpickle`** only.
+   Loads `london` via `graph_io` (pickle preferred). Samples LIDAR at each node, sets `elevation`; computes `grade` per edge (`(ele_v − ele_u) / length`). Writes **`london_elev_raw.gpickle`** only.
 
 2. **`elevation_processing_aggressive.py`**  
-   Loads `london_elev_raw.gpickle`. Applies 5×5 median smoothing on suspicious nodes, recalculates grades, pedestrian/micro pre-filters, then **connected hill-length filter** on ascent-steep edges: flatten chains **&lt;50 m**, halve **50–100 m**, keep **≥100 m** (union-find on steep subgraph). Caps extreme grades at ±20%. Writes **`london_elev_final.gpickle`** only.  
-   All non-elevation attributes from the graph are unchanged; only `elevation` and `grade` are modified.
+   Loads `london_elev_raw.gpickle`. Processing order:
+
+   | Step | What |
+   |------|------|
+   | Optional DEM | 5×5 median on nodes at endpoints of short (&lt;50 m) steep edges; recalculate grades |
+   | Pre-filters | Grade → 0 on edges &lt;5 m; grade → 0 on pedestrian/motorway types in `FLATTEN_CLASSES` |
+   | **Hill-length filter** | Union-find on **ascent-steep** edges (`grade > 3.3%`) sharing a node; component length = sum of member edge lengths |
+   | Cap | Clamp \|grade\| to **20%** |
+
+   **Hill-length thresholds** (constants `HILL_HALF_M`, `HILL_KEEP_M` in script):
+
+   | Connected steep chain length | Action |
+   |------------------------------|--------|
+   | **&lt; 50 m** | Flatten (grade → 0) |
+   | **50–100 m** | Halve grade (×0.5) |
+   | **≥ 100 m** | Keep full grade |
+
+   Reverse edges (`v→u`) are **not** chained to `u→v` when measuring components (each direction evaluated separately for ascents). Descents are unchanged by the hill filter except the ±20% cap.
+
+   **Usage:**
+   ```text
+   python elevation_processing_aggressive.py              # full (DEM + hill); very slow at ~4M edges
+   python elevation_processing_aggressive.py --skip-dem   # hill filter only; typical dev re-run
+   ```
+
+   Writes **`london_elev_final.gpickle`** only. Node `elevation` may change when DEM smoothing runs; otherwise only `grade` is modified.
+
+### 7.2 Elevation metrics (reference runs)
+
+Ascent-steep = directed edges with `grade > 3.3%`. **Steep / 100 km** = ascent-steep count ÷ network km × 100 (primary sanity metric on noded mesh).
+
+| Graph | Edges | Network km | Ascent-steep | Steep / 100 km | Total ascent km |
+|-------|------:|-----------:|-------------:|---------------:|----------------:|
+| Old mesh (`london_elev.graphml`, pre-noding) | 350,283 | ~28,033 | 34,211 | **122** | ~239 |
+| New RAW (`london_elev_raw.gpickle`) | 4,061,445 | ~70,111 | 535,815 | 764 | ~848 |
+| New final — **previous cluster logic** (Jun 2026) | 4,061,445 | ~70,111 | 173,842 | 248 | ~487 |
+| New final — **hill-length 50/100 m** (Jun 2026) | 4,061,445 | ~70,111 | **77,688** | **111** | **~371** |
+
+Hill-length run ( `--skip-dem` ): ~133k ascent edges flattened (&lt;50 m chains), ~41k halved (50–100 m), ~60k kept (≥100 m).
+
+### 7.3 After re-running elevation
+
+Rebuilding **`london_elev_final.gpickle`** does **not** automatically update TfL/attraction tags on **`london_elev_final_tfl.gpickle`**. Either:
+
+- Re-run from **`tag_attractions_osm.py`** onward via `run_graph_pipeline.py --start-at tag_attractions_osm.py` (with `--skip-tagging` / `--legacy-graph` as usual), **or**
+- Copy updated `grade` onto the existing `_tfl` graph (same topology) and restart backends.
+
+Restart **`app.py`** and **`app_debug.py`** after any runtime pickle change.
 
 ---
 
@@ -540,6 +624,7 @@ Output from **`python 6_verification/verify_tag_coverage.py`** on **`london_elev
 
 - **File used:** `1_data/london_elev_final_tfl.gpickle` at runtime (canonical path `london_elev_final_tfl.graphml` for `graph_io` fallback; see pipeline step 7).
 - **Graph type:** `networkx.DiGraph`; node id = `(lon, lat)` tuple.
+- **Scale (current noded mesh):** ~1.92M nodes, ~4.06M directed edges — see §1.
 - **Cost function:** Edge attributes (`length`, `risk`, `lit`, `surface`, `grade`, barriers, calming, etc.) plus **node** penalties at the head of each edge (`traffic_signals`, zebra/uncontrolled `crossing`, `mini_roundabout`, junction danger). See `0_documentation/APP_MAIN.md` §5.5. Junction cluster dedup (35 m) limits stacked penalties at one physical junction.
 
 ---
