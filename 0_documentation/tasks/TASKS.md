@@ -31,7 +31,7 @@ Prioritised list of work items. **Keep this file up to date:** when you complete
 - [x] **Battersea Park area: sparse edges and steep segments** — Certain quarters below Battersea Park have very few edges and lack steep segments; check OSM and elevation data coverage. See Development_Protocol_2026-02-19 §7.3.
 - [ ] **Add new data from TfL sets** — Ingest additional TfL datasets (e.g. line infrastructure, other route types) and integrate with tagging or overlays.
 - [ ] **Improve frontend** — UX, accessibility, performance, or layout improvements for the main and/or debug app.
-- [ ] **Improve data handling to reduce load up time and runtimes** — Optimise graph load, caching, spatial indexes, or backend response times.
+- [ ] **Improve data handling to reduce load up time and runtimes** — Optimise graph load, caching, spatial indexes, or backend response times. See [`route_generation_performance.md`](route_generation_performance.md).
 
 ---
 

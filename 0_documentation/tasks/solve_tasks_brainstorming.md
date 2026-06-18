@@ -2,7 +2,7 @@
 
 **Purpose:** Design notes for open performance, coverage, routing, and green-mode work. Not a task list — see [`TASKS.md`](TASKS.md) for actionable items.
 
-**Related:** [`GRAPH.md`](GRAPH.md), [`APP_MAIN.md`](APP_MAIN.md), [`3_pipeline/build_graph.py`](../3_pipeline/build_graph.py), [`4_backend_engine/app.py`](../4_backend_engine/app.py).
+**Related:** [`../GRAPH.md`](../GRAPH.md), [`../APP_MAIN.md`](../APP_MAIN.md), [`3_pipeline/build_graph.py`](../../3_pipeline/build_graph.py), [`4_backend_engine/app.py`](../../4_backend_engine/app.py).
 
 ---
 
@@ -17,7 +17,7 @@
 
 #### A. Largest weakly connected component only
 
-After building the directed graph, [`build_graph.py`](../3_pipeline/build_graph.py) keeps **only the largest weakly connected component** and deletes all other nodes/edges (“islands”).
+After building the directed graph, [`build_graph.py`](../../3_pipeline/build_graph.py) keeps **only the largest weakly connected component** and deletes all other nodes/edges (“islands”).
 
 Example from a successful build (see [`GRAPH.md`](GRAPH.md) §6):
 
@@ -46,13 +46,13 @@ Areas can look empty if the only connectors are tagged forbidden for cyclists or
 #### C. Data source / DB mismatch
 
 - **Graph build** reads **`planet_osm_line`** (full OSM line features with `highway`).
-- **`import_roads.py`** loads a **roads-only Geofabrik shapefile** into table **`ways`** for accident matching ([`calculate_risk.py`](../3_pipeline/calculate_risk.py)).
+- **`import_roads.py`** loads a **roads-only Geofabrik shapefile** into table **`ways`** for accident matching ([`calculate_risk.py`](../../3_pipeline/calculate_risk.py)).
 
 Coverage problems are often **OSM import quality or extent** for `planet_osm_line`, not the graph script alone. The roads shapefile does not replace a full osm2pgsql-style import for line topology.
 
 #### D. Snap and inspect behaviour
 
-**Status: improved (global edge snap).** [`tfl_live.snap_to_edge`](../4_backend_engine/tfl_live.py) queries the shared startup STRtree, projects the click onto the closest edge geometry, and picks the nearer terminal as the routing anchor. [`GET /route`](../4_backend_engine/app.py) prepends/appends snap coordinates as visual stubs; A\* remains node-to-node. [`GET /inspect`](../4_backend_engine/app.py) uses the same global snap.
+**Status: improved (global edge snap).** [`tfl_live.snap_to_edge`](../../4_backend_engine/tfl_live.py) queries the shared startup STRtree, projects the click onto the closest edge geometry, and picks the nearer terminal as the routing anchor. [`GET /route`](../../4_backend_engine/app.py) prepends/appends snap coordinates as visual stubs; A\* remains node-to-node. [`GET /inspect`](../../4_backend_engine/app.py) uses the same global snap.
 
 **Remaining gaps:** stats distance excludes stub segments; routing cost is optimal for anchor nodes, not exact click points; clicks **>50 m** from any edge return 400/404. Sparse graph holes are still possible where OSM has no geometry.
 
@@ -72,7 +72,7 @@ Endpoints are rounded to 6 decimals when used as node IDs. Ways that should meet
 
 ### Mitigation directions
 
-- **Topology repair (implemented):** [`noded_network.py`](../3_pipeline/noded_network.py) splits `planet_osm_line` at intersections into `planet_osm_line_noded_enriched`; [`build_graph.py`](../3_pipeline/build_graph.py) reads that view by default. Re-run [`run_graph_pipeline.py`](../3_pipeline/run_graph_pipeline.py) after OSM updates.
+- **Topology repair (implemented):** [`noded_network.py`](../../3_pipeline/noded_network.py) splits `planet_osm_line` at intersections into `planet_osm_line_noded_enriched`; [`build_graph.py`](../../3_pipeline/build_graph.py) reads that view by default. Re-run [`run_graph_pipeline.py`](../../3_pipeline/run_graph_pipeline.py) after OSM updates.
 - **Relax island policy (not implemented):** keep top-N components or components above a size threshold, not only the largest.
 - **Endpoint snap (not implemented):** merge endpoints within 1–2 m in PostGIS before graph build.
 - **Regional graphs** with boundary connectors (heavier architecture).
@@ -87,13 +87,13 @@ Endpoints are rounded to 6 decimals when used as node IDs. Ways that should meet
 
 For ~500k+ SQL rows, pandas iteration, directed edge doubling, weakly connected component analysis, KD-tree and multiple STRtree passes — **multi-minute builds in pure Python/NetworkX are plausible**.
 
-**Intended cadence:** batch job **at most once per day** (or on OSM update), via [`run_graph_pipeline.py`](../3_pipeline/run_graph_pipeline.py). Not per user request.
+**Intended cadence:** batch job **at most once per day** (or on OSM update), via [`run_graph_pipeline.py`](../../3_pipeline/run_graph_pipeline.py). Not per user request.
 
 **Future build optimisations (if needed):** vectorise instead of row-by-row loops, build topology in PostGIS/pgRouting, reduce in-memory graph copies.
 
 ### App startup (dev feels slow)
 
-[`app.py`](../4_backend_engine/app.py) and [`app_debug.py`](../4_backend_engine/app_debug.py) at import:
+[`app.py`](../../4_backend_engine/app.py) and [`app_debug.py`](../../4_backend_engine/app_debug.py) at import:
 
 1. `nx.read_graphml(...)` — full parse, attributes as strings
 2. Loop all nodes into `node_data`
@@ -142,7 +142,7 @@ Clients
 
 ### Previous behaviour (before heuristic)
 
-[`app.py`](../4_backend_engine/app.py) used `nx.astar_path` with **no custom `heuristic`** → **h = 0** (Dijkstra-style expansion). Snap was **O(n)** per request in `get_nearest_node`.
+[`app.py`](../../4_backend_engine/app.py) used `nx.astar_path` with **no custom `heuristic`** → **h = 0** (Dijkstra-style expansion). Snap was **O(n)** per request in `get_nearest_node`.
 
 ### Implemented behaviour
 
@@ -203,7 +203,7 @@ h(n) = haversine(n, goal) × max(R_MIN, product of enabled reward factors)
 
 ## 4. Green mode — current logic and manual regions
 
-### Current logic ([`_is_green_edge`](../4_backend_engine/app.py))
+### Current logic ([`_is_green_edge`](../../4_backend_engine/app.py))
 
 Edge is “green” when:
 
@@ -220,7 +220,7 @@ Most real park and scenic riding is **not** tagged that way on OSM **lines**:
 - Asphalt footpaths in parks fail the “natural surface” test.
 - Lit paths fail the “unlit” branch.
 
-See [`6_verification/green_mode_coverage.py`](../6_verification/green_mode_coverage.py) for measuring match rates on the graph.
+See [`6_verification/green_mode_coverage.py`](../../6_verification/green_mode_coverage.py) for measuring match rates on the graph.
 
 ### Proposed approach: manual geographic regions
 
@@ -231,7 +231,7 @@ Similar in spirit to TfL live matching and manual TfL edits.
 1. **Authoring (debug app):** draw polygons (parks), polyline + buffer (Thames), optional radii (landmarks).
 2. **Storage:** e.g. `3_pipeline/green_regions.json` — GeoJSON features + mode enum (`park` | `river_corridor` | `scenic` | …).
 3. **Tagging (pipeline step or startup):**
-   - STRtree over edge LineStrings (same pattern as [`tfl_live.py`](../4_backend_engine/tfl_live.py)).
+   - STRtree over edge LineStrings (same pattern as [`tfl_live.py`](../../4_backend_engine/tfl_live.py)).
    - If edge geometry intersects polygon (or lies within buffered river line), set e.g. `green_zone` on the edge.
 4. **Routing:** when `green_weight > 0`, apply tiered `R` multipliers by `green_zone`.
 
@@ -274,12 +274,12 @@ GLA greenspace / landcover datasets as bulk polygons — less manual drawing, le
 
 | File | Relevance |
 |------|-----------|
-| [`3_pipeline/build_graph.py`](../3_pipeline/build_graph.py) | Filters, island cleanup, step 4d calming relay |
-| [`3_pipeline/run_graph_pipeline.py`](../3_pipeline/run_graph_pipeline.py) | Batch pipeline orchestration |
-| [`4_backend_engine/app.py`](../4_backend_engine/app.py) | Routing, snap, green logic, load path |
-| [`4_backend_engine/tfl_live.py`](../4_backend_engine/tfl_live.py) | Polygon/line geometric edge matching |
-| [`0_documentation/TASKS.md`](TASKS.md) | A* heuristic, green mode, Battersea, performance items |
-| [`0_documentation/GRAPH.md`](GRAPH.md) | Pipeline order, island cleanup, routing use |
+| [`3_pipeline/build_graph.py`](../../3_pipeline/build_graph.py) | Filters, island cleanup, step 4d calming relay |
+| [`3_pipeline/run_graph_pipeline.py`](../../3_pipeline/run_graph_pipeline.py) | Batch pipeline orchestration |
+| [`4_backend_engine/app.py`](../../4_backend_engine/app.py) | Routing, snap, green logic, load path |
+| [`4_backend_engine/tfl_live.py`](../../4_backend_engine/tfl_live.py) | Polygon/line geometric edge matching |
+| [`0_documentation/tasks/TASKS.md`](TASKS.md) | A* heuristic, green mode, Battersea, performance items |
+| [`0_documentation/GRAPH.md`](../GRAPH.md) | Pipeline order, island cleanup, routing use |
 
 ---
 

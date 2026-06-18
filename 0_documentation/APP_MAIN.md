@@ -81,7 +81,7 @@ The main app (**Tuned Cycling**) is the production cycling route planner for Lon
 - **Fallback:** park edges without valid OSM hours default to **dawn-dusk** (astronomical, London coords).
 - **Dependency:** `pip install -r 4_backend_engine/requirements.txt` (`opening-hours-py`).
 - **`/route` meta:** `park_hours_at` (ISO-8601 London), `park_fallback_open`, `park_hours_map_size`.
-- **Verification (17 Jun 2026):** four-slot audit with edge/polygon counts — [`park_hours_verification.md`](park_hours_verification.md). Re-run: `python 4_backend_engine/park_hours_audit.py`.
+- **Verification (17 Jun 2026):** four-slot audit with edge/polygon counts — [`verification/park_hours_verification.md`](verification/park_hours_verification.md). Re-run: `python 4_backend_engine/park_hours_audit.py`.
 
 ### 3.4 Location search (Mapbox)
 

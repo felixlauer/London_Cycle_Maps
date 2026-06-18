@@ -2,7 +2,7 @@
 
 This document describes **what data is parsed**, **how the routing graph is built**, and **how it is processed** end-to-end. Keep this file up to date whenever you change the pipeline or add/remove tags.
 
-**Related docs:** `0_documentation/TASKS.md` (task list), `0_documentation/APP_MAIN.md` (main app), `0_documentation/APP_DEBUG.md` (debug app).
+**Related docs:** `0_documentation/tasks/TASKS.md` (task list), `0_documentation/APP_MAIN.md` (main app), `0_documentation/APP_DEBUG.md` (debug app).
 
 ---
 
@@ -256,7 +256,7 @@ Export format: `{ "source_graph", "exported_at", "edges": [ { "source", "target"
 
 **Source:** **`fetch_osm_park_polygons.py`** (local PBF or Overpass → `1_data/osm_park_polygons.geojson`, includes `opening_hours`) then **`tag_attractions_osm.py`** on `london_elev_final` (clears `is_park` + hours, re-tags from cache). **`attraction_manual_regions.json`** from debug **Modify attractions** mode; apply with **`apply_attraction_manual.py`** on the final graph (adds flags, does not clear OSM `is_park`; recompiles hours catalog). Spatial matching: [`attraction_spatial.py`](../3_pipeline/attraction_spatial.py) (STRtree + length ratio, EPSG:27700 for buffers). Main app **Green/scenic** toggle uses any of `is_park` / `is_river` / `is_sight` (`_has_attraction_edge` in `app.py`).
 
-**Park hours routing (main app):** At `GET /route`, backend pre-evaluates each unique `opening_hours` string once at **Europe/London** local time (GMT/BST per request date) via `opening-hours-py` ([`park_opening_hours.py`](../4_backend_engine/park_opening_hours.py)). Edges with `is_park=yes` and no valid hours use **dawn-dusk** fallback. Closed park edges get hard cost `1e9` in **both** fastest and optimized A* (profile-independent). **Manual overrides:** [`park_hours_overrides.json`](../3_pipeline/park_hours_overrides.json) — see [`park_hours_overrides.md`](park_hours_overrides.md). **Verification audit (17 Jun 2026):** [`park_hours_verification.md`](park_hours_verification.md).
+**Park hours routing (main app):** At `GET /route`, backend pre-evaluates each unique `opening_hours` string once at **Europe/London** local time (GMT/BST per request date) via `opening-hours-py` ([`park_opening_hours.py`](../4_backend_engine/park_opening_hours.py)). Edges with `is_park=yes` and no valid hours use **dawn-dusk** fallback. Closed park edges get hard cost `1e9` in **both** fastest and optimized A* (profile-independent). **Manual overrides:** [`park_hours_overrides.json`](../3_pipeline/park_hours_overrides.json) — see [`verification/park_hours_overrides.md`](verification/park_hours_overrides.md). **Verification audit (17 Jun 2026):** [`verification/park_hours_verification.md`](verification/park_hours_verification.md).
 
 **Manual edit apply run totals** (graph 175 490 nodes, 350 283 edges):
 
@@ -693,7 +693,7 @@ Live road disruption data (**TfL** and **TomTom**) is **not** stored in the grap
 - **Changing direction or exclusion rules:** Update Section 5.
 - **Adding a new pipeline script or changing order:** Update Section 1 and any affected sections.
 - **Changing elevation behaviour or outputs:** Update Section 7.
-- **Using new attributes in the backend:** Update Section 8; consider adding or updating a task in `0_documentation/TASKS.md`.
+- **Using new attributes in the backend:** Update Section 8; consider adding or updating a task in `0_documentation/tasks/TASKS.md`.
 - **Changing live disruption APIs or merge logic:** Update Section 9; sync with `0_documentation/APP_MAIN.md` and `APP_DEBUG.md`.
 
 A reminder to update this file is at the top of `3_pipeline/build_graph.py`.
