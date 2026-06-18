@@ -19,6 +19,7 @@ import time
 from attraction_spatial import (
     build_edge_strtree,
     clear_manual_river_sight_tags,
+    compile_park_hours_catalog,
     edge_geometries,
     geometry_from_geojson,
     init_attraction_attrs,
@@ -120,6 +121,8 @@ def main() -> int:
     print(f"   -> Cleared is_river on {cleared_river:,} edges, is_sight on {cleared_sight:,} edges")
 
     if not regions:
+        unique_hours = compile_park_hours_catalog(G)
+        print(f"   -> {len(unique_hours)} unique opening_hours strings in catalog")
         print("No regions to apply; saving graph unchanged.")
         save_graph(G, output_path, write_graphml=not args.pickle_only, write_fast=True)
         return 0
@@ -146,6 +149,8 @@ def main() -> int:
         print(f"   -> {flag}=yes: {count:,} edges")
 
     print(f"   -> {total_ops:,} edge-tag operations")
+    unique_hours = compile_park_hours_catalog(G)
+    print(f"   -> {len(unique_hours)} unique opening_hours strings in catalog")
     print(f"4. Saving to {output_path}...")
     save_graph(G, output_path, write_graphml=not args.pickle_only, write_fast=True)
     print("SUCCESS.")

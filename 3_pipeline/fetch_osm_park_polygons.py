@@ -77,6 +77,7 @@ out geom;
 
 EXCLUDED_ACCESS = frozenset({"private", "no", "customers"})
 ACCESS_RE = re.compile(r'"access"=>"([^"]+)"', re.IGNORECASE)
+OPENING_HOURS_RE = re.compile(r'"opening_hours"=>"([^"]+)"', re.IGNORECASE)
 
 REQUEST_HEADERS = {
     "User-Agent": "LondonCycleMaps/1.0 (park polygon fetch; local pipeline)",
@@ -147,6 +148,21 @@ def _access_value(row) -> str:
     return m.group(1).strip().lower() if m else ""
 
 
+def _opening_hours_value(row) -> str:
+    if hasattr(row, "get"):
+        direct = row.get("opening_hours")
+        if direct is not None and str(direct).strip():
+            return str(direct).strip()
+        other = row.get("other_tags") or ""
+    else:
+        direct = getattr(row, "opening_hours", None) if "opening_hours" in row.index else None
+        if direct is not None and str(direct).strip():
+            return str(direct).strip()
+        other = getattr(row, "other_tags", "") or ""
+    m = OPENING_HOURS_RE.search(str(other))
+    return m.group(1).strip() if m else ""
+
+
 def _gdf_to_features(gdf) -> list[dict]:
     features = []
     skipped_access = 0
@@ -166,6 +182,7 @@ def _gdf_to_features(gdf) -> list[dict]:
             "leisure": str(row.get("leisure") or "").strip(),
             "landuse": str(row.get("landuse") or "").strip(),
             "access": access,
+            "opening_hours": _opening_hours_value(row),
             "osm_id": str(osm_id),
             "feature_id": f"way/{osm_id}" if osm_id else "",
         }
@@ -285,6 +302,7 @@ def _element_to_feature(el: dict) -> dict | None:
             "leisure": str(tags.get("leisure", "") or ""),
             "landuse": str(tags.get("landuse", "") or ""),
             "access": access,
+            "opening_hours": str(tags.get("opening_hours", "") or "").strip(),
             "osm_id": str(osm_id) if osm_id is not None else "",
             "feature_id": f"{etype_prefix}/{osm_id}" if osm_id is not None else "",
         },

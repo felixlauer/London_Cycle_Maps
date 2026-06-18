@@ -6,7 +6,7 @@ Documentation for the **user-facing routing app**: frontend (`5_frontend`) and b
 
 ## 1. Purpose
 
-The main app is the production cycling route planner for London. Users set start and end on the map and get two routes (fastest vs optimized), with grouped toggles for **Safety** (accidents, night mode, TfL Cycleways, narrow facility, speed stress, signals, barriers, junction danger, live TfL disruptions), **Comfort** (road bike, flat route, traffic calming), and **Scenery** (TfL Quietways, green/scenic). Optional overlays highlight lit, steep, TfL, green, and narrow segments on the optimized route. **Node-based modes** (signals, barriers, junctions, calming) show as coloured circle icons on the map; left-click an icon opens a popup with details (e.g. barrier type). No data-exploration overlays (accidents heatmap, etc.) — those live in the debug app.
+The main app (**Tuned Cycling**) is the production cycling route planner for London. Users select a **routing profile** (or use **Test Mode** to override with manual toggles), set start and end on the map, and get two routes (fastest vs profile-optimized). Profiles store 14 numeric **activation weights** in `[0.0, 1.0]` (0%–100% of each routing factor); backend penalty magnitudes are fixed in `make_weight_optimized()`. Seed personas: Safe Commuter, Fast & Direct, Tourist / Explorer. Optional overlays highlight lit, steep, TfL, green, and narrow segments when the corresponding profile weight is &gt; 0. **Node-based modes** (signals, barriers, junctions, calming) show as coloured circle icons on the map. No data-exploration overlays — those live in the debug app.
 
 ---
 
@@ -22,11 +22,14 @@ The main app is the production cycling route planner for London. Users set start
 
 ### 2.2 Data flow
 
-1. User clicks map → start then end (or resets with a third click).
-2. Frontend calls `GET /route` with coordinates and all active weight parameters (0 or 1 per toggle).
-3. Backend loads graph once at startup; builds a **cKDTree** on node coordinates for O(log n) snap; loads `tfl_live` module at startup (builds STRtree edge spatial index); live disruption data populated via `POST /admin/update_tfl`. For each request it parses **request-scoped weights** (no globals), builds an optimized weight function via closure, runs **A\*** twice (fastest and optimized) with admissible haversine heuristics, returns paths, stats, chunk arrays (lit, steep, TfL, green, narrow), and **node_highlights** (barrier/signal/junction/calming points for map icons).
-4. Frontend draws two polylines (fastest grey, optimized coloured), overlays for lit/steep/TfL/green/narrow segments when toggles are on, and **circle markers** for node-based features (colour by type); left-click a marker opens a popup with details. Stats panel shows conditional rows including **Speed stress** as a percentage of route length.
-5. Right-click on map → `GET /inspect` → segment inspector popup and red segment overlay.
+1. On load, frontend fetches `GET /profiles` and loads the active profile (`GET /profiles/:id`); selection persisted in `localStorage`.
+2. User sets **start** and **end** via map click **or** Mapbox text search (profile panel); both update the same `[lat, lon]` state. Search selection flies the map to the chosen place; map clicks do not.
+3. When both points exist, frontend prefetches routes in the background; user clicks **Get Route** to reveal results.
+4. **Profile mode (default):** frontend calls `GET /route` with coordinates and `profile_id`; backend loads weights from `user_profiles.json`.
+5. **Test Mode:** header toggle exposes legacy 0/1 toggles; frontend sends explicit weight query params (no `profile_id`).
+6. Backend loads graph once at startup; builds STRtree for edge snap; for each request parses **request-scoped weights**, sets `calming_source='both'` (hardcoded), runs **A\*** twice (fastest and optimized), returns paths, stats, overlay chunks, and **node_highlights**.
+7. Frontend draws two polylines, overlays gated by active weights (&gt; 0), condensed stats panel (all metrics with Δ vs fastest).
+8. Right-click on map → `GET /inspect` → segment inspector popup and red segment overlay.
 
 ### 2.3 Backend (app.py)
 
@@ -44,35 +47,62 @@ The main app is the production cycling route planner for London. Users set start
 
 ### 2.4 Frontend (5_frontend)
 
-- Single-page React app; main UI in `App.js` (no routing library; one component tree).
-- Map: Leaflet via react-leaflet; center London, OSM tiles.
-- State: `useState` for start/end, route results, toggles, inspector; `useEffect` for daylight check and re-fetch when toggles change.
-- Theming: light/dark theme object (colors, tile filter) derived from Night Mode toggle; applied to header, panels, toggles, and map tiles.
+- Single-page React app; main UI in `App.js`.
+- **Profile panel** (top-left): dropdown of seed + custom profiles, **Route points** (Start/End Mapbox autocomplete), Create Profile modal, Get Route button.
+- **Test Mode** toggle in header (top-right); when on, legacy grouped toggles appear bottom-right (Safety, Comfort, Scenery).
+- Map: Leaflet via react-leaflet; center London, OSM tiles; `MapFlyTo` on search selection.
+- State: profiles, active profile, test mode, start/end (+ labels), route results, inspector.
+- **Env:** `REACT_APP_MAPBOX_API_KEY` in `5_frontend/.env` (see `5_frontend/.env.example`); required for location search. CRA reads env at startup only — restart `npm start` after changes.
+- Theming: light/dark from Night Mode toggle (Test Mode only for UI theme; `light_weight` in profile affects routing cost, not theme).
 
 ---
 
 ## 3. Features
 
-### 3.1 Routing
+### 3.1 Profile-driven routing
 
-- **Click to set start** → then **click to set end** → backend returns fastest and optimized routes.
-- **Third click** clears end and sets a new start (cycle repeats).
-- **Optimization toggles** (all optional, 0 or 1): **Safety** — Avoid Accidents, Night Mode, TfL Cycleways, Narrow facility, Speed stress, Traffic signals, Barriers, Junction danger, Live TfL Disruptions. **Comfort** — Road Bike, Flat Route, Traffic calming. **Scenery** — TfL Quietways, Green/scenic (park/river/sight graph flags). See API section for weight param names.
+- **Active profile** selects all 14 routing weights simultaneously (continuous values in `[0.0, 1.0]`).
+- **Seed personas:** Safe Commuter (infrastructure + safety), Fast & Direct (minimal penalties), Tourist / Explorer (green + quietways).
+- **Create Profile:** modal form with numeric inputs (`min=0`, `max=1`, `step=0.05`); `POST /profiles` persists to `user_profiles.json`.
+- **Test Mode:** reveals manual 0/1 toggles that override the active profile for debugging.
 
-### 3.2 Display
+### 3.2 Routing interaction
 
-- **Two routes:** Fastest (grey, semi-transparent) and optimized (solid colour: red in light theme, cyan in dark).
-- **Stats panel** (bottom-left): Time, Distance, and conditional rows per active mode (Accidents, Lit %, Rough %, Elevation, Steep seg., TfL km, Speed stress %, Narrow km, Green km, Barriers, Calming, Signals, Junctions, Disruptions). “Diff” column shows optimized − fastest.
-- **Control panel** (bottom-right): grouped toggles (Safety, Comfort, Scenery); scrollable. **Overlays:** lit, steep, TfL cycleway, TfL quietway, green, narrow when toggles on. **Node icons:** circle markers for barrier/signal/junction/calming; left-click opens popup with details.
-- **Header:** App title + status line (e.g. “Set Destination.”, “Route calculated in 842 ms \| min weight/m: 0.450”, “Night detected. Dark Mode ON.”). While routing or when toggles change, shows “Calculating... \| min weight/m: …” from active scenery reward toggles; after success, shows server `meta.timing_ms.total` and `meta.cost_per_m_lower_bound`.
+- **Map click:** set start → set end → third click resets (new start, end cleared). Labels show “Map location”.
+- **Text search:** Start/End fields in profile panel use **Mapbox Search Box API v1** (`mapboxGeocoding.js`, `LocationSearchInput.js`). Session UUID is created on input **focus** and reused for all `suggest` calls until selection (`retrieve`) or blur — one billing session per focus, not per keystroke. London bbox bias (`country=GB`). Selecting a result sets coordinates, updates the label, places the marker, and **flies** the map to the point.
+- Start/end from map and search are interchangeable; background prefetch runs when both exist; **Get Route** reveals prefetched results.
 
-### 3.3 Segment inspector
+### 3.3 Park opening hours (hard constraint)
+
+- **Closed parks are impassable** — edges with `is_park=yes` that are closed at request time receive cost `1e9` in **both** fastest and optimized routing, regardless of profile or `green_weight`.
+- **Evaluation time:** `Europe/London` local time (`datetime.now(ZoneInfo("Europe/London"))`), automatic GMT/BST from the request date.
+- **OSM hours:** graph edges store `opening_hours` from the highest-overlap park polygon; unique strings are pre-compiled in `G.graph["park_opening_hours_unique"]`.
+- **Pre-eval per request:** [`park_opening_hours.py`](4_backend_engine/park_opening_hours.py) parses each unique string once via `opening-hours-py` (solar events use London coordinates); A* only does O(1) dict lookup.
+- **Fallback:** park edges without valid OSM hours default to **dawn-dusk** (astronomical, London coords).
+- **Dependency:** `pip install -r 4_backend_engine/requirements.txt` (`opening-hours-py`).
+- **`/route` meta:** `park_hours_at` (ISO-8601 London), `park_fallback_open`, `park_hours_map_size`.
+- **Verification (17 Jun 2026):** four-slot audit with edge/polygon counts — [`park_hours_verification.md`](park_hours_verification.md). Re-run: `python 4_backend_engine/park_hours_audit.py`.
+
+### 3.4 Location search (Mapbox)
+
+- **Frontend-only** geocoding — backend unchanged.
+- **Files:** `5_frontend/src/mapboxGeocoding.js` (suggest/retrieve), `LocationSearchInput.js` (debounced dropdown), `MapFlyTo.js` (viewport fly on search select).
+- **Token:** public Mapbox token in `REACT_APP_MAPBOX_API_KEY`; restrict by URL in Mapbox dashboard. If unset, inputs are disabled with placeholder “Mapbox key not configured”.
+
+### 3.5 Display
+
+- **Two routes:** Fastest (grey) and optimized (red light / cyan dark).
+- **Stats panel** (bottom-left): hero Time + Distance rows; condensed table of all 15 secondary metrics with optimized value and Δ vs fastest.
+- **Overlays:** shown when corresponding profile weight &gt; 0 (or Test Mode toggle on).
+- **Header:** “Tuned Cycling” + status line with timing and active profile name.
+
+### 3.6 Segment inspector
 
 - **Right-click** on map → request to `GET /inspect?lat=…&lon=…` → backend returns nearest edge’s tags + geometry.
 - **Inspector window** (offset from click so segment stays visible): core tags (name, surface, maxspeed, grade, length, elevation_start, elevation_end); when edge is affected by a live disruption (TfL or TomTom), also shows `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` (and for TomTom: `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay`); “Show All Tags” expands to full edge attributes.
 - **Red polyline** overlay on the inspected segment; left-click elsewhere or close button dismisses.
 
-### 3.4 Daylight and theme
+### 3.7 Daylight and theme
 
 - On load, frontend calls sunrise-sunset API (London); if current time is before sunrise or after sunset, Night Mode is turned on automatically and status set to “Night detected. Dark Mode ON.”
 - Dark theme: dark background, light text, inverted map tiles, cyan optimized route, yellow lit segments, green steep segments, blue/teal TfL and green overlays.
@@ -81,9 +111,12 @@ The main app is the production cycling route planner for London. Users set start
 
 ## 4. API (backend)
 
-| Method | Endpoint | Query params | Response |
-|--------|----------|--------------|----------|
-| GET | `/route` | `start_lat`, `start_lon`, `end_lat`, `end_lon`, plus weight params below | `{ status, meta: { cost_per_m_lower_bound, timing_ms: { snap, fastest_astar, optimized_astar, total }, snap: { start, end } }, fastest: { path, stats }, safest: { path, stats, lit_chunks, steep_chunks, tfl_cycleway_chunks, tfl_quietway_chunks, green_chunks, narrow_chunks, disruption_chunks, node_highlights } }` |
+| Method | Endpoint | Params / body | Response |
+|--------|----------|---------------|----------|
+| GET | `/profiles` | — | `{ profiles: [{ id, name }, ...] }` |
+| GET | `/profiles/<user_id>` | — | `{ id, name, weights: { ...14 keys } }` or 404 |
+| POST | `/profiles` | JSON `{ name, weights }` | `{ id, name, weights }` (201) or 400 if weight ∉ `[0.0, 1.0]` |
+| GET | `/route` | `start_lat`, `start_lon`, `end_lat`, `end_lon`, **`profile_id`** *or* explicit weight params | See below |
 | POST | `/admin/update_tfl` | (none) | `{ ok, message, count }` — fetch TfL Road Disruptions, rebuild master lookup |
 | POST | `/admin/update_tomtom` | (none) | `{ ok, message, count }` — fetch TomTom Traffic Incidents, rebuild master lookup |
 | GET | `/admin/tfl_status` | — | `{ loaded, edge_count, disruption_count, last_update, error }` — TfL live data status |
@@ -100,7 +133,12 @@ Live disruption data is **not** in the graph file; it is fetched at runtime from
 - **Status:** `GET /admin/tfl_status` and `GET /admin/tomtom_status` return whether each source is loaded, edge count, last update time, and any error.
 - **Inspector:** When an inspected edge is affected by a live disruption, the response includes `tfl_live_category`, `tfl_live_severity`, `tfl_live_description`; for TomTom-sourced (or merged) records, also `tfl_live_iconCategory` and `tfl_live_magnitudeOfDelay`.
 
-**Route weight params** (each 0.0–1.0, typically 0 or 1): `risk_weight`, `light_weight`, `surface_weight`, `hill_weight`, `tfl_cycleway_weight`, `tfl_quietway_weight`, `speed_weight`, `width_weight`, `green_weight`, `barrier_weight`, `calming_weight`, `junction_weight`, `signal_weight`, `tfl_live_weight`. **Optional:** `calming_source` = `way` \| `point` \| `both` (default `way`) — which calming data to use for the calming additive and highlights (way = OSM way tag only; point = snapped OSM nodes only; both = max of the two).
+**`/route` response meta** includes `active_profile_id`, resolved `weights`, `calming_source` (`both`), `cost_per_m_lower_bound`, `timing_ms`, `snap`, `park_hours_at`, `park_fallback_open`, `park_hours_map_size`.
+
+**Route weight params** (each **strictly** `0.0`–`1.0` activation scalar): `risk_weight`, `light_weight`, `surface_weight`, `hill_weight`, `tfl_cycleway_weight`, `tfl_quietway_weight`, `speed_weight`, `width_weight`, `green_weight`, `barrier_weight`, `calming_weight`, `junction_weight`, `signal_weight`, `tfl_live_weight`. Values represent % activation of built-in backend penalties — not magnitude multipliers. **`calming_source`** is hardcoded to `both` (way + point calming); not accepted from clients.
+
+- **Profile mode:** send `profile_id` only (plus coordinates).
+- **Test mode / explicit:** send individual weight params; each clamped server-side to `[0.0, 1.0]`; defaults `0.0` when omitted.
 
 - **Stats** (per route): `length_m`, `accidents`, `duration_min`, `illumination_pct`, `rough_pct`, `elevation_gain`, `steep_count`, `tfl_cycleway_pct`, `tfl_quietway_pct`, `speed_stress_km`, **`speed_stress_pct`**, `narrow_km`, `green_km`, `barrier_count`, `give_way_count`, `stop_sign_count` (edge-based), `calming_count` (according to `calming_source`), `signal_count`, `junction_count`, `disruption_count`.
 - **Paths / geometry:** arrays of `[lat, lon]` (WGS84). Chunk arrays are lists of segment geometries for the optimized route only. **node_highlights** is a list of `{ lat, lon, type, details }` where `type` is `barrier`, `signal`, `junction`, `junction_danger`, or `calming` and `details` holds e.g. `{ barrier: "gate" }`, `{ traffic_calming: "hump", source: "way" }` or `"point"`, `{ degree: 5 }`. Calming highlights use the chosen `calming_source`; point-based calming uses stored `traffic_calming_point_lat/lon`. **Inspector:** when an edge is affected by a live disruption, tags include `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` (and for TomTom: `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay`). Routing uses the merged live lookup (Section 4.1) for the “Live TfL Disruptions” weight.
@@ -138,6 +176,7 @@ All formulas and preset values below are implemented in `4_backend_engine/app.py
 | `PEDESTRIAN_HIGHWAY_M` | 4.0 | `M_highway` for footway/pedestrian/path without cycle infrastructure. |
 | `STEPS_HIGHWAY_M` | 10.0 | `M_highway` for `steps`. |
 | `R_MIN` | 0.1 | Minimum reward multiplier. |
+| `BARRIER_HARD_COST` | 1e9 | Impassable edges (barriers, live closures, **closed parks**). |
 | `UP_THRESH` | 0.033 | Steep ascent threshold (3.3%). |
 | `DOWN_THRESH` | -0.033 | Steep descent threshold (-3.3%). |
 | `JUNCTION_DANGER_MIN_CAR_ROADS` | 4 | Junction danger only if ≥ 4 car-allowed physical roads. |
@@ -174,7 +213,7 @@ Overlays plot **a single point at the stored original position** (barrier_lat/ba
 - **Give-way / Stop sign (edge-based):** Only the edge that **ends** at the sign is tagged. Penalty = INTERSECTION_PENALTY_METRES × \(w_{\text{junction}}\). Position: `give_way_lat`/`give_way_lon`, `stop_sign_lat`/`stop_sign_lon`.
 - **Traffic signal:** \(20 \times 4.44 \approx 88.8\) m virtual distance × \(w_{\text{signal}}\) if node has `traffic_signals`.
 - **Junction danger:** 8 × \(w_{\text{junction}}\) if (a) node has no traffic signals, (b) number of **car-allowed physical roads** at node ≥ 4.
-- **Traffic calming:** Depends on **calming_source** (request param, default `way`). **way:** 5 (cushion/choker) or 10 (other) × \(w_{\text{calming}}\) per edge with `traffic_calming`. **point:** same cost mapping using `traffic_calming_point` only. **both:** \(\max(\text{way cost}, \text{point cost})\) per edge (avoids double-count).
+- **Traffic calming:** **`calming_source` is always `both`:** \(\max(\text{way cost}, \text{point cost})\) per edge.
 
 \[
 A_{\text{total}} = A_{\text{intersection}} + A_{\text{mini\_roundabout}} + A_{\text{barrier}} + A_{\text{give\_way}} + A_{\text{stop\_sign}} + A_{\text{signal}} + A_{\text{junction}} + A_{\text{calming}}
@@ -206,8 +245,10 @@ A_{\text{total}} = A_{\text{intersection}} + A_{\text{mini\_roundabout}} + A_{\t
 
 | Path | Role |
 |------|------|
+| `4_backend_engine/user_profiles.py` | Profile CRUD, weight validation `[0.0, 1.0]`, JSON persistence |
+| `4_backend_engine/user_profiles.json` | Local mock DB: seed personas + custom profiles |
 | `4_backend_engine/tfl_live.py` | Shared TfL live disruption module (STRtree, API fetch, spatial matching, lookup table) |
-| `5_frontend/src/App.js` | Map, toggles, route display, inspector, stats, theme, API calls |
+| `5_frontend/src/App.js` | Map, profile selector, Test Mode, route display, inspector, stats, API calls |
 | `5_frontend/src/index.js` | React root |
 | `5_frontend/public/index.html` | HTML shell |
 | `4_backend_engine/app.py` | Flask app, graph load, cost functions, `/route`, `/inspect` |

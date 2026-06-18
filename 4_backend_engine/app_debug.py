@@ -25,6 +25,12 @@ from attraction_spatial import (
 import tfl_live
 import live_disruptions
 from barrier_clusters import barrier_cluster_meta, cluster_legend
+from park_opening_hours import (
+    LONDON_TZ,
+    build_request_hours_context,
+    is_park_edge_open,
+    london_now,
+)
 
 # --- CONFIGURATION (set DB_PASS etc. via env or .env; do not commit secrets) ---
 GRAPH_PATH = os.path.join("..", "1_data", "london_elev_final_tfl.graphml")
@@ -183,7 +189,7 @@ STOP_POINTS = []
 TFL_ROUTES_CACHE = []  # [{id, p, b, programme, route}, ...]
 
 # Attraction / green mode (is_park, is_river, is_sight on graph edges)
-ATTRACTION_PARK_CACHE = []   # [{id, p, b, name}, ...]
+ATTRACTION_PARK_CACHE = []   # [{id, p, b, name, opening_hours}, ...]
 ATTRACTION_RIVER_CACHE = []
 ATTRACTION_SIGHT_CACHE = []
 
@@ -399,6 +405,7 @@ def build_all_debug_caches():
                 attr_park += 1
                 ATTRACTION_PARK_CACHE.append({
                     "id": f"park-{u}-{v}", "p": coords, "b": make_bounds(coords), "name": name,
+                    "opening_hours": str(data.get("opening_hours", "") or "").strip(),
                 })
         if _is_yes_attr(data.get("is_river")):
             if coords is None:
@@ -1282,9 +1289,29 @@ _ATTRACTION_LAYER_POOLS = {
 }
 
 
+def _parse_park_hours_at_time():
+    """Optional ISO `at` query param; default Europe/London now."""
+    from datetime import datetime
+
+    raw = (request.args.get("at") or "").strip()
+    if not raw:
+        return london_now()
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=LONDON_TZ)
+        return dt.astimezone(LONDON_TZ)
+    except Exception:
+        return london_now()
+
+
 @app.route('/debug/attractions', methods=['GET'])
 def get_attractions():
-    """Edges tagged is_park / is_river / is_sight. layer=park|river|sight|all (default all)."""
+    """Edges tagged is_park / is_river / is_sight. layer=park|river|sight|all (default all).
+
+    park_hours=1 on park layer: each park segment includes park_open (bool) at evaluation time.
+    Optional at= ISO datetime (Europe/London) for fixed-time preview.
+    """
     try:
         if not request.args.get("min_lat"):
             return jsonify({"segments": [], "limit_reached": False})
@@ -1297,25 +1324,46 @@ def get_attractions():
         layer = (request.args.get("layer", "all") or "all").strip().lower()
         if layer not in _ATTRACTION_LAYER_POOLS and layer != "all":
             layer = "all"
+        park_hours = (request.args.get("park_hours", "") or "").strip().lower() in ("1", "true", "yes")
         kinds = list(_ATTRACTION_LAYER_POOLS.keys()) if layer == "all" else [layer]
         in_bbox = []
         for kind in kinds:
             for s in _ATTRACTION_LAYER_POOLS[kind]():
                 b = s["b"]
                 if b[0] < max_lat and b[1] > min_lat and b[2] < max_lon and b[3] > min_lon:
-                    in_bbox.append({
+                    entry = {
                         "id": s["id"],
                         "p": s["p"],
                         "kind": kind,
                         "name": s.get("name", ""),
                         "b": b,
-                    })
+                    }
+                    if kind == "park":
+                        entry["_oh"] = s.get("opening_hours", "")
+                    in_bbox.append(entry)
         limited, limit_reached = _limit_segments_by_center(
             in_bbox, center_lat, center_lon, MAX_SEGMENTS_LIMIT
         )
+        meta = {}
+        if park_hours:
+            at_time = _parse_park_hours_at_time()
+            unique = G.graph.get("park_opening_hours_unique") or []
+            hours_map, fallback_open = build_request_hours_context(unique, at_time)
+            meta["park_hours_at"] = at_time.isoformat()
+            meta["park_fallback_open"] = fallback_open
+            for s in limited:
+                if s.get("kind") == "park":
+                    s["park_open"] = is_park_edge_open(
+                        {"is_park": "yes", "opening_hours": s.pop("_oh", "")},
+                        hours_map,
+                        fallback_open,
+                    )
+                else:
+                    s.pop("_oh", None)
         for s in limited:
             s.pop("b", None)
-        return jsonify({"segments": limited, "limit_reached": limit_reached})
+            s.pop("_oh", None)
+        return jsonify({"segments": limited, "limit_reached": limit_reached, **meta})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

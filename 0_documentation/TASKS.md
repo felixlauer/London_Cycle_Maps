@@ -51,5 +51,5 @@ Prioritised list of work items. **Keep this file up to date:** when you complete
 - **Global edge snap (STRtree + visual stub)** — Done: `tfl_live.snap_to_edge`; `/route` anchor-node A\* + endpoint stubs; `/inspect` global nearest edge. See APP_MAIN.md §2.3.
 - **Pedestrian way length multiplier** — Done: `M_highway` ×4 on footway/pedestrian/path without dedicated cycle infrastructure; ×10 on `steps`; fastest and optimized paths. See APP_MAIN.md §5.
 - **Barrier routing clusters** — Done: `barrier_clusters.py` (5 groups, hard block 1e9, additive 0/15/35/90 m); debug overlay colours by cluster. See APP_MAIN.md §5.5, Development_Protocol_2026_06_08.md §9.
-- **Elevation hill-length filter (noded mesh)** — Done: connected ascent chains &lt;50 m flattened, 50–100 m halved, ≥100 m kept; replaces legacy cluster-of-3 logic. See GRAPH.md §7.
+- **Elevation hill-length filter (noded mesh)** — Done: connected ascent chains &lt;50 m flattened, 50–100 m halved, ≥100 m kept; steep / 100 km ~118 (vs old 122, cluster 248). See GRAPH.md §7.2, Development_Protocol_2026_06_12.md §2.7.
 

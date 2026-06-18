@@ -33,7 +33,7 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 - **Port:** 5001 (so it can run alongside main app on 5000).
 - **Graph:** Same as main app: `graph_io.load_graph` on `1_data/london_elev_final_tfl.graphml` (prefers `.gpickle`).
 - **Caches (built at startup):**
-  - **STEEP_CACHE** — edges with grade ≥ 3.3% (for uphill heatmap).
+  - **STEEP_CACHE** — edges with grade ≥ 3.3% (for uphill heatmap). On current noded mesh with hill-length grades: ~**83k** segments at startup (see [`GRAPH.md`](../GRAPH.md) §7.2).
   - **SURFACE_CACHE** — segments with surface/quality issues or no surface data (see Surfaces below). When returning surfaces, **no_data** segments are limited to 20k per request (by distance from bbox centre); response includes `limit_reached` when truncated.
   - **UNLIT_CACHE** — edges whose `lit` is not in LIT_VALUES; each entry has type `"no"` or `"unknown"`. Response limited to 20k (unknown capped by centre); `include_unknown` param; frontend subtoggle and 20k message.
   - **CYCLEWAY_GENERAL** — edges with `cycleway` / `cycleway_left` / `cycleway_right` / `cycleway_both` (non-empty).
@@ -54,7 +54,7 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 ### 2.4 Frontend (8_debug/5_frontend)
 
 - Separate React app (copy of CRA structure); main UI in `App.js`.
-- Collapsible **Debug panel** (top-right): toggles for Uphill, Accidents, Surfaces, Unlit, Cycleway, HGV banned, TfL cycle routes, **Attraction edges** (park / river / sight subtoggles), **TfL Live Disruptions**, **TomTom Live Disruptions**, Traffic calming, Junction type, **Node tags** (Barriers, Traffic signals, etc.). Left-click on point overlays shows type; right-click opens segment inspector. When **Modify TfL** or **Modify attractions** is on, the Debug panel is forced collapsed and inspector is disabled.
+- Collapsible **Debug panel** (top-right): toggles for Uphill, Accidents, Surfaces, Unlit, Cycleway, HGV banned, TfL cycle routes, **Attraction edges** (park / river / sight subtoggles; **park hours open/closed** overlay when park sublayer on), **TfL Live Disruptions**, **TomTom Live Disruptions**, Traffic calming, Junction type, **Node tags** (Barriers, Traffic signals, etc.). Left-click on point overlays shows type; right-click opens segment inspector. When **Modify TfL** or **Modify attractions** is on, the Debug panel is forced collapsed and inspector is disabled.
 - **Modify suite** (bottom-left): two collapsible panels — **Modify TfL cycle routes** (left) and **Modify attractions** (offset right). Only one modify mode active at a time. TfL: left add / right remove, undo Ctrl+Z. Attractions: park/river/sight type buttons, name field, Complete geometry for park/river, river buffer (m) when river selected; OSM park outline overlay while active.
 - No start/end markers, no route polylines — only overlay polylines, point markers, inspector, and modify overlays.
 
@@ -68,6 +68,7 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 - **Backend:** `GET /debug/heatmap?min_lat=&max_lat=&min_lon=&max_lon=` returns steep segments (grade ≥ 3.3%) in view.
 - **Display:** Polylines coloured by grade: purple (≥40%, artifact), red (&gt;7.5%), gold (3.3–7.5%).
 - **Legend:** Artifact / Steep / Moderate; “Descents & Flat hidden.”
+- **Scale (noded mesh, hill-length grades, Jun 2026):** startup **STEEP_CACHE** ~**83k** ascent segments (was ~**174k** with cluster cleaning; old ~350k mesh ~**34k**). Fairness metric **steep / 100 km** ~**118** vs old **122** — see [`GRAPH.md`](../GRAPH.md) §7.2.
 
 ### 3.2 Accidents
 
@@ -111,8 +112,9 @@ The debug app is for inspecting and validating graph data (elevation, surfaces, 
 ### 3.7a Attraction edges (green mode)
 
 - **Toggle:** “Attraction edges”. **Subtoggles:** Park (`is_park`), River (`is_river`), Sight (`is_sight`) — same colours as the Modify attractions suite (green / blue / purple).
-- **Backend:** `GET /debug/attractions?min_lat=&max_lat=&min_lon=&max_lon=&layer=park|river|sight|all` returns `{ segments, limit_reached }`. Each segment is `{ id, p, kind, name }` where `p` is `[[lat, lon], ...]` and `name` is `attraction_name` when set.
-- **Caches:** Built at startup from graph edge attributes (`is_park`, `is_river`, `is_sight` = yes). Requires pipeline tagging (`tag_attractions_osm.py`, `apply_attraction_manual.py`) and graph reload.
+- **Subtoggle (park only):** “Park hours (open/closed)” — when on (requires Park sublayer), park edges are coloured **green** = open at evaluation time, **red** = closed (same logic as main-app routing: `opening-hours-py` + dawn-dusk fallback). River and sight layers unchanged. Pan/zoom refetches; status bar shows open/closed counts and `park_hours_at`.
+- **Backend:** `GET /debug/attractions?min_lat=&max_lat=&min_lon=&max_lon=&layer=park|river|sight|all` returns `{ segments, limit_reached }`. Each segment is `{ id, p, kind, name }` where `p` is `[[lat, lon], ...]` and `name` is `attraction_name` when set. With **`park_hours=1`** on the park layer, each park segment also has **`park_open`** (boolean). Response may include **`park_hours_at`** (ISO, Europe/London) and **`park_fallback_open`**. Optional **`at=`** ISO datetime fixes evaluation time (debug preview).
+- **Caches:** Built at startup from graph edge attributes (`is_park`, `is_river`, `is_sight` = yes; park cache also stores `opening_hours`). Requires pipeline tagging (`tag_attractions_osm.py`, `apply_attraction_manual.py`) and graph reload. **Restart `app_debug.py`** after graph pickle changes so park hours cache picks up new `opening_hours`.
 - **Limit:** 20k cap across the combined bbox result (centre-prioritised), same as cycleway / TfL routes.
 - **Display:** Polylines per active sublayer; an edge with multiple flags appears in each enabled layer.
 
@@ -190,6 +192,7 @@ Matches [`barrier_clusters.py`](../4_backend_engine/barrier_clusters.py) and mai
 | GET | `/debug/cycleway` | same + `layer` (general\|segregated) | `{ segments: [...], limit_reached }` — segments have `id`, `p`, optional `v` |
 | GET | `/debug/hgv_banned` | min_lat, max_lat, min_lon, max_lon | `{ segments: [{ id, p }], limit_reached }` |
 | GET | `/debug/graph_network` | min_lat, max_lat, min_lon, max_lon | `{ segments: [{ id, p, h }], limit_reached }` — `h` = edge `type` (OSM highway) |
+| GET | `/debug/attractions` | min_lat, max_lat, min_lon, max_lon, **layer** (park \| river \| sight \| all), optional **park_hours** (0\|1), optional **at** (ISO) | `{ segments: [{ id, p, kind, name, park_open? }], limit_reached, park_hours_at?, park_fallback_open? }` |
 | GET | `/debug/traffic_calming_points` | min_lat, max_lat, min_lon, max_lon, **source** (way \| point \| both) | Array of `{ lat, lon, type, source }` (20k limit) |
 | GET | `/debug/junction_points` | same | Array of `{ lat, lon, type }` (20k limit) |
 | GET | `/debug/barrier_points` | same | Array of `{ lat, lon, type, details }` (details: barrier, barrier_cluster, barrier_cluster_label, barrier_cluster_color, optional barrier_confidence; 20k limit) |

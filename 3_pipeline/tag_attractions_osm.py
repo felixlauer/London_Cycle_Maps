@@ -1,7 +1,7 @@
 """
-Tag graph edges inside OSM park polygons (is_park=yes, attraction_name from OSM).
+Tag graph edges inside OSM park polygons (is_park=yes, attraction_name, opening_hours from OSM).
 
-Reads: 1_data/osm_park_polygons.geojson
+Reads: 1_data/osm_park_polygons.geojson, 3_pipeline/park_hours_overrides.json
 Reads/writes: london_elev_final.gpickle (default, before TfL steps)
 
 Run after elevation_processing_aggressive.py:
@@ -20,12 +20,17 @@ import time
 from attraction_spatial import (
     build_edge_strtree,
     clear_osm_park_tags,
+    compile_park_hours_catalog,
     edge_geometries,
     geometry_from_geojson,
     init_attraction_attrs,
     tag_polygon,
 )
 from graph_io import load_graph, save_graph, fast_path
+from park_hours_overrides import (
+    load_park_hours_overrides,
+    resolve_polygon_opening_hours,
+)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "1_data"))
@@ -77,6 +82,9 @@ def main() -> int:
     print(f"   -> {len(edge_list):,} edges indexed in {time.perf_counter() - t0:.1f}s")
 
     features = _load_park_features(parks_path)
+    overrides = load_park_hours_overrides()
+    if overrides:
+        print(f"   -> {len(overrides)} manual opening_hours override(s) loaded")
     print(f"3. Tagging {len(features):,} park polygons...")
     total_tagged = 0
     polygons_ok = 0
@@ -93,7 +101,14 @@ def main() -> int:
             continue
         props = feat.get("properties") or {}
         name = str(props.get("name", "") or "").strip()
-        n = tag_polygon(G, poly, edge_list=edge_list, tree=tree, name=name)
+        if name.lower() == "nan":
+            name = ""
+        opening_hours = resolve_polygon_opening_hours(
+            name,
+            str(props.get("opening_hours", "") or "").strip(),
+            overrides,
+        )
+        n = tag_polygon(G, poly, edge_list=edge_list, tree=tree, name=name, opening_hours=opening_hours)
         if n > 0:
             polygons_ok += 1
             total_tagged += n
@@ -105,9 +120,17 @@ def main() -> int:
         1 for _u, _v, d in G.edges(data=True)
         if str(d.get("is_park", "")).strip().lower() == "yes"
     )
+    park_with_hours = sum(
+        1 for _u, _v, d in G.edges(data=True)
+        if str(d.get("is_park", "")).strip().lower() == "yes"
+        and str(d.get("opening_hours", "")).strip()
+    )
+    unique_hours = compile_park_hours_catalog(G)
     print(f"   -> {polygons_ok} polygons tagged at least one edge")
     print(f"   -> {total_tagged:,} edge-tag operations in {elapsed:.1f}s")
     print(f"   -> {park_edges:,} directed edges with is_park=yes")
+    print(f"   -> {park_with_hours:,} park edges with opening_hours")
+    print(f"   -> {len(unique_hours)} unique opening_hours strings in catalog")
 
     print(f"4. Saving to {output_path}...")
     save_graph(G, output_path, write_graphml=not args.pickle_only, write_fast=True)

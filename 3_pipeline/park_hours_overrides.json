@@ -1,0 +1,15 @@
+{
+  "description": "Manual opening_hours overrides by park name (Royal Parks and others). Applied in tag_attractions_osm.py after OSM polygon properties; survives pipeline re-runs. See 0_documentation/park_hours_overrides.md.",
+  "overrides": [
+    {
+      "match_names": ["Kensington Gardens"],
+      "opening_hours": "Jan 01-Jan 18 06:00-16:30; Jan 19-Feb 01 06:00-17:00; Feb 02-Feb 22 06:00-17:30; Feb 23-Mar 08 06:00-18:00; Mar 09-Mar 28 06:00-18:30; Mar 29-Apr 12 06:00-20:00; Apr 13-May 03 06:00-20:30; May 04-May 17 06:00-21:00; May 18-Jun 07 06:00-21:30; Jun 08-Jun 28 06:00-21:45; Jun 29-Aug 02 06:00-21:30; Aug 03-Aug 16 06:00-21:00; Aug 17-Aug 30 06:00-20:30; Aug 31-Sep 13 06:00-20:00; Sep 14-Sep 27 06:00-19:30; Sep 28-Oct 04 06:00-19:00; Oct 05-Oct 24 06:00-18:30; Oct 25-Nov 01 06:00-17:00; Nov 02-Dec 31 06:00-16:30",
+      "source": "Royal Parks — Kensington Gardens seasonal hours (manual, 2026-06-17)"
+    },
+    {
+      "match_names": ["Hyde Park", "Hyde Park Enclosed Garden"],
+      "opening_hours": "Mo-Su 05:00-24:00",
+      "source": "Royal Parks — Hyde Park 05:00–midnight (manual, 2026-06-17)"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 """
-Main routing backend: /route and /inspect. Uses 1_data/london_elev_final_tfl.gpickle (fast) or .graphml fallback.
-When changing API or cost logic, update 0_documentation/APP_MAIN.md (and TASKS.md if needed).
+Main routing backend: /route, /inspect, /profiles. Uses 1_data/london_elev_final_tfl.gpickle (fast) or .graphml fallback.
+Profile-driven routing via user_profiles.json (local mock DB). When changing API or cost logic, update 0_documentation/APP_MAIN.md.
 """
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -32,6 +32,8 @@ from barrier_clusters import (
     barrier_is_hard_block,
     barrier_cluster_meta,
 )
+import user_profiles
+import park_opening_hours
 
 # --- CONFIGURATION ---
 # UPDATED: Pointing to the final, clean, dual-pass processed graph
@@ -70,6 +72,8 @@ def bootstrap_routing_engine():
         if 'x' in data and 'y' in data:
             node_data.append({'id': node, 'x': float(data['x']), 'y': float(data['y'])})
     print(f"Graph loaded with {len(G.nodes())} nodes ({time.perf_counter() - t0:.1f}s).")
+    park_hours_n = len(G.graph.get("park_opening_hours_unique") or [])
+    print(f"--> Park opening_hours catalog: {park_hours_n} unique strings")
 
     t0 = time.perf_counter()
     coords = np.array([[n['x'], n['y']] for n in node_data], dtype=np.float64)
@@ -437,13 +441,23 @@ def _traffic_calming_additive(d, source='way'):
     return _cost(way_tc)
 
 # --- COST FUNCTIONS ---
-def weight_fastest(u, v, d):
-    if barrier_is_hard_block(d):
-        return BARRIER_HARD_COST
-    return float(d.get('length', 1.0)) * _highway_type_multiplier(d)
+def _park_edge_blocked(d, hours_map, fallback_open):
+    if _is_yes_attr(d.get('is_park')) and not park_opening_hours.is_park_edge_open(d, hours_map, fallback_open):
+        return True
+    return False
 
 
-def make_weight_optimized(w):
+def make_weight_fastest(hours_map, fallback_open):
+    def weight_fn(u, v, d):
+        if barrier_is_hard_block(d):
+            return BARRIER_HARD_COST
+        if _park_edge_blocked(d, hours_map, fallback_open):
+            return BARRIER_HARD_COST
+        return float(d.get('length', 1.0)) * _highway_type_multiplier(d)
+    return weight_fn
+
+
+def make_weight_optimized(w, hours_map, fallback_open):
     """
     Return a weight function (u, v, d) -> cost using request-scoped weights (no globals).
     Rewards (TfL, green) are implemented as multiplier R < 1 on length, not negative penalty,
@@ -451,6 +465,8 @@ def make_weight_optimized(w):
     """
     def weight_fn(u, v, d):
         if barrier_is_hard_block(d):
+            return BARRIER_HARD_COST
+        if _park_edge_blocked(d, hours_map, fallback_open):
             return BARRIER_HARD_COST
 
         length = float(d.get('length', 1.0))
@@ -1013,6 +1029,41 @@ def get_tomtom_disruption_at():
         return jsonify({"error": str(e), "disruptions": []}), 500
 
 
+# --- PROFILE ENDPOINTS ---
+
+@app.route('/profiles', methods=['GET'])
+def list_profiles():
+    try:
+        return jsonify({"profiles": user_profiles.list_profiles()})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/profiles/<user_id>', methods=['GET'])
+def get_profile(user_id):
+    try:
+        profile = user_profiles.get_profile(user_id)
+        if not profile:
+            return jsonify({"error": "Profile not found"}), 404
+        return jsonify(profile)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/profiles', methods=['POST'])
+def create_profile():
+    try:
+        body = request.get_json(silent=True) or {}
+        name = body.get("name", "")
+        weights = body.get("weights", {})
+        profile, err = user_profiles.create_profile(name, weights)
+        if err:
+            return jsonify({"error": err}), 400
+        return jsonify(profile), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # --- ROUTING ENDPOINTS ---
 
 @app.route('/route', methods=['GET'])
@@ -1023,24 +1074,18 @@ def get_route():
         end_lat = float(request.args.get('end_lat'))
         end_lon = float(request.args.get('end_lon'))
 
-        # Request-scoped weights (no globals; safe for concurrent users)
-        w = {
-            "risk_weight": float(request.args.get('risk_weight', 1.0)),
-            "light_weight": float(request.args.get('light_weight', 0.0)),
-            "surface_weight": float(request.args.get('surface_weight', 0.0)),
-            "hill_weight": float(request.args.get('hill_weight', 0.0)),
-            "tfl_cycleway_weight": float(request.args.get('tfl_cycleway_weight', 0.0)),
-            "tfl_quietway_weight": float(request.args.get('tfl_quietway_weight', 0.0)),
-            "speed_weight": float(request.args.get('speed_weight', 0.0)),
-            "width_weight": float(request.args.get('width_weight', 0.0)),
-            "green_weight": float(request.args.get('green_weight', 0.0)),
-            "barrier_weight": float(request.args.get('barrier_weight', 0.0)),
-            "calming_weight": float(request.args.get('calming_weight', 0.0)),
-            "calming_source": request.args.get('calming_source', 'way').strip().lower() or 'way',
-            "junction_weight": float(request.args.get('junction_weight', 0.0)),
-            "signal_weight": float(request.args.get('signal_weight', 0.0)),
-            "tfl_live_weight": float(request.args.get('tfl_live_weight', 0.0)),
-        }
+        profile_id = (request.args.get('profile_id') or '').strip() or None
+        active_profile_id = None
+
+        if profile_id:
+            profile_weights = user_profiles.get_profile_weights(profile_id)
+            if profile_weights is None:
+                return jsonify({"error": f"Profile not found: {profile_id}"}), 404
+            w = user_profiles.clamp_weights(profile_weights)
+            w["calming_source"] = user_profiles.CALMING_SOURCE
+            active_profile_id = profile_id
+        else:
+            w = user_profiles.build_weight_dict_from_request(request.args)
 
         t_route = time.perf_counter()
         start_snap = tfl_live.snap_to_edge(start_lat, start_lon)
@@ -1053,6 +1098,11 @@ def get_route():
         start_node = start_snap.anchor_node
         end_node = end_snap.anchor_node
 
+        at_time = park_opening_hours.london_now()
+        unique_hours = G.graph.get("park_opening_hours_unique") or []
+        hours_map, fallback_open = park_opening_hours.build_request_hours_context(unique_hours, at_time)
+
+        weight_fastest = make_weight_fastest(hours_map, fallback_open)
         h_fast = make_heuristic(end_node, G, cost_per_m=1.0)
         t0 = time.perf_counter()
         path_fastest = nx.astar_path(G, start_node, end_node, heuristic=h_fast, weight=weight_fastest)
@@ -1064,7 +1114,7 @@ def get_route():
 
         scale = compute_optimized_cost_per_metre_lower_bound(w)
         h_opt = make_heuristic(end_node, G, cost_per_m=scale)
-        weight_optimized = make_weight_optimized(w)
+        weight_optimized = make_weight_optimized(w, hours_map, fallback_open)
         t0 = time.perf_counter()
         path_optimized = nx.astar_path(G, start_node, end_node, heuristic=h_opt, weight=weight_optimized)
         t_opt = time.perf_counter() - t0
@@ -1078,7 +1128,7 @@ def get_route():
         coords_optimized = apply_endpoint_stubs(
             reconstruct_path_geometry(path_optimized), start_snap, end_snap
         )
-        stats_optimized = calculate_path_stats(path_optimized, calming_source=w.get('calming_source', 'way'))
+        stats_optimized = calculate_path_stats(path_optimized, calming_source=user_profiles.CALMING_SOURCE)
 
         # Route-only overlay chunks (only segments on path_optimized that match each criterion)
         lit_chunks = get_lit_sections(path_optimized)
@@ -1094,6 +1144,9 @@ def get_route():
             "status": "success",
             "meta": {
                 "cost_per_m_lower_bound": round(scale, 4),
+                "active_profile_id": active_profile_id,
+                "weights": {k: w[k] for k in user_profiles.ROUTING_WEIGHT_KEYS},
+                "calming_source": user_profiles.CALMING_SOURCE,
                 "timing_ms": {
                     "snap": round(t_snap * 1000, 1),
                     "fastest_astar": round(t_fast * 1000, 1),
@@ -1104,6 +1157,9 @@ def get_route():
                     "start": _snap_meta(start_snap),
                     "end": _snap_meta(end_snap),
                 },
+                "park_hours_at": at_time.isoformat(),
+                "park_fallback_open": fallback_open,
+                "park_hours_map_size": len(hours_map),
             },
             "fastest": {"path": coords_fastest, "stats": stats_fastest},
             "safest": {

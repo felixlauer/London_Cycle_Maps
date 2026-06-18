@@ -245,11 +245,18 @@ Export format: `{ "source_graph", "exported_at", "edges": [ { "source", "target"
 | Tag | Description |
 |-----|-------------|
 | `is_park` | `yes` if ≥50% of edge length lies inside an OSM park polygon (`leisure=park`, `landuse=recreation_ground`; not `leisure=garden`) or a manual park polygon. Private/restricted polygons excluded at fetch (`access=private/no/customers`). |
+| `opening_hours` | OSM `opening_hours` string from the highest-overlap park polygon (empty → dawn-dusk fallback at route time). Manual overrides in `park_hours_overrides.json` compete in the same overlap pass. |
+| `park_hours_overlap` | Fraction of edge length inside the polygon that set `opening_hours` (debug / pipeline). |
+| `park_hours_owner` | Name of that winning polygon (debug). |
 | `is_river` | `yes` if edge ≥50% inside a manual river polygon (drawn in debug app, same workflow as park) |
 | `is_sight` | `yes` if edge intersects a manual sight circle (point + radius in metres, default 200) |
 | `attraction_name` | Semicolon-separated names from matching OSM/manual regions (may list multiple) |
 
-**Source:** **`fetch_osm_park_polygons.py`** (Overpass → `1_data/osm_park_polygons.geojson`) then **`tag_attractions_osm.py`** on `london_elev_final` (clears `is_park`, re-tags from cache). **`attraction_manual_regions.json`** from debug **Modify attractions** mode; apply with **`apply_attraction_manual.py`** on the final graph (adds flags, does not clear OSM `is_park`). Spatial matching: [`attraction_spatial.py`](../3_pipeline/attraction_spatial.py) (STRtree + length ratio, EPSG:27700 for buffers). Main app **Green/scenic** toggle uses any of `is_park` / `is_river` / `is_sight` (`_has_attraction_edge` in `app.py`).
+**Graph attribute:** `park_opening_hours_unique` — sorted list of unique `opening_hours` strings on park edges; compiled by `compile_park_hours_catalog(G)` in [`attraction_spatial.py`](../3_pipeline/attraction_spatial.py) after `tag_attractions_osm.py` and `apply_attraction_manual.py`.
+
+**Source:** **`fetch_osm_park_polygons.py`** (local PBF or Overpass → `1_data/osm_park_polygons.geojson`, includes `opening_hours`) then **`tag_attractions_osm.py`** on `london_elev_final` (clears `is_park` + hours, re-tags from cache). **`attraction_manual_regions.json`** from debug **Modify attractions** mode; apply with **`apply_attraction_manual.py`** on the final graph (adds flags, does not clear OSM `is_park`; recompiles hours catalog). Spatial matching: [`attraction_spatial.py`](../3_pipeline/attraction_spatial.py) (STRtree + length ratio, EPSG:27700 for buffers). Main app **Green/scenic** toggle uses any of `is_park` / `is_river` / `is_sight` (`_has_attraction_edge` in `app.py`).
+
+**Park hours routing (main app):** At `GET /route`, backend pre-evaluates each unique `opening_hours` string once at **Europe/London** local time (GMT/BST per request date) via `opening-hours-py` ([`park_opening_hours.py`](../4_backend_engine/park_opening_hours.py)). Edges with `is_park=yes` and no valid hours use **dawn-dusk** fallback. Closed park edges get hard cost `1e9` in **both** fastest and optimized A* (profile-independent). **Manual overrides:** [`park_hours_overrides.json`](../3_pipeline/park_hours_overrides.json) — see [`park_hours_overrides.md`](park_hours_overrides.md). **Verification audit (17 Jun 2026):** [`park_hours_verification.md`](park_hours_verification.md).
 
 **Manual edit apply run totals** (graph 175 490 nodes, 350 283 edges):
 
@@ -598,16 +605,33 @@ Noding splits OSM ways into many **short edges** (~9 m median). Raw LIDAR grades
 
 ### 7.2 Elevation metrics (reference runs)
 
-Ascent-steep = directed edges with `grade > 3.3%`. **Steep / 100 km** = ascent-steep count ÷ network km × 100 (primary sanity metric on noded mesh).
+Ascent-steep = directed edges with `grade > 3.3%` (debug **Uphill** overlay uses `grade ≥ 3.3%`). **Steep / 100 km** = ascent-steep count ÷ network km × 100 — primary fairness metric on noded mesh. **Total ascent** = Σ(`grade × length`) on all edges with `grade > 0` (includes gentle slopes below 3.3%).
 
-| Graph | Edges | Network km | Ascent-steep | Steep / 100 km | Total ascent km |
-|-------|------:|-----------:|-------------:|---------------:|----------------:|
-| Old mesh (`london_elev.graphml`, pre-noding) | 350,283 | ~28,033 | 34,211 | **122** | ~239 |
-| New RAW (`london_elev_raw.gpickle`) | 4,061,445 | ~70,111 | 535,815 | 764 | ~848 |
-| New final — **previous cluster logic** (Jun 2026) | 4,061,445 | ~70,111 | 173,842 | 248 | ~487 |
-| New final — **hill-length 50/100 m** (Jun 2026) | 4,061,445 | ~70,111 | **77,688** | **111** | **~371** |
+#### Three-way comparison (verified reload, Jun 2026)
 
-Hill-length run ( `--skip-dem` ): ~133k ascent edges flattened (&lt;50 m chains), ~41k halved (50–100 m), ~60k kept (≥100 m).
+| Graph | Network km | Total ascent | Ascent / 100 km | Ascent-steep | Steep / 100 km | Moderate uphill (0–3.3%) |
+|-------|----------:|-------------:|----------------:|-------------:|---------------:|-------------------------:|
+| Old mesh (`london_elev.graphml`, pre-noding) | 28,033 | **238.6 km** | **0.9 m** | 34,211 | **122.0** | 113,655 |
+| New RAW (`london_elev_raw.gpickle`) | 70,111 | 847.6 km | 1.2 m | 535,815 | 764 | — |
+| New final — **cluster logic** (`london_elev_final_cluster.gpickle`) | 70,111 | **487.0 km** | **0.7 m** | 173,842 | **248.0** | 762,335 |
+| New final — **hill-length** (`london_elev_final.gpickle`, current) | 70,111 | **414.9 km** | **0.6 m** | 82,651 | **117.9** | 751,371 |
+
+Pipeline exit log (12 Jun `--skip-dem` run): total ascent **371.0 km**, **77,688** steep edges, **110.8** steep / 100 km — consistent with table above.
+
+Hill-length run: ~133k ascent edges flattened (&lt;50 m chains), ~41k halved (50–100 m), ~60k kept (≥100 m).
+
+#### Interpreting total ascent vs steep / 100 km
+
+| Comparison | Total ascent | Steep / 100 km | What it means |
+|------------|-------------:|---------------:|---------------|
+| **Old → hill-length** | 238.6 → **415 km** (**+74%**) | 122 → **118** (~same) | More absolute climb because network is **2.5× longer**; steep **density** back to pre-noding baseline |
+| **Cluster → hill-length** | 487 → **415 km** (**−15%**) | 248 → **118** (**−52%**) | Hill filter removed fake steep tags **and** some inflated climb |
+
+**Why both can be true:** Total ascent sums **all** uphill edges (including 0.1%–3.3%). Steep / 100 km counts only **&gt;3.3%** edges. Hill filter removes short steep noise but leaves millions of gentle uphills on the finer mesh. **Ascent / 100 km** dropped (0.9 → 0.6 m) — the graph is **less climb-heavy per kilometre** on average.
+
+**Fairness metrics for operators:** prefer **steep / 100 km** and **ascent / 100 km** over raw total ascent when comparing pre- vs post-noding graphs.
+
+See [`Development_Protocol_2026_06_12.md`](development_protocols/Development_Protocol_2026_06_12.md) §2.7 for full narrative.
 
 ### 7.3 After re-running elevation
 

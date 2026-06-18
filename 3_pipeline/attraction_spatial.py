@@ -93,6 +93,35 @@ def _overlap_ratio(edge_geom: LineString, zone_geom) -> float:
     return overlap_len / edge_len
 
 
+def _is_park_edge(edge_data: dict) -> bool:
+    return str(edge_data.get("is_park", "")).strip().lower() in ("yes", "true", "1")
+
+
+def _set_park_hours_on_edge(
+    ed: dict,
+    opening_hours: str,
+    overlap: float,
+    park_name: str = "",
+) -> None:
+    """Highest-overlap park polygon owns opening_hours (and optional override) on this edge."""
+    hours = (opening_hours or "").strip()
+    name = (park_name or "").strip()
+    if name.lower() == "nan":
+        name = ""
+    try:
+        prev_overlap = float(ed.get("park_hours_overlap") or 0.0)
+    except (TypeError, ValueError):
+        prev_overlap = 0.0
+
+    if overlap < prev_overlap:
+        return
+
+    ed["park_hours_overlap"] = overlap
+    if name:
+        ed["park_hours_owner"] = name
+    ed["opening_hours"] = hours
+
+
 def _tag_edges_in_zone(
     G: nx.DiGraph,
     edge_list: list[tuple],
@@ -103,6 +132,7 @@ def _tag_edges_in_zone(
     set_river: bool = False,
     set_sight: bool = False,
     name: str = "",
+    opening_hours: str = "",
     threshold: float = ALIGNMENT_THRESHOLD,
 ) -> int:
     if zone_geom is None or zone_geom.is_empty:
@@ -118,13 +148,15 @@ def _tag_edges_in_zone(
     tagged = 0
     for j in indices:
         u, v, edge_geom, _length_m = edge_list[j]
-        if _overlap_ratio(edge_geom, zone_geom) < threshold:
+        overlap = _overlap_ratio(edge_geom, zone_geom)
+        if overlap < threshold:
             continue
         if not G.has_edge(u, v):
             continue
         ed = G.edges[u, v]
         if set_park:
             ed["is_park"] = "yes"
+            _set_park_hours_on_edge(ed, opening_hours, overlap, name)
         if set_river:
             ed["is_river"] = "yes"
         if set_sight:
@@ -141,6 +173,7 @@ def tag_polygon(
     edge_list: list[tuple] | None = None,
     tree: STRtree | None = None,
     name: str = "",
+    opening_hours: str = "",
     threshold: float = ALIGNMENT_THRESHOLD,
 ) -> int:
     if edge_list is None or tree is None:
@@ -148,7 +181,7 @@ def tag_polygon(
         tree, edge_list = build_edge_strtree(edge_list)
     return _tag_edges_in_zone(
         G, edge_list, tree, polygon_wgs84,
-        set_park=True, name=name, threshold=threshold,
+        set_park=True, name=name, opening_hours=opening_hours, threshold=threshold,
     )
 
 
@@ -312,18 +345,34 @@ def clear_manual_river_sight_tags(G: nx.DiGraph) -> tuple[int, int]:
 
 
 def clear_osm_park_tags(G: nx.DiGraph) -> int:
-    """Clear is_park on all edges (OSM re-apply). Does not touch is_river/is_sight."""
+    """Clear is_park and park hours on all edges (OSM re-apply). Does not touch is_river/is_sight."""
     n = 0
     for _u, _v, d in G.edges(data=True):
         if str(d.get("is_park", "")).strip().lower() == "yes":
             d["is_park"] = ""
+            d["opening_hours"] = ""
+            d["park_hours_overlap"] = ""
+            d["park_hours_owner"] = ""
             n += 1
     return n
+
+
+def compile_park_hours_catalog(G: nx.DiGraph) -> list[str]:
+    """Collect unique opening_hours strings from park edges into G.graph."""
+    unique = sorted({
+        s.strip()
+        for _u, _v, d in G.edges(data=True)
+        if _is_park_edge(d)
+        for s in str(d.get("opening_hours", "")).split(";")
+        if s.strip()
+    })
+    G.graph["park_opening_hours_unique"] = unique
+    return unique
 
 
 def init_attraction_attrs(G: nx.DiGraph) -> None:
     """Ensure attraction keys exist on every edge."""
     for _u, _v, d in G.edges(data=True):
-        for key in ("is_park", "is_river", "is_sight", "attraction_name"):
+        for key in ("is_park", "is_river", "is_sight", "attraction_name", "opening_hours"):
             if key not in d:
                 d[key] = ""

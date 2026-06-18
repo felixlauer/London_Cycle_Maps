@@ -43,10 +43,18 @@ def _mock_flask():
 _mock_flask()
 
 import tfl_live
-from app import G, weight_fastest, make_weight_optimized
+import park_opening_hours
+from app import G, make_weight_fastest, make_weight_optimized
 from routing_heuristic import compute_optimized_cost_per_metre_lower_bound, make_heuristic
 
 ZERO_HEURISTIC = lambda u, v: 0.0
+
+
+def _benchmark_weight_fns():
+    at_time = park_opening_hours.london_now()
+    unique_hours = G.graph.get("park_opening_hours_unique") or []
+    hours_map, fallback_open = park_opening_hours.build_request_hours_context(unique_hours, at_time)
+    return hours_map, fallback_open
 
 
 def _build_fixtures():
@@ -118,9 +126,11 @@ def run_pair(label, start_lat, start_lon, end_lat, end_lon, w, combo_name):
     end_node = end_snap.anchor_node
 
     scale = compute_optimized_cost_per_metre_lower_bound(w)
+    hours_map, fallback_open = _benchmark_weight_fns()
+    weight_fastest = make_weight_fastest(hours_map, fallback_open)
     h_fast = make_heuristic(end_node, G, cost_per_m=1.0)
     h_opt = make_heuristic(end_node, G, cost_per_m=scale)
-    weight_optimized = make_weight_optimized(w)
+    weight_optimized = make_weight_optimized(w, hours_map, fallback_open)
 
     t0 = time.perf_counter()
     path_fast_h0 = nx.astar_path(G, start_node, end_node, heuristic=ZERO_HEURISTIC, weight=weight_fastest)

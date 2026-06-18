@@ -311,6 +311,8 @@ const TOMTOM_DISRUPTION_COLORS = {
 const getTomtomDisruptionColor = (type) => TOMTOM_DISRUPTION_COLORS[String(type).toLowerCase()] || '#757575';
 
 const ATTRACTION_TYPE_COLORS = { park: '#2E7D32', river: '#1565C0', sight: '#6A1B9A' };
+const PARK_HOURS_OPEN_COLOR = '#00C853';
+const PARK_HOURS_CLOSED_COLOR = '#D50000';
 
 const attractionZonePathOptions = (type, { fillOpacity = 0.18, weight = 1.5, lineOpacity = 0.85 } = {}) => {
     const color = ATTRACTION_TYPE_COLORS[type] || '#00796B';
@@ -341,6 +343,7 @@ const DebugPanel = ({
     attractionParkOn, setAttractionParkOn,
     attractionRiverOn, setAttractionRiverOn,
     attractionSightOn, setAttractionSightOn,
+    attractionParkHoursOn, setAttractionParkHoursOn,
     attractionLimitReached,
     tflDisruptionsOn, setTflDisruptionsOn, onRefreshTfl, tflDisruptionStatus,
     tomtomDisruptionsOn, setTomtomDisruptionsOn, onRefreshTomtom, tomtomDisruptionStatus,
@@ -508,11 +511,31 @@ const DebugPanel = ({
                             <Subtoggle label="Park (is_park)" isOn={attractionParkOn} setIsOn={setAttractionParkOn} />
                             <Subtoggle label="River (is_river)" isOn={attractionRiverOn} setIsOn={setAttractionRiverOn} />
                             <Subtoggle label="Sight (is_sight)" isOn={attractionSightOn} setIsOn={setAttractionSightOn} />
+                            {attractionParkOn && (
+                                <Subtoggle
+                                    label="Park hours (open/closed)"
+                                    isOn={attractionParkHoursOn}
+                                    setIsOn={setAttractionParkHoursOn}
+                                />
+                            )}
                             <div style={{ fontWeight: 'bold', marginTop: '6px', marginBottom: '4px' }}>Colours:</div>
-                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
-                                <div style={{ width: 10, height: 10, background: ATTRACTION_TYPE_COLORS.park, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
-                                Park
-                            </div>
+                            {attractionParkOn && attractionParkHoursOn ? (
+                                <>
+                                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+                                        <div style={{ width: 10, height: 10, background: PARK_HOURS_OPEN_COLOR, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
+                                        Park open (routable)
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+                                        <div style={{ width: 10, height: 10, background: PARK_HOURS_CLOSED_COLOR, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
+                                        Park closed (blocked)
+                                    </div>
+                                </>
+                            ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+                                    <div style={{ width: 10, height: 10, background: ATTRACTION_TYPE_COLORS.park, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
+                                    Park
+                                </div>
+                            )}
                             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
                                 <div style={{ width: 10, height: 10, background: ATTRACTION_TYPE_COLORS.river, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
                                 River
@@ -1197,7 +1220,7 @@ const TflRoutesLayer = ({ isOn, setSegments, setStatus }) => {
 };
 
 // --- ATTRACTION EDGES (is_park / is_river / is_sight) ---
-const AttractionsLayer = ({ isOn, layers, setSegmentsByKind, setLimitReached, setStatus }) => {
+const AttractionsLayer = ({ isOn, layers, parkHoursOn, setSegmentsByKind, setLimitReached, setStatus }) => {
     const map = useMapEvents({
         moveend: () => {
             if (!isOn) return;
@@ -1217,22 +1240,42 @@ const AttractionsLayer = ({ isOn, layers, setSegmentsByKind, setLimitReached, se
             setStatus("Attraction edges: 0 segments");
             return;
         }
-        Promise.all(active.map(kind =>
-            fetch(`http://127.0.0.1:5001/debug/attractions?${q}&layer=${kind}`).then(r => r.json())
-        )).then(results => {
+        Promise.all(active.map(kind => {
+            const parkHoursParam = (kind === 'park' && parkHoursOn) ? '&park_hours=1' : '';
+            return fetch(`http://127.0.0.1:5001/debug/attractions?${q}&layer=${kind}${parkHoursParam}`).then(r => r.json());
+        })).then(results => {
             const out = {};
             let total = 0;
+            let openCount = 0;
+            let closedCount = 0;
             let limitReached = false;
+            let parkHoursAt = null;
             active.forEach((kind, i) => {
                 const d = results[i];
                 const segs = (d && d.segments) ? d.segments : [];
                 out[kind] = segs;
                 total += segs.length;
                 if (d && d.limit_reached) limitReached = true;
+                if (kind === 'park' && parkHoursOn) {
+                    if (d && d.park_hours_at) parkHoursAt = d.park_hours_at;
+                    segs.forEach((seg) => {
+                        if (seg.park_open) openCount += 1;
+                        else closedCount += 1;
+                    });
+                }
             });
             setSegmentsByKind(out);
             if (typeof setLimitReached === 'function') setLimitReached(limitReached);
-            setStatus(limitReached ? `Attraction edges: ${total} (20k limit)` : `Attraction edges: ${total}`);
+            if (parkHoursOn && layers.park) {
+                const atNote = parkHoursAt ? ` @ ${parkHoursAt}` : '';
+                setStatus(
+                    limitReached
+                        ? `Park hours: ${openCount} open, ${closedCount} closed${atNote} (20k limit)`
+                        : `Park hours: ${openCount} open, ${closedCount} closed${atNote}`
+                );
+            } else {
+                setStatus(limitReached ? `Attraction edges: ${total} (20k limit)` : `Attraction edges: ${total}`);
+            }
         }).catch(() => setStatus("Connection Error"));
     };
 
@@ -1242,7 +1285,7 @@ const AttractionsLayer = ({ isOn, layers, setSegmentsByKind, setLimitReached, se
             setSegmentsByKind({});
             if (typeof setLimitReached === 'function') setLimitReached(false);
         }
-    }, [isOn, layers.park, layers.river, layers.sight]);
+    }, [isOn, layers.park, layers.river, layers.sight, parkHoursOn]);
 
     return null;
 };
@@ -1689,6 +1732,7 @@ function App() {
     const [attractionParkOn, setAttractionParkOn] = useState(true);
     const [attractionRiverOn, setAttractionRiverOn] = useState(true);
     const [attractionSightOn, setAttractionSightOn] = useState(true);
+    const [attractionParkHoursOn, setAttractionParkHoursOn] = useState(false);
     const [attractionLimitReached, setAttractionLimitReached] = useState(false);
     const [attractionSegmentsByKind, setAttractionSegmentsByKind] = useState({});
     const [tflDisruptionsOn, setTflDisruptionsOn] = useState(false);
@@ -1999,6 +2043,7 @@ function App() {
                 attractionParkOn={attractionParkOn} setAttractionParkOn={setAttractionParkOn}
                 attractionRiverOn={attractionRiverOn} setAttractionRiverOn={setAttractionRiverOn}
                 attractionSightOn={attractionSightOn} setAttractionSightOn={setAttractionSightOn}
+                attractionParkHoursOn={attractionParkHoursOn} setAttractionParkHoursOn={setAttractionParkHoursOn}
                 attractionLimitReached={attractionLimitReached}
                 tflDisruptionsOn={tflDisruptionsOn} setTflDisruptionsOn={setTflDisruptionsOn}
                 onRefreshTfl={handleRefreshTfl} tflDisruptionStatus={tflDisruptionStatus}
@@ -2091,6 +2136,7 @@ function App() {
                 <AttractionsLayer
                     isOn={attractionsOn}
                     layers={{ park: attractionParkOn, river: attractionRiverOn, sight: attractionSightOn }}
+                    parkHoursOn={attractionParkHoursOn}
                     setSegmentsByKind={setAttractionSegmentsByKind}
                     setLimitReached={setAttractionLimitReached}
                     setStatus={setStatus}
@@ -2290,12 +2336,18 @@ function App() {
                 {/* ATTRACTION EDGES (park / river / sight) */}
                 {attractionsOn && ['park', 'river', 'sight'].map((kind) => {
                     const segs = attractionSegmentsByKind[kind] || [];
+                    const useParkHours = kind === 'park' && attractionParkHoursOn && attractionParkOn;
                     const color = ATTRACTION_TYPE_COLORS[kind] || '#00796B';
                     return (
                         <React.Fragment key={`attr-${kind}`}>
-                            {segs.map((seg) => (
-                                <Polyline key={`${kind}-${seg.id}`} positions={seg.p} color={color} weight={4} opacity={0.85} />
-                            ))}
+                            {segs.map((seg) => {
+                                const segColor = useParkHours
+                                    ? (seg.park_open ? PARK_HOURS_OPEN_COLOR : PARK_HOURS_CLOSED_COLOR)
+                                    : color;
+                                return (
+                                    <Polyline key={`${kind}-${seg.id}`} positions={seg.p} color={segColor} weight={4} opacity={0.85} />
+                                );
+                            })}
                         </React.Fragment>
                     );
                 })}
