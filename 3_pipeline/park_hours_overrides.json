@@ -1,5 +1,5 @@
 {
-  "description": "Manual opening_hours overrides by park name (Royal Parks and others). Applied in tag_attractions_osm.py after OSM polygon properties; survives pipeline re-runs. See 0_documentation/park_hours_overrides.md.",
+  "description": "Manual opening_hours overrides by park name (Royal Parks and others). Applied in tag_attractions_osm.py after OSM polygon properties; survives pipeline re-runs. See 0_documentation/verification/park_hours_overrides.md.",
   "overrides": [
     {
       "match_names": ["Kensington Gardens"],
