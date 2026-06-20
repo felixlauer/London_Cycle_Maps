@@ -11,8 +11,11 @@ TfL final stage (when tfl_edges_from_graph.json exists):
 
 Run from repo root or 3_pipeline/:
   python run_graph_pipeline.py
-  python run_graph_pipeline.py --skip-tagging --legacy-graph ../1_data/legacy_graph.graphml
+  python run_graph_pipeline.py --skip-tagging
   python run_graph_pipeline.py --start-at apply_tfl_export.py --skip-tagging
+
+Graph I/O: pickle-only by default at every graph-save step (load_graph prefers .gpickle).
+Pass --write-graphml to also export .graphml (slow; fails after park catalog without list fix).
 
 When changing pipeline order, update 0_documentation/GRAPH.md.
 """
@@ -44,12 +47,22 @@ STEPS_FROM_DB = [
 
 STEPS_GRAPH_CORE = [
     ("noded_network.py", "Split highways at intersections (planet_osm_line_noded_enriched)"),
-    ("build_graph.py", "Build graph (london.graphml + london.gpickle)"),
+    ("build_graph.py", "Build graph (london.gpickle)"),
     ("Add_elevation_raster.py", "Sample LIDAR elevation (london_elev_raw.gpickle)"),
     ("elevation_processing_aggressive.py", "Smooth grades (london_elev_final.gpickle)"),
     ("tag_attractions_osm.py", "Tag OSM park polygons (is_park) on london_elev_final"),
-    ("tag_tfl_routes.py", "Tag TfL routes from geometry (london_elev_final_tfl.gpickle + .graphml)"),
+    ("tag_tfl_routes.py", "Tag TfL routes from geometry (london_elev_final_tfl.gpickle)"),
 ]
+
+# Scripts that call save_graph — always get --pickle-only unless --write-graphml.
+GRAPH_SAVE_STEPS = frozenset({
+    "build_graph.py",
+    "tag_attractions_osm.py",
+    "tag_tfl_routes.py",
+    "apply_tfl_export.py",
+    "apply_tfl_manual_edits.py",
+    "apply_attraction_manual.py",
+})
 
 STEP_TFL_EXPORT = ("apply_tfl_export.py", "Restore TfL tags from tfl_edges_from_graph.json (ground truth)")
 STEP_TFL_MANUAL = ("apply_tfl_manual_edits.py", "Apply debug-app manual TfL edits")
@@ -102,6 +115,14 @@ def _legacy_cli_args(legacy_path: str | None) -> list[str]:
     if not legacy_path:
         return []
     return ["--legacy-graph", legacy_path]
+
+
+def _merge_cli_args(base: list[str], extra: list[str]) -> list[str]:
+    out = list(base)
+    for arg in extra:
+        if arg not in out:
+            out.append(arg)
+    return out
 
 
 def _run_step(script_name: str, description: str, extra_args: list[str] | None = None) -> int:
@@ -168,9 +189,14 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--write-graphml",
+        action="store_true",
+        help="Also write .graphml at graph-save steps (default: pickle only)",
+    )
+    parser.add_argument(
         "--pickle-only",
         action="store_true",
-        help="TfL apply steps save .gpickle only (skip GraphML write on large final graph)",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--start-at",
@@ -182,7 +208,10 @@ def main() -> int:
 
     legacy_path = _resolve_legacy_path(args.legacy_graph)
     legacy_args = _legacy_cli_args(legacy_path)
-    pickle_args = ["--pickle-only"] if args.pickle_only else []
+    if args.write_graphml:
+        graph_save_args: list[str] = ["--no-pickle-only"]
+    else:
+        graph_save_args = ["--pickle-only"]
 
     steps: list[tuple[str, str]] = []
     step_extra: dict[str, list[str]] = {}
@@ -222,7 +251,7 @@ def main() -> int:
             print(f"ERROR: --apply-export set but file missing: {EXPORT_JSON}")
             return 1
         steps.append(STEP_TFL_EXPORT)
-        export_extra = list(legacy_args) + list(pickle_args)
+        export_extra = list(legacy_args)
         if args.skip_tagging:
             export_extra.extend(["--graph", ELEV_FINAL_GRAPH, "--output", FINAL_GRAPH])
         step_extra[STEP_TFL_EXPORT[0]] = export_extra
@@ -235,20 +264,26 @@ def main() -> int:
             print("       Create edits in the debug app or pass --skip-manual.")
             return 1
         steps.append(STEP_TFL_MANUAL)
-        step_extra[STEP_TFL_MANUAL[0]] = list(legacy_args) + list(pickle_args)
+        step_extra[STEP_TFL_MANUAL[0]] = list(legacy_args)
 
     if not args.skip_attraction_manual:
         steps.append(STEP_ATTRACTION_MANUAL)
-        step_extra[STEP_ATTRACTION_MANUAL[0]] = list(pickle_args)
 
     steps, skipped, start_err = _slice_steps_from_start(steps, args.start_at)
     if start_err:
         print(start_err)
         return 1
 
+    for script_name, _ in steps:
+        if script_name in GRAPH_SAVE_STEPS:
+            step_extra[script_name] = _merge_cli_args(
+                step_extra.get(script_name, []), graph_save_args
+            )
+
     print("London Cycle Maps — graph pipeline")
     print(f"  Working directory: {SCRIPT_DIR}")
     print(f"  Steps: {len(steps)}" + (f" ({skipped} skipped via --start-at)" if skipped else ""))
+    print(f"  Graph save: {'GraphML + pickle' if args.write_graphml else 'pickle only (.gpickle)'}")
     if legacy_path:
         print(f"  Legacy graph (osm_id lookup): {legacy_path}")
 
@@ -264,8 +299,8 @@ def main() -> int:
     print(f"  PIPELINE COMPLETE ({total / 60:.1f} min total)")
     if os.path.isfile(FINAL_GRAPH_FAST):
         print(f"  Output (runtime): {FINAL_GRAPH_FAST}")
-    if os.path.isfile(FINAL_GRAPH):
-        print(f"  Output (export):  {FINAL_GRAPH}")
+    elif os.path.isfile(FINAL_GRAPH):
+        print(f"  Output (runtime): {FINAL_GRAPH}")
     print("  Restart app.py / app_debug.py to load the new graph.")
     print("=" * 72)
     return 0

@@ -6,7 +6,7 @@ Documentation for the **user-facing routing app**: frontend (`5_frontend`) and b
 
 ## 1. Purpose
 
-The main app (**Tuned Cycling**) is the production cycling route planner for London. Users select a **routing profile** (or use **Test Mode** to override with manual toggles), set start and end on the map, and get two routes (fastest vs profile-optimized). Profiles store 14 numeric **activation weights** in `[0.0, 1.0]` (0%–100% of each routing factor); backend penalty magnitudes are fixed in `make_weight_optimized()`. Seed personas: Safe Commuter, Fast & Direct, Tourist / Explorer. Optional overlays highlight lit, steep, TfL, green, and narrow segments when the corresponding profile weight is &gt; 0. **Node-based modes** (signals, barriers, junctions, calming) show as coloured circle icons on the map. No data-exploration overlays — those live in the debug app.
+The main app (**Tuned Cycling**) is the production cycling route planner for London. Users select a **routing profile** (or use **Test Mode** to override routing weights), set start and end on the map, and get two routes (fastest vs profile-optimized). A **Route overlays** picker (bottom-right) lets users choose which edge and point layers to draw on the optimized route after **Get Route** — independent of profile weights. No full-map data exploration — that stays in the debug app.
 
 ---
 
@@ -38,18 +38,21 @@ The main app (**Tuned Cycling**) is the production cycling route planner for Lon
 - **No DB in main app:** Routing uses only the graph; no PostgreSQL in this process.
 - **Dynamic API data:** Live disruptions come from two sources—**TfL** (Road Disruptions) and **TomTom** (Traffic Incidents v5). Both are refreshed independently via `POST /admin/update_tfl` and `POST /admin/update_tomtom`; the backend merges them into a single lookup used for routing and the “Live TfL Disruptions” overlay (see Section 4.1).
 - **Cost functions:** See **Section 5** for full mathematical formulation, preset constants, and per-mode formulas.
-- **Optimized weight** is built per request via `make_weight_optimized(w)` (no global weights; safe for concurrent users). Formula: **Weight = (Length × M_total × M_highway × R) + A_total + H**. **M_highway** (always on): `steps` → ×10; `footway` / `pedestrian` / `path` without dedicated cycle infrastructure (`cycleway` type or `cycleway*` tags) → ×4; else ×1. **Fastest** uses `Length × M_highway` only.
+- **Optimized weight** is built per request via `make_weight_optimized(w)` (no global weights; safe for concurrent users). Formula: **Weight = (Length × M_total × M_highway × R) + A_total + H**. **M_highway** (always on): `steps` → ×50; `footway` / `pedestrian` / `path` without dedicated cycle infrastructure (`cycleway` type or `cycleway*` tags) → ×4; else ×1. **Fastest** uses `Length × M_highway` only. **Penalty masks** (`cost_masks.py`): vehicular-free edges skip risk/speed/calming; steps skip surface/hill (see §5.9).
 - **Edge snap:** `tfl_live.snap_to_edge` uses the startup **STRtree** (shared with live disruptions; built in `live_disruptions.init`) to find the globally closest point on any edge (`line.project` + `interpolate`). Max orthogonal distance **50 m** (default). **Routing:** A\* runs from the **closer terminal node** (anchor) of each snapped edge; returned `path` coordinates prepend/append the exact snap points as **visual stubs** (stats/cost exclude stub segments). **Inspector:** same global snap (not node-local candidates). A legacy **cKDTree** on nodes remains at bootstrap but is unused by `/route` and `/inspect`.
 - **A\* heuristics** (`routing_heuristic.py`):
   - **Fastest:** `h(u, goal) = haversine_m(u, goal)` — straight-line metres (admissible for length-minimizing routes).
-  - **Optimized:** `h(u, goal) = haversine_m(u, goal) × cost_per_m_lb`, where `cost_per_m_lb = 1.0 × r_lb` and `r_lb` is the product of enabled reward factors (TfL cycleway ×0.75, TfL quietway ×0.75, green ×0.8, floored at `R_MIN`). Additives (signals, barriers, hills) and live closures are omitted from `h` (admissible underestimate). Reward constants are shared with `make_weight_optimized`.
+  - **Optimized:** `h(u, goal) = haversine_m(u, goal) × cost_per_m_lb`, where `cost_per_m_lb = m_lb × r_lb`. **`r_lb`:** product of enabled reward factors (TfL cycleway ×0.75, TfL quietway ×0.75, green ×0.8), floored at `R_MIN`. **`m_lb`:** `max(M_MIN, 1.0 + Σ w_k × floor_k)` for enabled length multipliers (`risk`, `light`, `surface`, `speed`, `width`); each `floor_k` is computed once at startup from the graph (0 if any edge has zero penalty for that type — admissible). Additives (signals, junctions, hills) and live closures are omitted from `h`. Reward constants are shared with `make_weight_optimized`.
+  - **Note (penalty floors vs earlier design):** The explicit `m_lb` term generalises an earlier formulation that hardcoded `m_lb = 1.0` and omitted length penalties from `h` for the same admissibility reason. On the current London graph, every `floor_k` is 0 (lit, good-surface, zero-risk, etc. edges exist), so **`cost_per_m_lb` is unchanged in practice** — still `1.0 × r_lb` for Safe Commuter. The structure is ready if a future graph has no zero-penalty edges for a type; tighter bounds would still require other admissible techniques (e.g. precomputed weights) because additives remain excluded from `h`.
+  - **Junction cache:** at startup, each node gets `is_dangerous_junction` and `car_physical_road_count` (O(1) in A\* weight fn).
 - **Dev timing:** set `ROUTE_BENCHMARK=1` to log snap + A\* wall times per `/route` request. Run `python 4_backend_engine/route_benchmark.py` (optional `--quick`) to compare path **costs** with `h=0` vs the new heuristic (must match).
 
 ### 2.4 Frontend (5_frontend)
 
 - Single-page React app; main UI in `App.js`.
 - **Profile panel** (top-left): dropdown of seed + custom profiles, **Route points** (Start/End Mapbox autocomplete), Create Profile modal, Get Route button.
-- **Test Mode** toggle in header (top-right); when on, legacy grouped toggles appear bottom-right (Safety, Comfort, Scenery).
+- **Route overlay picker** (bottom-right): hideable **Layers** FAB — edge overlays (lit, steep, TfL, green, narrow, disruptions) and point overlays (barriers, signals, junctions, calming) on the **optimized route only**. On **Get Route**, only **TfL cycleways** is on by default; other overlays are off until toggled. Display-only (routing unchanged). Catalog: `GET /overlay_catalog`.
+- **Test Mode** toggle in header (top-right); when on, legacy grouped toggles appear mid-right (**routing** overrides only, not map overlays).
 - Map: Leaflet via react-leaflet; center London, OSM tiles; `MapFlyTo` on search selection.
 - State: profiles, active profile, test mode, start/end (+ labels), route results, inspector.
 - **Env:** `REACT_APP_MAPBOX_API_KEY` in `5_frontend/.env` (see `5_frontend/.env.example`); required for location search. CRA reads env at startup only — restart `npm start` after changes.
@@ -91,9 +94,9 @@ The main app (**Tuned Cycling**) is the production cycling route planner for Lon
 
 ### 3.5 Display
 
-- **Two routes:** Fastest (grey) and optimized (red light / cyan dark).
+- **Two routes:** Fastest (grey) and optimized (red light / cyan dark) — always shown after **Get Route**.
 - **Stats panel** (bottom-left): hero Time + Distance rows; condensed table of all 15 secondary metrics with optimized value and Δ vs fastest.
-- **Overlays:** shown when corresponding profile weight &gt; 0 (or Test Mode toggle on).
+- **Route overlays:** user-selected via bottom-right **Layers** picker (edge polylines + point markers along optimized path). Backend returns all overlay chunks on every `/route`; `node_highlights` uses `overlay_mode=True` (full path features). Visibility is client-side only.
 - **Header:** “Tuned Cycling” + status line with timing and active profile name.
 
 ### 3.6 Segment inspector
@@ -117,6 +120,7 @@ The main app (**Tuned Cycling**) is the production cycling route planner for Lon
 | GET | `/profiles/<user_id>` | — | `{ id, name, weights: { ...14 keys } }` or 404 |
 | POST | `/profiles` | JSON `{ name, weights }` | `{ id, name, weights }` (201) or 400 if weight ∉ `[0.0, 1.0]` |
 | GET | `/route` | `start_lat`, `start_lon`, `end_lat`, `end_lon`, **`profile_id`** *or* explicit weight params | See below |
+| GET | `/overlay_catalog` | — | `{ version, edge: [...], point: [...] }` — route overlay picker metadata |
 | POST | `/admin/update_tfl` | (none) | `{ ok, message, count }` — fetch TfL Road Disruptions, rebuild master lookup |
 | POST | `/admin/update_tomtom` | (none) | `{ ok, message, count }` — fetch TomTom Traffic Incidents, rebuild master lookup |
 | GET | `/admin/tfl_status` | — | `{ loaded, edge_count, disruption_count, last_update, error }` — TfL live data status |
@@ -156,7 +160,7 @@ All formulas and preset values below are implemented in `4_backend_engine/app.py
 \]
 
 - **Length:** edge length in metres (`d['length']`).
-- **M_highway:** always-on highway-type multiplier on length (`steps` ×10; plain footway/pedestrian/path ×4; dedicated cycle infrastructure ×1).
+- **M_highway:** always-on highway-type multiplier on length (`steps` ×50; plain footway/pedestrian/path ×4; dedicated cycle infrastructure ×1).
 - **M_total:** toggle-based length multiplier (penalties only); clamped so \(M_{\text{total}} \geq 0.1\).
 - **R:** reward multiplier for preferred edges; \(R \in [0.1, 1]\) so cost stays positive.
 - **A_total:** sum of fixed additive costs (metres or virtual metres).
@@ -174,7 +178,7 @@ All formulas and preset values below are implemented in `4_backend_engine/app.py
 | `SPEED_DIFF_LOW_KMH` | 30 | 20–30 km/h: low penalty; &gt;30: moderate. |
 | `M_MIN` | 0.1 | Minimum length multiplier. |
 | `PEDESTRIAN_HIGHWAY_M` | 4.0 | `M_highway` for footway/pedestrian/path without cycle infrastructure. |
-| `STEPS_HIGHWAY_M` | 10.0 | `M_highway` for `steps`. |
+| `STEPS_HIGHWAY_M` | 50.0 | `M_highway` for `steps` (surface/hill masked — §5.9). |
 | `R_MIN` | 0.1 | Minimum reward multiplier. |
 | `BARRIER_HARD_COST` | 1e9 | Impassable edges (barriers, live closures, **closed parks**). |
 | `UP_THRESH` | 0.033 | Steep ascent threshold (3.3%). |
@@ -187,7 +191,7 @@ All formulas and preset values below are implemented in `4_backend_engine/app.py
 - **Light:** \(\text{light\_penalty} = 0.5 \times w_{\text{light}}\) if edge not lit, else 0. Lit = `lit` in `['yes','true','24/7','on','designated']`.
 - **Surface:** \(\text{surface\_penalty} = 3.0 \times w_{\text{surface}}\) if surface in `BAD_SURFACES`, else 0. `BAD_SURFACES` = grass, dirt, sand, ground, unpaved, sett, gravel, wood, fine_gravel, earth, mud, woodchips, cobblestone, pebblestone, clay, grit, grass_paver, stone, unhewn_cobblestone, stepping_stones.
 - **Speed stress:** \(\text{speed\_m} = m \times w_{\text{speed}}\) where \(m = 0\) if \(\Delta v < 20\) km/h, \(m = 0.15\) if \(20 \leq \Delta v \leq 30\), \(m = 0.35\) if \(\Delta v > 30\) (\(\Delta v = \text{maxspeed} - \text{cyclist speed}\)). Maxspeed parsed from edge or inferred from highway type (e.g. residential 30, primary 50 km/h).
-- **Width:** \(\text{width\_m} = p \times w_{\text{width}}\) where \(p = 0\) if width ≥ 1.5 m, \(p = 0.2\) if 1.25 ≤ width &lt; 1.5 m, \(p = 0.5\) if width &lt; 1.25 m. Width from `cycleway_width` or `width`.
+- **Width:** \(\text{width\_m} = p \times w_{\text{width}}\) where \(p = 0\) if width ≥ 1.5 m, \(p = 0.2\) if 1.25 ≤ width &lt; 1.5 m, \(p = 0.5\) if width &lt; 1.25 m. Width from `cycleway_width` when set (ignores road `width`); else `width` unless vehicular-free (then \(p = 0\)). See §5.9.
 
 \[
 M_{\text{total}} = \max\bigl(0.1,\; 1 + \text{risk\_penalty} + \text{light\_penalty} + \text{surface\_penalty} + \text{speed\_m} + \text{width\_m}\bigr)
@@ -231,7 +235,29 @@ A_{\text{total}} = A_{\text{intersection}} + A_{\text{mini\_roundabout}} + A_{\t
 
 ### 5.7 Hill cost H
 
-- **WORK_COEFF** = 20.0. If grade \(g > 0\): \(\text{hill\_cost} = L \times \bigl(20g + (20g)^2 \mathbf{1}_{g>0.033}\bigr)\). If grade \(< -0.033\): \(\text{hill\_cost} = L \times 1.5\). Otherwise 0. Then \(H = \text{hill\_cost} \times w_{\text{hill}}\).
+- **WORK_COEFF** = 20.0. If grade \(g > 0\): \(\text{hill\_cost} = L \times \bigl(20g + (20g)^2 \mathbf{1}_{g>0.033}\bigr)\). If grade \(< -0.033\): \(\text{hill\_cost} = L \times 1.5\). Otherwise 0. Then \(H = \text{hill\_cost} \times w_{\text{hill}}\). **Skipped on `type=steps`** (§5.9).
+
+### 5.9 Penalty masks (`cost_masks.py`)
+
+Implemented per `0_documentation/tasks/cost_function_brainstorming.md`. Evaluated per edge inside `make_weight_optimized`.
+
+**Vehicular-free** (`is_vehicular_free`): cyclist physically separated from general motor traffic. **True** if any of:
+
+| Trigger | Values / notes |
+|---------|----------------|
+| `type` | `cycleway`, `path`, `pedestrian`, `footway`, `bridleway` |
+| `is_park` | `yes` only — **not** `is_river` (river = green reward only; towpaths may have traffic) |
+| `cycleway` / `cycleway_left` / `cycleway_right` / `cycleway_both` | **Whitelist only:** `track`, `separate`, `share_busway`, `exclusive` (not `lane`, `shared_lane`, `shared`, `advisory`, `opposite`, `no`, `segregated`, etc.) |
+| `cycleway_separation` (+ left/right) | `bollard`, `kerb` |
+| `tfl_cycle_programme` | contains `superhighway` |
+
+When vehicular-free, force to **0**: `risk_weight`, `speed_weight`, `calming_weight` (M and A terms). **Width:** use `cycleway_width` only when set; if missing on vehicular-free edge, `width_weight` penalty = 0 (ignore adjacent car-lane `width`).
+
+**`is_river` excluded:** manual river polygons mark scenic corridors (e.g. towpaths) that may still carry motor traffic. Those edges keep risk/speed/calming penalties; only `green_weight` reward applies (`is_park` / `is_river` / `is_sight` via `_has_attraction_edge`).
+
+**Steps** (`type=steps`): keep `M_highway` = **×50**; force **0** for `surface_weight` and `hill_weight`. Lighting, barriers, junctions, rewards, etc. still apply.
+
+Route stats (`calculate_path_stats`) use the same masks for accidents, speed stress, calming, rough surface, elevation on steps, and narrow width resolution.
 
 ### 5.8 Fastest weight
 
@@ -252,6 +278,7 @@ A_{\text{total}} = A_{\text{intersection}} + A_{\text{mini\_roundabout}} + A_{\t
 | `5_frontend/src/index.js` | React root |
 | `5_frontend/public/index.html` | HTML shell |
 | `4_backend_engine/app.py` | Flask app, graph load, cost functions, `/route`, `/inspect` |
+| `4_backend_engine/cost_masks.py` | Vehicular-free and steps penalty masks |
 | `4_backend_engine/routing_heuristic.py` | Admissible A\* heuristics and shared reward constants |
 | `4_backend_engine/barrier_clusters.py` | Barrier tag → cluster, penalties, debug colours |
 | `4_backend_engine/route_benchmark.py` | Dev script: optimality check (h=0 vs heuristic costs) |

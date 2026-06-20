@@ -2021,6 +2021,12 @@
       "target": "(-0.123732, 51.486638)",
       "programme": "cycleway",
       "route": "C"
+    },
+    {
+      "source": "(-0.19228, 51.509218)",
+      "target": "(-0.190453, 51.505713)",
+      "programme": "cycleway",
+      "route": "C27"
     }
   ],
   "removed": [
@@ -7381,6 +7387,13 @@
       "type": "remove",
       "source": "(-0.148646, 51.478514)",
       "target": "(-0.148616, 51.478348)"
+    },
+    {
+      "type": "add",
+      "source": "(-0.19228, 51.509218)",
+      "target": "(-0.190453, 51.505713)",
+      "programme": "cycleway",
+      "route": "C27"
     }
   ]
 }

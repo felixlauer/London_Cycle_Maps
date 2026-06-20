@@ -49,7 +49,8 @@ def main() -> int:
     parser.add_argument("--input", default=DEFAULT_INPUT, help="Input graph (.graphml or .gpickle)")
     parser.add_argument("--output", default=None, help="Output path (default: overwrite input)")
     parser.add_argument("--parks", default=PARKS_GEOJSON, help="Park polygons GeoJSON")
-    parser.add_argument("--pickle-only", action="store_true", help="Save .gpickle only")
+    parser.add_argument("--pickle-only", action=argparse.BooleanOptionalAction, default=True,
+                        help="Save .gpickle only (default). Use --no-pickle-only for GraphML.")
     args = parser.parse_args()
 
     input_path = os.path.normpath(os.path.join(SCRIPT_DIR, args.input))

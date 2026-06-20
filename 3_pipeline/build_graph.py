@@ -22,6 +22,7 @@ from shapely.strtree import STRtree
 from db_config import DEFAULT_ROAD_SOURCE, db_url
 from graph_debug_report import new_debug_report_path
 from graph_io import save_graph
+from manual_edges import apply_manual_edges
 OUTPUT_PATH = os.path.join("..", "1_data", "london.graphml")
 
 # Snap threshold for matching point features to graph nodes (degrees ~20m at London latitude)
@@ -53,6 +54,12 @@ def main():
         "--source",
         default=DEFAULT_ROAD_SOURCE,
         help="Line table or materialized view (default: planet_osm_line_noded_enriched)",
+    )
+    parser.add_argument(
+        "--pickle-only",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Save .gpickle only (default). Use --no-pickle-only to also write GraphML.",
     )
     args = parser.parse_args()
     road_source = args.source
@@ -235,6 +242,16 @@ def main():
     print(f"   -> Processed {count_oneway} one-way streets.")
     print(f"   -> Enabled {count_contraflow} contraflow cycling exceptions.")
     print(f"   -> Graph before cleanup: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+
+    # =====================================================================
+    # STEP 2b: MANUAL CONNECTIONS (persistent gaps not in OSM extract)
+    # =====================================================================
+    print("2b. Applying manual graph connections...")
+    manual_added = apply_manual_edges(G)
+    if manual_added:
+        print(f"   -> Added {manual_added} directed manual edge(s).")
+    else:
+        print("   -> No manual edges added (none configured or all already present).")
 
     # =====================================================================
     # STEP 3: CLEAN ISLANDS
@@ -691,7 +708,7 @@ def main():
     # STEP 5: SAVE GRAPH
     # =====================================================================
     print(f"5. Saving to {OUTPUT_PATH} (+ fast pickle)...")
-    save_graph(G, OUTPUT_PATH, write_graphml=True, write_fast=True)
+    save_graph(G, OUTPUT_PATH, write_graphml=not args.pickle_only, write_fast=True)
     print("   -> Graph saved.")
 
     # =====================================================================

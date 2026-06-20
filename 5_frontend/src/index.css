@@ -21,6 +21,22 @@ body {
   color: #333 !important;
 }
 
+.route-overlay-picker {
+  position: absolute;
+  bottom: 50px;
+  right: 60px;
+  z-index: 1000;
+}
+
+.route-overlay-panel {
+  animation: route-overlay-in 0.2s ease-out;
+}
+
+@keyframes route-overlay-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;

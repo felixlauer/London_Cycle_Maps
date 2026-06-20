@@ -25,6 +25,7 @@ from attraction_spatial import (
 import tfl_live
 import live_disruptions
 from barrier_clusters import barrier_cluster_meta, cluster_legend
+from cycleway_clusters import classify_cycleway_edge, cluster_legend as cycleway_cluster_legend
 from park_opening_hours import (
     LONDON_TZ,
     build_request_hours_context,
@@ -170,8 +171,7 @@ def get_edge_midpoint(u, v, data, coords=None):
     return (lat, lon)
 
 # Caches for cycleway, HGV, and point-based overlays (filled in build_all_debug_caches)
-CYCLEWAY_GENERAL = []   # has cycleway / cycleway_left / right / both (non-empty)
-CYCLEWAY_SEGREGATED = []
+CYCLEWAY_CACHE = []  # meaningful cycleway* infra with cluster metadata
 HGV_BANNED_CACHE = []
 TRAFFIC_CALMING_POINTS = []       # way-based: [{lat, lon, type, source: 'way'}, ...]
 TRAFFIC_CALMING_POINT_POINTS = [] # point-based: [{lat, lon, type, source: 'point'}, ...]
@@ -244,8 +244,7 @@ def build_all_debug_caches():
     steep_error = 0
     surface_count = 0
     unlit_count = 0
-    cycleway_g = 0
-    cycleway_seg = 0
+    cycleway_counts = {1: 0, 2: 0, 3: 0}
     hgv_count = 0
     tc_points = 0
     jn_points = 0
@@ -333,29 +332,21 @@ def build_all_debug_caches():
                     "b": make_bounds(coords)
                 })
 
-        # Cycleway caches (GRAPH.md 3.3)
-        cw = str(data.get('cycleway', '')).strip()
-        cw_left = str(data.get('cycleway_left', '')).strip()
-        cw_right = str(data.get('cycleway_right', '')).strip()
-        cw_both = str(data.get('cycleway_both', '')).strip()
-        has_general = bool(cw or cw_left or cw_right or cw_both)
-        if has_general:
+        # Cycleway overlay: meaningful cycleway* values only (not no / crossing / segregated=yes)
+        cw_meta = classify_cycleway_edge(data)
+        if cw_meta:
             if coords is None:
                 coords = get_edge_coords(u, v, data)
             if coords:
-                cycleway_g += 1
-                CYCLEWAY_GENERAL.append({
-                    "id": f"cw-{u}-{v}", "p": coords, "b": make_bounds(coords),
-                    "v": cw or cw_left or cw_right or cw_both
-                })
-        seg_val = str(data.get('segregated', '')).lower().strip()
-        if seg_val == 'yes':
-            if coords is None:
-                coords = get_edge_coords(u, v, data)
-            if coords:
-                cycleway_seg += 1
-                CYCLEWAY_SEGREGATED.append({
-                    "id": f"cws-{u}-{v}", "p": coords, "b": make_bounds(coords)
+                cluster = cw_meta["cluster"]
+                cycleway_counts[cluster] = cycleway_counts.get(cluster, 0) + 1
+                CYCLEWAY_CACHE.append({
+                    "id": f"cw-{u}-{v}",
+                    "p": coords,
+                    "b": make_bounds(coords),
+                    "c": cw_meta["cluster_key"],
+                    "v": cw_meta["tag"],
+                    "color": cw_meta["cluster_color"],
                 })
 
         # HGV banned: hgv=no
@@ -474,7 +465,10 @@ def build_all_debug_caches():
     print(f"--> Steep cache: {len(STEEP_CACHE)} (errors: {steep_error}, ignored: {steep_ignored})")
     print(f"--> Surface cache: {surface_count} bad-surface segments")
     print(f"--> Unlit cache: {unlit_count} unlit segments")
-    print(f"--> Cycleway: general={cycleway_g}, segregated={cycleway_seg}")
+    print(
+        f"--> Cycleway clusters: segregated={cycleway_counts.get(1, 0)}, "
+        f"bus_shared={cycleway_counts.get(2, 0)}, car_shared={cycleway_counts.get(3, 0)}"
+    )
     print(f"--> HGV banned: {hgv_count}")
     print(f"--> Traffic calming points: {tc_points}, Junction points: {jn_points}")
     print(f"--> TfL cycle routes: {tfl_count} edges")
@@ -1197,37 +1191,38 @@ def _limit_segments_by_center(segments, center_lat, center_lon, limit):
 @app.route('/debug/cycleway', methods=['GET'])
 def get_cycleway():
     try:
-        if not request.args.get('min_lat') or not request.args.get('layer'):
+        if not request.args.get('min_lat'):
             return jsonify({"segments": [], "limit_reached": False})
         min_lat = float(request.args.get('min_lat'))
         max_lat = float(request.args.get('max_lat'))
         min_lon = float(request.args.get('min_lon'))
         max_lon = float(request.args.get('max_lon'))
-        layer = request.args.get('layer', 'general').lower()
         center_lat = (min_lat + max_lat) / 2.0
         center_lon = (min_lon + max_lon) / 2.0
 
-        if layer == 'general':
-            cache = CYCLEWAY_GENERAL
-        elif layer == 'segregated':
-            cache = CYCLEWAY_SEGREGATED
-        else:
-            return jsonify({"segments": [], "limit_reached": False})
+        clusters_param = request.args.get('clusters', '').strip().lower()
+        allowed_clusters = None
+        if clusters_param:
+            allowed_clusters = {c.strip() for c in clusters_param.split(',') if c.strip()}
 
         in_bbox = [
-            {"id": s['id'], "p": s['p'], "v": s.get('v', ''), "b": s['b']}
-            for s in cache
+            {"id": s['id'], "p": s['p'], "c": s['c'], "v": s.get('v', ''), "color": s.get('color', '')}
+            for s in CYCLEWAY_CACHE
             if (s['b'][0] < max_lat and s['b'][1] > min_lat and
                 s['b'][2] < max_lon and s['b'][3] > min_lon)
+            and (allowed_clusters is None or s['c'] in allowed_clusters)
         ]
         limited, limit_reached = _limit_segments_by_center(
             in_bbox, center_lat, center_lon, MAX_SEGMENTS_LIMIT)
-        for s in limited:
-            if 'b' in s:
-                s.pop('b')
         return jsonify({"segments": limited, "limit_reached": limit_reached})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/debug/cycleway_clusters', methods=['GET'])
+def get_cycleway_clusters():
+    """Cluster legend for cycleway overlay colours (matches cycleway_clusters.py)."""
+    return jsonify(cycleway_cluster_legend())
 
 @app.route('/debug/hgv_banned', methods=['GET'])
 def get_hgv_banned():

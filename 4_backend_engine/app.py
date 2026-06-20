@@ -23,8 +23,10 @@ from routing_heuristic import (
     TFL_CYCLEWAY_REWARD,
     TFL_QUIETWAY_REWARD,
     GREEN_REWARD,
+    VEHICULAR_FREE_REWARD,
     compute_optimized_cost_per_metre_lower_bound,
     make_heuristic,
+    set_penalty_floors,
 )
 from barrier_clusters import (
     BARRIER_HARD_COST,
@@ -32,6 +34,7 @@ from barrier_clusters import (
     barrier_is_hard_block,
     barrier_cluster_meta,
 )
+from cost_masks import is_segregated_cycling, is_steps, is_vehicular_free, routing_width_m
 import user_profiles
 import park_opening_hours
 
@@ -98,11 +101,12 @@ def get_nearest_node(lat, lon):
 
 # Weights are passed per-request (no globals) for multi-user safety; see make_weight_optimized().
 
-BAD_SURFACES = [
+BAD_SURFACES = frozenset([
     'grass', 'dirt', 'sand', 'ground', 'unpaved', 'sett', 'gravel', 'wood',
     'fine_gravel', 'earth', 'mud', 'woodchips', 'cobblestone', 'pebblestone',
     'clay', 'grit', 'grass_paver', 'stone', 'unhewn_cobblestone', 'stepping_stones'
-]
+])
+BAD_SMOOTHNESS = frozenset(['bad', 'very_bad', 'horrible', 'impassable'])
 
 # --- BASE PHYSICS (implementation.md) ---
 CYCLIST_SPEED_MPS = 16.0 / 3.6   # ~4.44 m/s (16 km/h)
@@ -116,7 +120,7 @@ R_MIN = 0.1   # Reward multiplier minimum (rewards implemented as R < 1, not neg
 
 # Highway-type length multipliers (cost ∝ length × M_highway × …)
 PEDESTRIAN_HIGHWAY_M = 4.0
-STEPS_HIGHWAY_M = 10.0
+STEPS_HIGHWAY_M = 50.0
 PEDESTRIAN_HIGHWAY_TYPES = frozenset(['footway', 'pedestrian', 'path'])
 CYCLEWAY_TAG_KEYS = ('cycleway', 'cycleway_left', 'cycleway_right', 'cycleway_both')
 
@@ -180,18 +184,8 @@ def _parse_maxspeed_kmh(d):
     return 30.0
 
 def _get_width_m(d):
-    """Width in meters. Prefer cycleway_width then width."""
-    for key in ('cycleway_width', 'width'):
-        val = d.get(key)
-        if val is None: continue
-        s = str(val).strip().lower().replace(',', '.')
-        try:
-            num = float(''.join(c for c in s if c.isdigit() or c == '.'))
-            if 'ft' in s or 'foot' in s: num *= 0.3048
-            return max(0.0, num)
-        except ValueError:
-            pass
-    return None
+    """Width in metres for routing penalties and narrow overlays (see cost_masks.routing_width_m)."""
+    return routing_width_m(d)
 
 def _tfl_programmes(d):
     prog = str(d.get('tfl_cycle_programme', '')).strip().lower()
@@ -216,6 +210,11 @@ def _has_attraction_edge(d):
         or _is_yes_attr(d.get('is_river'))
         or _is_yes_attr(d.get('is_sight'))
     )
+
+
+def _is_green_edge(d):
+    """Park and river scenic edges only (excludes is_sight)."""
+    return _is_yes_attr(d.get('is_park')) or _is_yes_attr(d.get('is_river'))
 
 # Only zebra/uncontrolled crossings get the junction penalty (cycling on main road: unmarked is not a risk, signals are separate mode)
 CROSSING_PENALTY_VALUES = frozenset(['zebra', 'uncontrolled'])
@@ -282,11 +281,14 @@ def _is_car_allowed_edge(edge_data):
 def _count_car_physical_roads_at_node(node_id):
     """
     Count physical car-allowed roads meeting at this node.
-    One physical road = one undirected link: (u,v) and (v,u) count as one road.
-    Only edges with car-allowed highway type are counted (excludes footway, cycleway, path, etc.).
+    Prefer cached car_physical_road_count when set at bootstrap.
     """
     if node_id not in G.nodes:
         return 0
+    nd = G.nodes[node_id]
+    cached = nd.get('car_physical_road_count')
+    if cached is not None:
+        return int(cached)
     physical = set()
     for u in G.predecessors(node_id):
         ed = G.get_edge_data(u, node_id)
@@ -299,20 +301,43 @@ def _count_car_physical_roads_at_node(node_id):
     return len(physical)
 
 
+def _cache_junction_node_flags(graph):
+    """One-time pass: car_physical_road_count + is_dangerous_junction on each node."""
+    t0 = time.perf_counter()
+    dangerous = 0
+    for node_id in graph.nodes:
+        physical = set()
+        for u in graph.predecessors(node_id):
+            ed = graph.get_edge_data(u, node_id)
+            if _is_car_allowed_edge(ed):
+                physical.add((min(u, node_id), max(u, node_id)))
+        for w in graph.successors(node_id):
+            ed = graph.get_edge_data(node_id, w)
+            if _is_car_allowed_edge(ed):
+                physical.add((min(node_id, w), max(node_id, w)))
+        count = len(physical)
+        nd = graph.nodes[node_id]
+        nd['car_physical_road_count'] = count
+        if str(nd.get('traffic_signals', '')).lower() == 'yes':
+            nd['is_dangerous_junction'] = False
+        elif count >= JUNCTION_DANGER_MIN_CAR_ROADS:
+            nd['is_dangerous_junction'] = True
+            dangerous += 1
+        else:
+            nd['is_dangerous_junction'] = False
+    print(
+        f"--> Junction flags: {dangerous} dangerous junctions "
+        f"({time.perf_counter() - t0:.1f}s)"
+    )
+
+
 def _junction_danger_penalty(node_id):
     """
-    Complex junction without signals: proxy for right-turn / merge danger.
-    Only counts car-allowed roads; counts physical roads (one-way + two-way = one road).
-    Dangerous when >= JUNCTION_DANGER_MIN_CAR_ROADS (4) such roads meet.
-    Crossings are not used here (may move to edge-based logic later).
+    Complex junction without signals: O(1) lookup on is_dangerous_junction (bootstrap cache).
     """
     if node_id not in G.nodes:
         return 0.0
-    node_data = G.nodes[node_id]
-    if str(node_data.get('traffic_signals', '')).lower() == 'yes':
-        return 0.0
-    car_road_count = _count_car_physical_roads_at_node(node_id)
-    if car_road_count < JUNCTION_DANGER_MIN_CAR_ROADS:
+    if not G.nodes[node_id].get('is_dangerous_junction', False):
         return 0.0
     return 8.0
 
@@ -331,6 +356,30 @@ def _haversine_m(lon1, lat1, lon2, lat2):
     return 2 * r * math.asin(min(1.0, math.sqrt(a)))
 
 
+def _speed_stress_multiplier(d):
+    """Mild penalty by speed difference to cyclist (Literature Table 7)."""
+    maxspeed_kmh = _parse_maxspeed_kmh(d)
+    cyclist_kmh = CYCLIST_SPEED_MPS * 3.6
+    diff = maxspeed_kmh - cyclist_kmh
+    if diff < SPEED_DIFF_NEGLIGIBLE_KMH:
+        return 0.0
+    if diff <= SPEED_DIFF_LOW_KMH:
+        return 0.15
+    return 0.35
+
+
+def _width_penalty_multiplier(d):
+    """Width < 1.5m: slight; < 1.25m: moderate (not impassable)."""
+    w = _get_width_m(d)
+    if w is None:
+        return 0.0
+    if w >= WIDTH_STD_M:
+        return 0.0
+    if w >= WIDTH_MIN_M:
+        return 0.2
+    return 0.5
+
+
 def _junction_cluster_score(node_id):
     """Higher = preferred representative for junction_weight penalties in a cluster."""
     if node_id not in G.nodes:
@@ -341,7 +390,7 @@ def _junction_cluster_score(node_id):
     score = 0
     if _node_intersection_penalty(nd) > 0:
         score += 100
-    car = _count_car_physical_roads_at_node(node_id)
+    car = int(nd.get('car_physical_road_count', 0))
     if car >= JUNCTION_DANGER_MIN_CAR_ROADS:
         score += car
     if str(nd.get('mini_roundabout', '')).strip().lower() in ('yes', 'true', '1'):
@@ -400,29 +449,60 @@ def _build_junction_cluster_suppression():
     return frozenset(suppressed)
 
 
+def _build_heuristic_penalty_floors(graph):
+    """
+    One O(edges) scan: admissible minimum penalty increment per multiplier type at weight=1.
+    If any edge has zero increment for a type, floor is 0 (path may use only those edges).
+    """
+    t0 = time.perf_counter()
+    has_zero_risk = False
+    min_risk = float('inf')
+    has_lit = False
+    has_good_surface = False
+    has_zero_speed_stress = False
+    has_zero_width_penalty = False
+
+    for _u, _v, d in graph.edges(data=True):
+        risk = float(d.get('risk', 0.0))
+        if risk <= 0:
+            has_zero_risk = True
+        elif risk < min_risk:
+            min_risk = risk
+
+        if is_lit(d):
+            has_lit = True
+        surface = str(d.get('surface', '')).lower()
+        if surface not in BAD_SURFACES:
+            has_good_surface = True
+        if _speed_stress_multiplier(d) <= 0:
+            has_zero_speed_stress = True
+        width_m = _get_width_m(d)
+        if width_m is None or width_m >= WIDTH_STD_M:
+            has_zero_width_penalty = True
+
+    floors = {
+        'risk_weight': 0.0 if has_zero_risk else (min_risk if min_risk != float('inf') else 0.0),
+        'light_weight': 0.0 if has_lit else 0.5,
+        'surface_weight': 0.0 if has_good_surface else 3.0,
+        'speed_weight': 0.0 if has_zero_speed_stress else 0.15,
+        'width_weight': 0.0 if has_zero_width_penalty else 0.2,
+    }
+    set_penalty_floors(floors)
+    print(
+        f"--> Heuristic penalty floors: {floors} ({time.perf_counter() - t0:.1f}s)"
+    )
+
+
+if G is not None:
+    _cache_junction_node_flags(G)
+    _build_heuristic_penalty_floors(G)
+
 JUNCTION_CLUSTER_SUPPRESSED = _build_junction_cluster_suppression()
 print(
     f"Junction cluster dedup: {len(JUNCTION_CLUSTER_SUPPRESSED)} nodes suppressed "
     f"(radius {JUNCTION_CLUSTER_RADIUS_M:.0f} m)."
 )
 
-
-def _speed_stress_multiplier(d):
-    """Mild penalty by speed difference to cyclist (Literature Table 7)."""
-    maxspeed_kmh = _parse_maxspeed_kmh(d)
-    cyclist_kmh = CYCLIST_SPEED_MPS * 3.6
-    diff = maxspeed_kmh - cyclist_kmh
-    if diff < SPEED_DIFF_NEGLIGIBLE_KMH: return 0.0
-    if diff <= SPEED_DIFF_LOW_KMH: return 0.15
-    return 0.35
-
-def _width_penalty_multiplier(d):
-    """Width < 1.5m: slight; < 1.25m: moderate (not impassable)."""
-    w = _get_width_m(d)
-    if w is None: return 0.0
-    if w >= WIDTH_STD_M: return 0.0
-    if w >= WIDTH_MIN_M: return 0.2
-    return 0.5
 
 def _traffic_calming_additive(d, source='way'):
     """Fixed distance cost per segment with calming. source: 'way' (OSM way tag), 'point' (snapped point), 'both' (max of both)."""
@@ -463,92 +543,120 @@ def make_weight_optimized(w, hours_map, fallback_open):
     Rewards (TfL, green) are implemented as multiplier R < 1 on length, not negative penalty,
     to keep A* heuristic well-behaved.
     """
+    w_risk = w.get('risk_weight', 0.0)
+    w_light = w.get('light_weight', 0.0)
+    w_surface = w.get('surface_weight', 0.0)
+    w_hill = w.get('hill_weight', 0.0)
+    w_tfl_cw = w.get('tfl_cycleway_weight', 0.0)
+    w_tfl_qw = w.get('tfl_quietway_weight', 0.0)
+    w_speed = w.get('speed_weight', 0.0)
+    w_width = w.get('width_weight', 0.0)
+    w_green = w.get('green_weight', 0.0)
+    w_barrier = w.get('barrier_weight', 0.0)
+    w_calming = w.get('calming_weight', 0.0)
+    w_junction = w.get('junction_weight', 0.0)
+    w_signal = w.get('signal_weight', 0.0)
+    w_tfl_live = w.get('tfl_live_weight', 0.0)
+    w_vf = w.get('vehicular_free_weight', 0.0)
+    calming_src = w.get('calming_source', 'way')
+    tfl_live_on = w_tfl_live > 0
+    tfl_cw_on = w_tfl_cw > 0
+    tfl_qw_on = w_tfl_qw > 0
+    green_on = w_green > 0
+    vf_on = w_vf > 0
+    hill_on = w_hill > 0
+    hard_cost = BARRIER_HARD_COST
+    junction_suppressed = JUNCTION_CLUSTER_SUPPRESSED
+
     def weight_fn(u, v, d):
         if barrier_is_hard_block(d):
-            return BARRIER_HARD_COST
+            return hard_cost
         if _park_edge_blocked(d, hours_map, fallback_open):
-            return BARRIER_HARD_COST
+            return hard_cost
+
+        disruption = None
+        if tfl_live_on:
+            disruption = live_disruptions.get_edge_disruption(u, v)
+            if disruption and (disruption.get('has_closure') or disruption.get('is_closed')):
+                return hard_cost
 
         length = float(d.get('length', 1.0))
-        grade = float(d.get('grade', 0.0))
 
-        # --- Multipliers M (penalties only; no negative terms) ---
-        risk_penalty = float(d.get('risk', 0.0)) * w.get('risk_weight', 0.0)
-        is_illuminated = is_lit(d)
-        light_penalty = (0.0 if is_illuminated else 0.5) * w.get('light_weight', 0.0)
+        vehicular_free = is_vehicular_free(d)
+        on_steps = is_steps(d)
+
+        risk_penalty = 0.0 if vehicular_free else float(d.get('risk', 0.0)) * w_risk
+        light_penalty = (0.0 if is_lit(d) else 0.5) * w_light
         surface = str(d.get('surface', '')).lower()
-        surface_penalty = (3.0 if surface in BAD_SURFACES else 0.0) * w.get('surface_weight', 0.0)
-        speed_m = _speed_stress_multiplier(d) * w.get('speed_weight', 0.0)
-        width_m = _width_penalty_multiplier(d) * w.get('width_weight', 0.0)
+        surface_penalty = (
+            0.0 if on_steps else (3.0 if surface in BAD_SURFACES else 0.0) * w_surface
+        )
+        speed_m = 0.0 if vehicular_free else _speed_stress_multiplier(d) * w_speed
+        width_m = _width_penalty_multiplier(d) * w_width
 
         M_total = 1.0 + risk_penalty + light_penalty + surface_penalty + speed_m + width_m
         M_total = max(M_MIN, M_total)
 
-        # --- Reward R: multiply by factor < 1 for preferred edges (no negative penalty) ---
         R = 1.0
-        if w.get('tfl_cycleway_weight', 0.0) > 0 and _is_tfl_cycleway_or_superhighway(d):
+        if tfl_cw_on and _is_tfl_cycleway_or_superhighway(d):
             R *= TFL_CYCLEWAY_REWARD
-        if w.get('tfl_quietway_weight', 0.0) > 0 and _is_tfl_quietway(d):
+        if tfl_qw_on and _is_tfl_quietway(d):
             R *= TFL_QUIETWAY_REWARD
-        if w.get('green_weight', 0.0) > 0 and _has_attraction_edge(d):
+        if green_on and _has_attraction_edge(d):
             R *= GREEN_REWARD
+        if vf_on and is_segregated_cycling(d):
+            R *= 1.0 - (1.0 - VEHICULAR_FREE_REWARD) * w_vf
         R = max(R_MIN, R)
 
-        # --- Additives A (fixed per edge/node) ---
         node_v = G.nodes[v] if v in G.nodes else {}
-        jw = w.get('junction_weight', 0.0)
-        if v in JUNCTION_CLUSTER_SUPPRESSED:
+        if v in junction_suppressed:
             A_intersection = 0.0
             A_mini_roundabout = 0.0
             A_junction = 0.0
         else:
-            A_intersection = _node_intersection_penalty(node_v) * jw
-            A_mini_roundabout = _node_mini_roundabout_penalty(node_v) * jw
-            A_junction = _junction_danger_penalty(v) * jw
-        A_barrier = _edge_barrier_penalty(d) * w.get('barrier_weight', 0.0)
-        A_give_way = _edge_give_way_penalty(d) * jw
-        A_stop_sign = _edge_stop_sign_penalty(d) * jw
-        A_signal = _node_signal_penalty(node_v) * w.get('signal_weight', 0.0)
-        calming_src = w.get('calming_source', 'way')
-        A_calming = _traffic_calming_additive(d, calming_src) * w.get('calming_weight', 0.0)
+            A_intersection = _node_intersection_penalty(node_v) * w_junction
+            A_mini_roundabout = _node_mini_roundabout_penalty(node_v) * w_junction
+            A_junction = (8.0 if node_v.get('is_dangerous_junction', False) else 0.0) * w_junction
+        A_barrier = _edge_barrier_penalty(d) * w_barrier
+        A_give_way = _edge_give_way_penalty(d) * w_junction
+        A_stop_sign = _edge_stop_sign_penalty(d) * w_junction
+        A_signal = _node_signal_penalty(node_v) * w_signal
+        A_calming = (
+            0.0 if vehicular_free else _traffic_calming_additive(d, calming_src) * w_calming
+        )
         A_total = (
             A_intersection + A_mini_roundabout + A_barrier + A_give_way + A_stop_sign
             + A_signal + A_junction + A_calming
         )
 
-        # --- Hill H ---
-        WORK_COEFF = 20.0
-        hill_cost = 0.0
-        if grade > 0:
-            work_penalty = grade * WORK_COEFF
-            power_penalty = (grade * 20.0) ** 2 if grade > UP_THRESH else 0.0
-            hill_cost = length * (work_penalty + power_penalty)
-        elif grade < DOWN_THRESH:
-            hill_cost = length * 1.5
-        H = hill_cost * w.get('hill_weight', 0.0)
+        H = 0.0
+        if hill_on and not on_steps:
+            grade = float(d.get('grade', 0.0))
+            hill_cost = 0.0
+            if grade > 0:
+                work_penalty = grade * 20.0
+                power_penalty = (grade * 20.0) ** 2 if grade > UP_THRESH else 0.0
+                hill_cost = length * (work_penalty + power_penalty)
+            elif grade < DOWN_THRESH:
+                hill_cost = length * 1.5
+            H = hill_cost * w_hill
 
-        # --- Dynamic live disruptions (TfL + TomTom, lookup table O(1)) ---
-        if w.get('tfl_live_weight', 0.0) > 0:
-            disruption = live_disruptions.get_edge_disruption(u, v)
-            if disruption:
-                if disruption.get('has_closure') or disruption.get('is_closed'):
-                    return 1e9
-                live_w = w['tfl_live_weight']
-                if disruption.get('is_diversion'):
-                    M_total += 5.0 * live_w
-                cat = disruption.get('category', '')
-                if cat == 'Works':
-                    M_total += 3.0 * live_w
-                elif cat in ('Collisions', 'Emergency service incidents',
-                             'Traffic Incidents', 'Network delays'):
-                    M_total += 2.0 * live_w
-                if disruption.get('temporary_bad_surface'):
-                    M_total += 3.0 * live_w
-                if disruption.get('environmental_hazard'):
-                    M_total *= 1.3
-                sev_mult = disruption.get('severity_multiplier', 1.0)
-                if sev_mult > 1.0:
-                    M_total *= sev_mult
+        if disruption:
+            if disruption.get('is_diversion'):
+                M_total += 5.0 * w_tfl_live
+            cat = disruption.get('category', '')
+            if cat == 'Works':
+                M_total += 3.0 * w_tfl_live
+            elif cat in ('Collisions', 'Emergency service incidents',
+                         'Traffic Incidents', 'Network delays'):
+                M_total += 2.0 * w_tfl_live
+            if disruption.get('temporary_bad_surface'):
+                M_total += 3.0 * w_tfl_live
+            if disruption.get('environmental_hazard'):
+                M_total *= 1.3
+            sev_mult = disruption.get('severity_multiplier', 1.0)
+            if sev_mult > 1.0:
+                M_total *= sev_mult
 
         M_highway = _highway_type_multiplier(d)
         return (length * M_total * M_highway * R) + A_total + H
@@ -627,7 +735,10 @@ def calculate_path_stats(path_nodes, calming_source='way'):
     speed_stress_length = 0.0
     narrow_length = 0.0
     green_length = 0.0
+    scenic_green_length = 0.0
+    segregated_cycling_length = 0.0
     barrier_count = 0
+    barrier_penalty_count = 0
     give_way_count = 0
     stop_sign_count = 0
     calming_count = 0
@@ -640,23 +751,43 @@ def calculate_path_stats(path_nodes, calming_source='way'):
         edge_data = G.get_edge_data(u, v) or {}
         l = float(edge_data.get('length', 0))
         total_length += l
-        total_accidents += float(edge_data.get('risk', 0))
+        vehicular_free = is_vehicular_free(edge_data)
+        on_steps = is_steps(edge_data)
+        if not vehicular_free:
+            total_accidents += float(edge_data.get('risk', 0))
         if is_lit(edge_data): lit_length += l
         s = str(edge_data.get('surface', '')).lower()
-        if s in BAD_SURFACES: rough_length += l
+        smoothness = str(edge_data.get('smoothness', '')).lower()
+        if not on_steps and (s in BAD_SURFACES or smoothness in BAD_SMOOTHNESS):
+            rough_length += l
+        if is_segregated_cycling(edge_data):
+            segregated_cycling_length += l
         grade = float(edge_data.get('grade', 0.0))
-        if grade > 0: total_climb += (grade * l)
-        if grade > UP_THRESH or grade < DOWN_THRESH: steep_count += 1
+        if not on_steps:
+            if grade > 0:
+                total_climb += (grade * l)
+            if grade > UP_THRESH or grade < DOWN_THRESH:
+                steep_count += 1
 
         if _is_tfl_cycleway_or_superhighway(edge_data): tfl_cycleway_length += l
         if _is_tfl_quietway(edge_data): tfl_quietway_length += l
-        if _speed_stress_multiplier(edge_data) > 0: speed_stress_length += l
-        if _get_width_m(edge_data) is not None and _get_width_m(edge_data) < WIDTH_STD_M: narrow_length += l
+        if not vehicular_free and _speed_stress_multiplier(edge_data) > 0:
+            speed_stress_length += l
+        width_m = _get_width_m(edge_data)
+        if width_m is not None and width_m < WIDTH_STD_M:
+            narrow_length += l
         if _has_attraction_edge(edge_data): green_length += l
-        if _traffic_calming_additive(edge_data, calming_source) > 0: calming_count += 1
+        if _is_green_edge(edge_data): scenic_green_length += l
+        if (
+            not vehicular_free
+            and _traffic_calming_additive(edge_data, calming_source) > 0
+        ):
+            calming_count += 1
 
         if barrier_is_hard_block(edge_data) or _edge_barrier_penalty(edge_data) > 0:
             barrier_count += 1
+        if _edge_barrier_penalty(edge_data) > 0:
+            barrier_penalty_count += 1
         if _edge_give_way_penalty(edge_data) > 0: give_way_count += 1
         if _edge_stop_sign_penalty(edge_data) > 0: stop_sign_count += 1
         node_v = G.nodes[v] if v in G.nodes else {}
@@ -664,7 +795,7 @@ def calculate_path_stats(path_nodes, calming_source='way'):
         if v not in JUNCTION_CLUSTER_SUPPRESSED and (
             _node_intersection_penalty(node_v) > 0
             or _node_mini_roundabout_penalty(node_v) > 0
-            or _junction_danger_penalty(v) > 0
+            or node_v.get('is_dangerous_junction', False)
         ):
             junction_count += 1
         if live_disruptions.get_edge_disruption(u, v): disruption_count += 1
@@ -676,6 +807,8 @@ def calculate_path_stats(path_nodes, calming_source='way'):
     speed_stress_km = speed_stress_length / 1000.0
     speed_stress_pct = (speed_stress_length / total_length * 100) if total_length > 0 else 0
     green_km = green_length / 1000.0
+    pct_green = (scenic_green_length / total_length * 100) if total_length > 0 else 0
+    pct_vf = (segregated_cycling_length / total_length * 100) if total_length > 0 else 0
     tfl_cycleway_pct = (tfl_cycleway_length / total_length * 100) if total_length > 0 else 0
     tfl_quietway_pct = (tfl_quietway_length / total_length * 100) if total_length > 0 else 0
     return {
@@ -686,7 +819,9 @@ def calculate_path_stats(path_nodes, calming_source='way'):
         "tfl_cycleway_pct": round(tfl_cycleway_pct, 1), "tfl_quietway_pct": round(tfl_quietway_pct, 1),
         "speed_stress_km": round(speed_stress_km, 2), "speed_stress_pct": round(speed_stress_pct, 1),
         "narrow_km": round(narrow_km, 2), "green_km": round(green_km, 2),
-        "barrier_count": barrier_count, "give_way_count": give_way_count, "stop_sign_count": stop_sign_count,
+        "green_pct": round(pct_green, 1), "vehicular_free_pct": round(pct_vf, 1),
+        "barrier_count": barrier_count, "barrier_penalty_count": barrier_penalty_count,
+        "give_way_count": give_way_count, "stop_sign_count": stop_sign_count,
         "calming_count": calming_count, "signal_count": signal_count, "junction_count": junction_count,
         "disruption_count": disruption_count,
     }
@@ -781,15 +916,21 @@ def _edge_display_point(edge_data, lat_key, lon_key):
     return None, None
 
 
-def get_node_highlights(path_nodes, w=None):
+def get_node_highlights(path_nodes, w=None, overlay_mode=False):
     """
     For the optimized path, collect node- and edge-based features for map icons.
     Barrier, give_way, stop_sign are EDGE-based: plot a single point at stored original position.
-    Only includes a highlight when that feature actually receives a penalty (weight > 0 and penalty > 0).
+    When overlay_mode=False, only includes highlights for features with weight > 0 (legacy).
+    When overlay_mode=True, returns all features on the path for client-side overlay toggles.
     """
     w = w or {}
     out = []
     seen = set()  # (key, type) to avoid duplicate markers
+
+    def weight_on(key):
+        return overlay_mode or w.get(key, 0.0) > 0
+
+    calming_src = 'both' if overlay_mode else w.get('calming_source', 'way')
 
     # --- Edge-based: barrier, give_way, stop_sign (plot point at stored position only) ---
     for i in range(len(path_nodes) - 1):
@@ -797,7 +938,7 @@ def get_node_highlights(path_nodes, w=None):
         ed = G.get_edge_data(u, v) or {}
         key = (u, v)
 
-        if w.get('barrier_weight', 0.0) > 0 and (barrier_is_hard_block(ed) or _edge_barrier_penalty(ed) > 0) and (key, 'barrier') not in seen:
+        if weight_on('barrier_weight') and (barrier_is_hard_block(ed) or _edge_barrier_penalty(ed) > 0) and (key, 'barrier') not in seen:
             seen.add((key, 'barrier'))
             lat, lon = _edge_display_point(ed, 'barrier_lat', 'barrier_lon')
             if lat is not None and lon is not None:
@@ -807,7 +948,7 @@ def get_node_highlights(path_nodes, w=None):
                     details.update(meta)
                 out.append({"lat": lat, "lon": lon, "type": "barrier", "details": details})
 
-        if w.get('junction_weight', 0.0) > 0:
+        if weight_on('junction_weight'):
             if _edge_give_way_penalty(ed) > 0 and (key, 'give_way') not in seen:
                 seen.add((key, 'give_way'))
                 lat, lon = _edge_display_point(ed, 'give_way_lat', 'give_way_lon')
@@ -828,11 +969,11 @@ def get_node_highlights(path_nodes, w=None):
         lat = float(node_data.get('y', 0))
         lon = float(node_data.get('x', 0))
 
-        if w.get('signal_weight', 0.0) > 0 and _node_signal_penalty(node_data) > 0 and (v, 'signal') not in seen:
+        if weight_on('signal_weight') and _node_signal_penalty(node_data) > 0 and (v, 'signal') not in seen:
             seen.add((v, 'signal'))
             out.append({"lat": lat, "lon": lon, "type": "signal", "details": {"traffic_signals": "yes"}})
 
-        if w.get('junction_weight', 0.0) > 0 and v not in JUNCTION_CLUSTER_SUPPRESSED:
+        if weight_on('junction_weight') and v not in JUNCTION_CLUSTER_SUPPRESSED:
             if _node_intersection_penalty(node_data) > 0 and (v, 'junction') not in seen:
                 seen.add((v, 'junction'))
                 details = {'crossing': node_data.get('crossing_type') or node_data.get('crossing') or 'zebra/uncontrolled'}
@@ -840,15 +981,16 @@ def get_node_highlights(path_nodes, w=None):
             if _node_mini_roundabout_penalty(node_data) > 0 and (v, 'mini_roundabout') not in seen:
                 seen.add((v, 'mini_roundabout'))
                 out.append({"lat": lat, "lon": lon, "type": "mini_roundabout", "details": {"mini_roundabout": "yes"}})
-            car_road_count = _count_car_physical_roads_at_node(v)
-            if _junction_danger_penalty(v) > 0 and (v, 'junction_danger') not in seen:
+            car_road_count = int(node_data.get('car_physical_road_count', 0))
+            if node_data.get('is_dangerous_junction', False) and (v, 'junction_danger') not in seen:
                 seen.add((v, 'junction_danger'))
                 out.append({"lat": lat, "lon": lon, "type": "junction_danger", "details": {"car_road_count": car_road_count}})
 
-        if w.get('calming_weight', 0.0) > 0 and i > 0:
+        if weight_on('calming_weight') and i > 0:
             u = path_nodes[i - 1]
             ed = G.get_edge_data(u, v) or {}
-            calming_src = w.get('calming_source', 'way')
+            if is_vehicular_free(ed):
+                continue
             # Way-based calming: use edge geometry midpoint (no stored position for way tag)
             if calming_src in ('way', 'both'):
                 tc = str(ed.get('traffic_calming', '') or '').strip().lower()
@@ -1029,6 +1171,35 @@ def get_tomtom_disruption_at():
         return jsonify({"error": str(e), "disruptions": []}), 500
 
 
+# --- OVERLAY CATALOG (main app route visualization) ---
+
+ROUTE_OVERLAY_CATALOG = {
+    "version": 1,
+    "edge": [
+        {"id": "lit", "label": "Lit segments", "chunk_key": "lit_chunks"},
+        {"id": "steep", "label": "Steep / uphill", "chunk_key": "steep_chunks"},
+        {"id": "tflCycleway", "label": "TfL cycleways", "chunk_key": "tfl_cycleway_chunks"},
+        {"id": "tflQuietway", "label": "TfL quietways", "chunk_key": "tfl_quietway_chunks"},
+        {"id": "green", "label": "Green / scenic", "chunk_key": "green_chunks"},
+        {"id": "narrow", "label": "Narrow facility", "chunk_key": "narrow_chunks"},
+        {"id": "disruptions", "label": "Live disruptions", "chunk_key": "disruption_chunks"},
+    ],
+    "point": [
+        {"id": "barriers", "label": "Barriers", "highlight_types": ["barrier"]},
+        {"id": "signals", "label": "Traffic signals", "highlight_types": ["signal"]},
+        {"id": "junctionDanger", "label": "Junctions & crossings",
+         "highlight_types": ["junction", "junction_danger", "give_way", "stop_sign", "mini_roundabout"]},
+        {"id": "calming", "label": "Traffic calming", "highlight_types": ["calming"]},
+    ],
+}
+
+
+@app.route('/overlay_catalog', methods=['GET'])
+def get_overlay_catalog():
+    """Metadata for main-app route overlay picker (display only; routing uses profile weights)."""
+    return jsonify(ROUTE_OVERLAY_CATALOG)
+
+
 # --- PROFILE ENDPOINTS ---
 
 @app.route('/profiles', methods=['GET'])
@@ -1138,7 +1309,7 @@ def get_route():
         green_chunks = get_green_sections(path_optimized)
         narrow_chunks = get_narrow_sections(path_optimized)
         disruption_chunks = get_disruption_sections(path_optimized)  # path-only, like lit/steep/narrow
-        node_highlights = get_node_highlights(path_optimized, w)
+        node_highlights = get_node_highlights(path_optimized, w, overlay_mode=True)
 
         return jsonify({
             "status": "success",

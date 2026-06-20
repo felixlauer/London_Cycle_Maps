@@ -158,6 +158,12 @@ def main():
     parser.add_argument("--input", default=DEFAULT_INPUT_GRAPH, help="Input GraphML path")
     parser.add_argument("--output", default=None, help="Output GraphML path (default: input name with _tfl before .graphml)")
     parser.add_argument("--tfl", default=TFL_ROUTES_PATH, help="TfL Cycle_routes.json path")
+    parser.add_argument(
+        "--pickle-only",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Save .gpickle only (default). Use --no-pickle-only for GraphML.",
+    )
     args = parser.parse_args()
     input_path = os.path.normpath(os.path.join(SCRIPT_DIR, args.input))
     if args.output:
@@ -354,7 +360,7 @@ def main():
     print(f"   -> Tagged {tagged} edges with TfL routes.")
 
     print(f"8. Saving graph to {output_path} (+ fast pickle)...")
-    save_graph(G, output_path, write_graphml=True, write_fast=True)
+    save_graph(G, output_path, write_graphml=not args.pickle_only, write_fast=True)
     print("SUCCESS! TfL cycle route tags added (tfl_cycle_programme, tfl_cycle_route).")
     return 0
 

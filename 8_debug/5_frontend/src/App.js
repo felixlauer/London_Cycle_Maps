@@ -335,7 +335,11 @@ const DebugPanel = ({
     accidentsOn, setAccidentsOn,
     surfacesOn, setSurfacesOn, surfaceNoDataOn, setSurfaceNoDataOn, surfaceLimitReached,
     unlitOn, setUnlitOn, unlitNoDataOn, setUnlitNoDataOn, unlitLimitReached,
-    cyclewayOn, setCyclewayOn, cyclewayGeneralOn, setCyclewayGeneralOn, cyclewaySegregatedOn, setCyclewaySegregatedOn,
+    cyclewayOn, setCyclewayOn,
+    cyclewaySegregatedOn, setCyclewaySegregatedOn,
+    cyclewayBusSharedOn, setCyclewayBusSharedOn,
+    cyclewayCarSharedOn, setCyclewayCarSharedOn,
+    cyclewayLimitReached,
     hgvBannedOn, setHgvBannedOn,
     graphNetworkOn, setGraphNetworkOn, graphNetworkLimitReached,
     tflRoutesOn, setTflRoutesOn,
@@ -462,11 +466,25 @@ const DebugPanel = ({
                         </div>
                     )}
 
-                    <Toggle label="Cycleway" isOn={cyclewayOn} setIsOn={setCyclewayOn} activeColor="#2E7D32" />
+                    <Toggle label="Cycleway" isOn={cyclewayOn} setIsOn={setCyclewayOn} activeColor="#1B5E20" />
                     {cyclewayOn && (
                         <div style={{ marginBottom: 10 }}>
-                            <Subtoggle label="General (lane/track etc)" isOn={cyclewayGeneralOn} setIsOn={setCyclewayGeneralOn} activeColor="#2E7D32" />
-                            <Subtoggle label="Segregated" isOn={cyclewaySegregatedOn} setIsOn={setCyclewaySegregatedOn} activeColor="#66BB6A" />
+                            <Subtoggle label="Segregated / track" isOn={cyclewaySegregatedOn} setIsOn={setCyclewaySegregatedOn} activeColor={CYCLEWAY_CLUSTER_COLORS.segregated} />
+                            <Subtoggle label="Bus lane shared" isOn={cyclewayBusSharedOn} setIsOn={setCyclewayBusSharedOn} activeColor={CYCLEWAY_CLUSTER_COLORS.bus_shared} />
+                            <Subtoggle label="Car lane shared" isOn={cyclewayCarSharedOn} setIsOn={setCyclewayCarSharedOn} activeColor={CYCLEWAY_CLUSTER_COLORS.car_shared} />
+                            {cyclewayLimitReached && <div style={{ fontSize: '10px', color: '#E65100', marginLeft: 12, marginBottom: 8 }}>20k limit — zoom in to see more</div>}
+                            <div style={{ marginTop: '5px', marginBottom: '10px', fontSize: '10px', color: '#666' }}>
+                                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Cycleway clusters:</div>
+                                {Object.entries(CYCLEWAY_CLUSTER_COLORS).map(([key, color]) => (
+                                    <div key={key} style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+                                        <div style={{ width: 10, height: 10, background: color, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
+                                        {CYCLEWAY_CLUSTER_LABELS[key]}
+                                    </div>
+                                ))}
+                                <div style={{ marginTop: '6px', color: '#888', fontStyle: 'italic' }}>
+                                    Excludes cycleway=no, crossing, sidewalk, opposite, and OSM segregated=yes.
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -1052,10 +1070,21 @@ const UnlitLayer = ({ isOn, includeUnknown, setSegments, setLimitReached, setSta
     return null;
 };
 
-const CYCLEWAY_LAYER_COLORS = { general: '#2E7D32', segregated: '#66BB6A' };
+// Cycleway infrastructure clusters (cycleway_clusters.py)
+const CYCLEWAY_CLUSTER_COLORS = {
+    segregated: '#1B5E20',
+    bus_shared: '#00838F',
+    car_shared: '#EF6C00',
+};
+const CYCLEWAY_CLUSTER_LABELS = {
+    segregated: 'Segregated / track',
+    bus_shared: 'Bus lane shared',
+    car_shared: 'Car lane shared',
+};
+const getCyclewayColor = (seg) => seg?.color || CYCLEWAY_CLUSTER_COLORS[seg?.c] || '#2E7D32';
 
 // --- CYCLEWAY LAYER ---
-const CyclewayLayer = ({ isOn, layers, setSegmentsByLayer, setStatus }) => {
+const CyclewayLayer = ({ isOn, clusters, setSegments, setStatus, setLimitReached }) => {
     const map = useMapEvents({
         moveend: () => {
             if (!isOn) return;
@@ -1066,34 +1095,32 @@ const CyclewayLayer = ({ isOn, layers, setSegmentsByLayer, setStatus }) => {
     const fetchAll = () => {
         const bounds = map.getBounds();
         const q = `min_lat=${bounds.getSouth()}&max_lat=${bounds.getNorth()}&min_lon=${bounds.getWest()}&max_lon=${bounds.getEast()}`;
-        setStatus("Loading cycleway...");
-        const order = ['general', 'segregated'];
-        const active = order.filter(l => layers[l]);
+        const active = Object.entries(clusters).filter(([, on]) => on).map(([key]) => key);
         if (active.length === 0) {
-            setSegmentsByLayer({});
-            setStatus("Cycleway: 0 segments");
+            setSegments([]);
+            setLimitReached(false);
+            setStatus('Cycleway: 0 segments');
             return;
         }
-        Promise.all(active.map(layer =>
-            fetch(`http://127.0.0.1:5001/debug/cycleway?${q}&layer=${layer}`).then(r => r.json())
-        )).then(results => {
-            const out = {};
-            let total = 0;
-            active.forEach((layer, i) => {
-                const d = results[i];
+        setStatus('Loading cycleway...');
+        fetch(`http://127.0.0.1:5001/debug/cycleway?${q}&clusters=${active.join(',')}`)
+            .then(r => r.json())
+            .then(d => {
                 const segs = (d && d.segments) ? d.segments : [];
-                out[layer] = segs;
-                total += segs.length;
-            });
-            setSegmentsByLayer(out);
-            setStatus(`Cycleway: ${total} segments`);
-        }).catch(() => setStatus("Connection Error"));
+                setSegments(segs);
+                setLimitReached(!!(d && d.limit_reached));
+                setStatus(`Cycleway: ${segs.length} segments`);
+            })
+            .catch(() => setStatus('Connection Error'));
     };
 
     useEffect(() => {
         if (isOn) fetchAll();
-        else setSegmentsByLayer({});
-    }, [isOn, layers.general, layers.segregated]);
+        else {
+            setSegments([]);
+            setLimitReached(false);
+        }
+    }, [isOn, clusters.segregated, clusters.bus_shared, clusters.car_shared]);
 
     return null;
 };
@@ -1718,9 +1745,11 @@ function App() {
     const [unlitLimitReached, setUnlitLimitReached] = useState(false);
     const [unlitSegments, setUnlitSegments] = useState([]);
     const [cyclewayOn, setCyclewayOn] = useState(false);
-    const [cyclewayGeneralOn, setCyclewayGeneralOn] = useState(true);
-    const [cyclewaySegregatedOn, setCyclewaySegregatedOn] = useState(false);
-    const [cyclewaySegmentsByLayer, setCyclewaySegmentsByLayer] = useState({});
+    const [cyclewaySegregatedOn, setCyclewaySegregatedOn] = useState(true);
+    const [cyclewayBusSharedOn, setCyclewayBusSharedOn] = useState(true);
+    const [cyclewayCarSharedOn, setCyclewayCarSharedOn] = useState(true);
+    const [cyclewaySegments, setCyclewaySegments] = useState([]);
+    const [cyclewayLimitReached, setCyclewayLimitReached] = useState(false);
     const [hgvBannedOn, setHgvBannedOn] = useState(false);
     const [hgvBannedSegments, setHgvBannedSegments] = useState([]);
     const [graphNetworkOn, setGraphNetworkOn] = useState(false);
@@ -2033,8 +2062,10 @@ function App() {
                 unlitNoDataOn={unlitNoDataOn} setUnlitNoDataOn={setUnlitNoDataOn}
                 unlitLimitReached={unlitLimitReached}
                 cyclewayOn={cyclewayOn} setCyclewayOn={setCyclewayOn}
-                cyclewayGeneralOn={cyclewayGeneralOn} setCyclewayGeneralOn={setCyclewayGeneralOn}
                 cyclewaySegregatedOn={cyclewaySegregatedOn} setCyclewaySegregatedOn={setCyclewaySegregatedOn}
+                cyclewayBusSharedOn={cyclewayBusSharedOn} setCyclewayBusSharedOn={setCyclewayBusSharedOn}
+                cyclewayCarSharedOn={cyclewayCarSharedOn} setCyclewayCarSharedOn={setCyclewayCarSharedOn}
+                cyclewayLimitReached={cyclewayLimitReached}
                 hgvBannedOn={hgvBannedOn} setHgvBannedOn={setHgvBannedOn}
                 graphNetworkOn={graphNetworkOn} setGraphNetworkOn={setGraphNetworkOn}
                 graphNetworkLimitReached={graphNetworkLimitReached}
@@ -2129,7 +2160,13 @@ function App() {
                 <HeatmapLayer isOn={heatmapOn} setSegments={setHeatmapSegments} setStatus={setStatus} />
                 <SurfaceLayer isOn={surfacesOn} includeNoData={surfaceNoDataOn} setSegments={setSurfaceSegments} setLimitReached={setSurfaceLimitReached} setStatus={setStatus} />
                 <UnlitLayer isOn={unlitOn} includeUnknown={unlitNoDataOn} setSegments={setUnlitSegments} setLimitReached={setUnlitLimitReached} setStatus={setStatus} />
-                <CyclewayLayer isOn={cyclewayOn} layers={{ general: cyclewayGeneralOn, segregated: cyclewaySegregatedOn }} setSegmentsByLayer={setCyclewaySegmentsByLayer} setStatus={setStatus} />
+                <CyclewayLayer
+                    isOn={cyclewayOn}
+                    clusters={{ segregated: cyclewaySegregatedOn, bus_shared: cyclewayBusSharedOn, car_shared: cyclewayCarSharedOn }}
+                    setSegments={setCyclewaySegments}
+                    setStatus={setStatus}
+                    setLimitReached={setCyclewayLimitReached}
+                />
                 <HgvBannedLayer isOn={hgvBannedOn} setSegments={setHgvBannedSegments} setStatus={setStatus} />
                 <GraphNetworkLayer isOn={graphNetworkOn} setSegments={setGraphNetworkSegments} setLimitReached={setGraphNetworkLimitReached} setStatus={setStatus} />
                 <TflRoutesLayer isOn={tflRoutesOn || modifyTflOn} setSegments={setTflRoutesSegments} setStatus={setStatus} />
@@ -2307,16 +2344,16 @@ function App() {
                         />
                     ))}
 
-                {/* CYCLEWAY (per layer) */}
-                {cyclewayOn && ['general', 'segregated'].map(layer => {
-                    const on = layer === 'general' ? cyclewayGeneralOn : cyclewaySegregatedOn;
-                    const segs = cyclewaySegmentsByLayer[layer] || [];
-                    if (!on || !segs.length) return null;
-                    const color = CYCLEWAY_LAYER_COLORS[layer] || '#2E7D32';
-                    return <React.Fragment key={layer}>{segs.map((seg) => (
-                        <Polyline key={seg.id} positions={seg.p} color={color} weight={3} opacity={0.8} />
-                    ))}</React.Fragment>;
-                })}
+                {/* CYCLEWAY (cluster colours) */}
+                {cyclewayOn && cyclewaySegments.map((seg) => (
+                    <Polyline
+                        key={seg.id}
+                        positions={seg.p}
+                        color={getCyclewayColor(seg)}
+                        weight={3}
+                        opacity={0.85}
+                    />
+                ))}
 
                 {/* HGV BANNED */}
                 {hgvBannedOn && hgvBannedSegments.map((seg) => (

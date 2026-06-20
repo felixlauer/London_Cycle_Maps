@@ -34,6 +34,7 @@ Prioritised list of work items. **Keep this file up to date:** when you complete
 - [ ] **Improve data handling to reduce load up time and runtimes** — Optimise graph load, caching, spatial indexes, or backend response times. See [`route_generation_performance.md`](route_generation_performance.md) and baseline timings in [`../verification/route_benchmark.md`](../verification/route_benchmark.md).
 - [ ] **Bike-type speed for displayed time only** — Let the user pick a bike type and use a different assumed speed when showing estimated route time (routing cost unchanged). *Note: later this may be blended with an average of actual recorded ride speed.*
 - [ ] **Race mode (explore)** — Investigate a routing mode that deliberately relaxes some traffic-rule penalties (e.g. signals, give-way) to favour faster, more direct paths — scope, safety trade-offs, and UI placement TBD.
+- [] **Santander and Lime-Bike Drop off zone** - Integrate via APIs probably
 
 ---
 

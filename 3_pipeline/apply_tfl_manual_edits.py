@@ -123,8 +123,9 @@ def main():
     )
     parser.add_argument(
         "--pickle-only",
-        action="store_true",
-        help="Save .gpickle only (skip GraphML write)",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Save .gpickle only (default). Use --no-pickle-only for GraphML.",
     )
     args = parser.parse_args()
     input_path = os.path.normpath(os.path.join(SCRIPT_DIR, args.input))

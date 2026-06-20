@@ -10,6 +10,8 @@ import L from 'leaflet';
 
 import LocationSearchInput from './LocationSearchInput';
 import MapFlyTo from './MapFlyTo';
+import RouteOverlayPicker from './RouteOverlayPicker';
+import { emptyOverlayVisibility, defaultOverlayVisibility } from './routeOverlayCatalog';
 import { getMapboxToken } from './mapboxGeocoding';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -543,6 +545,7 @@ function App() {
   const [narrowChunks, setNarrowChunks] = useState([]);
   const [disruptionChunks, setDisruptionChunks] = useState([]);
   const [nodeHighlights, setNodeHighlights] = useState([]);
+  const [overlayVisibility, setOverlayVisibility] = useState(emptyOverlayVisibility);
 
   const [useSafetyRouting, setUseSafetyRouting] = useState(true);
   const [useLighting, setUseLighting] = useState(false);
@@ -595,25 +598,6 @@ function App() {
   const effectiveWeights = testMode
     ? togglesToWeights(toggleState)
     : (activeProfile?.weights || emptyWeights());
-
-  const overlayFlags = testMode ? {
-    light: useLighting, hill: useHillRouting, tflCycleway: useTflCycleway,
-    tflQuietway: useTflQuietway, green: useGreen, narrow: useWidth,
-    disruptions: useTflLive || useTomtomLive,
-    barriers: useBarriers, signals: useSignals, junctionDanger: useJunctionDanger, calming: useCalming,
-  } : {
-    light: effectiveWeights.light_weight > 0,
-    hill: effectiveWeights.hill_weight > 0,
-    tflCycleway: effectiveWeights.tfl_cycleway_weight > 0,
-    tflQuietway: effectiveWeights.tfl_quietway_weight > 0,
-    green: effectiveWeights.green_weight > 0,
-    narrow: effectiveWeights.width_weight > 0,
-    disruptions: effectiveWeights.tfl_live_weight > 0,
-    barriers: effectiveWeights.barrier_weight > 0,
-    signals: effectiveWeights.signal_weight > 0,
-    junctionDanger: effectiveWeights.junction_weight > 0,
-    calming: effectiveWeights.calming_weight > 0,
-  };
 
   const loadProfileList = useCallback(async () => {
     try {
@@ -785,6 +769,7 @@ function App() {
 
   const handleGetRoute = () => {
     if (!start || !end) return;
+    setOverlayVisibility(defaultOverlayVisibility());
     setRouteRevealed(true);
     if (isCalculating) {
       setStatus(`Calculating... | min weight/m: ${minWeightPreview.toFixed(3)}`);
@@ -823,25 +808,32 @@ function App() {
   };
 
   useEffect(() => {
-    if (overlayFlags.disruptions && testMode && useTflLive && !tflDisruptionStatus) {
+    if (overlayVisibility.disruptions && routeRevealed && !tflDisruptionStatus) {
       fetch(`${API_BASE}/admin/tfl_status`)
         .then(r => r.json())
         .then(st => { if (st.edge_count !== undefined) setTflDisruptionStatus(`${st.edge_count} edges`); })
         .catch(() => {});
     }
-  }, [overlayFlags.disruptions, testMode, useTflLive, tflDisruptionStatus]);
+  }, [overlayVisibility.disruptions, routeRevealed, tflDisruptionStatus]);
 
   useEffect(() => {
-    if (overlayFlags.disruptions && testMode && useTomtomLive && !tomtomDisruptionStatus) {
+    if (overlayVisibility.disruptions && routeRevealed && !tomtomDisruptionStatus) {
       fetch(`${API_BASE}/admin/tomtom_status`)
         .then(r => r.json())
         .then(st => { if (st.edge_count !== undefined) setTomtomDisruptionStatus(`${st.edge_count} edges`); })
         .catch(() => {});
     }
-  }, [overlayFlags.disruptions, testMode, useTomtomLive, tomtomDisruptionStatus]);
+  }, [overlayVisibility.disruptions, routeRevealed, tomtomDisruptionStatus]);
+
+  const handleRefreshDisruptions = () => {
+    handleRefreshTfl();
+    handleRefreshTomtom();
+  };
+
+  const disruptionStatusLabel = [tflDisruptionStatus, tomtomDisruptionStatus].filter(Boolean).join(' · ');
 
   function MapEvents() {
-    const disruptionActive = routeRevealed && overlayFlags.disruptions;
+    const disruptionActive = routeRevealed && overlayVisibility.disruptions;
 
     const doStartEndClick = (e) => {
       const lat = e.latlng.lat;
@@ -872,12 +864,8 @@ function App() {
         const pos = { x: e.originalEvent.clientX, y: e.originalEvent.clientY };
 
         if (disruptionActive) {
-          const checkTfl = (testMode && useTflLive) || (!testMode && effectiveWeights.tfl_live_weight > 0)
-            ? fetch(`${API_BASE}/tfl_disruption_at?lat=${lat}&lon=${lon}&tolerance=0.00025`).then(r => r.json())
-            : Promise.resolve({ disruptions: [] });
-          const checkTomtom = (testMode && useTomtomLive)
-            ? fetch(`${API_BASE}/tomtom_disruption_at?lat=${lat}&lon=${lon}&tolerance=0.00025`).then(r => r.json())
-            : Promise.resolve({ disruptions: [] });
+          const checkTfl = fetch(`${API_BASE}/tfl_disruption_at?lat=${lat}&lon=${lon}&tolerance=0.00025`).then(r => r.json());
+          const checkTomtom = fetch(`${API_BASE}/tomtom_disruption_at?lat=${lat}&lon=${lon}&tolerance=0.00025`).then(r => r.json());
           Promise.all([checkTfl, checkTomtom]).then(([tflData, tomtomData]) => {
             const tflHit = tflData?.disruptions?.length > 0;
             const tomtomHit = tomtomData?.disruptions?.length > 0;
@@ -1026,28 +1014,28 @@ function App() {
         {inspectorGeo && <Polyline positions={inspectorGeo} color="red" weight={6} opacity={0.8} />}
         {routeRevealed && fastestData && <Polyline positions={fastestData.path} color={theme.routeGrey} weight={6} opacity={0.4} />}
         {routeRevealed && safestData && <Polyline positions={safestData.path} color={theme.routeOptimized} weight={5} opacity={1.0} />}
-        {routeRevealed && overlayFlags.light && litSegments.map((s, i) => <Polyline key={`lit-${i}`} positions={s} color={theme.litColor} weight={4} opacity={1.0} />)}
-        {routeRevealed && overlayFlags.hill && !overlayFlags.light && steepSegments.map((s, i) => <Polyline key={`steep-${i}`} positions={s} color={theme.steepColor} weight={5} opacity={1.0} />)}
-        {routeRevealed && overlayFlags.tflCycleway && tflCyclewayChunks.map((s, i) => <Polyline key={`tfl-c-${i}`} positions={s} color={theme.tflCyclewayColor} weight={4} opacity={0.9} />)}
-        {routeRevealed && overlayFlags.tflQuietway && tflQuietwayChunks.map((s, i) => <Polyline key={`tfl-q-${i}`} positions={s} color={theme.tflQuietwayColor} weight={4} opacity={0.9} />)}
-        {routeRevealed && overlayFlags.green && greenChunks.map((s, i) => <Polyline key={`green-${i}`} positions={s} color={theme.greenColor} weight={4} opacity={0.9} />)}
-        {routeRevealed && overlayFlags.narrow && narrowChunks.map((s, i) => <Polyline key={`narrow-${i}`} positions={s} color={theme.narrowColor} weight={4} opacity={0.9} />)}
-        {routeRevealed && overlayFlags.disruptions && disruptionChunks.map((s, i) => <Polyline key={`dis-${i}`} positions={s} color={theme.disruptionColor} weight={5} opacity={0.9} />)}
-        {routeRevealed && (overlayFlags.barriers || overlayFlags.signals || overlayFlags.junctionDanger || overlayFlags.calming) && (
+        {routeRevealed && overlayVisibility.lit && litSegments.map((s, i) => <Polyline key={`lit-${i}`} positions={s} color={theme.litColor} weight={4} opacity={1.0} />)}
+        {routeRevealed && overlayVisibility.steep && !overlayVisibility.lit && steepSegments.map((s, i) => <Polyline key={`steep-${i}`} positions={s} color={theme.steepColor} weight={5} opacity={1.0} />)}
+        {routeRevealed && overlayVisibility.tflCycleway && tflCyclewayChunks.map((s, i) => <Polyline key={`tfl-c-${i}`} positions={s} color={theme.tflCyclewayColor} weight={4} opacity={0.9} />)}
+        {routeRevealed && overlayVisibility.tflQuietway && tflQuietwayChunks.map((s, i) => <Polyline key={`tfl-q-${i}`} positions={s} color={theme.tflQuietwayColor} weight={4} opacity={0.9} />)}
+        {routeRevealed && overlayVisibility.green && greenChunks.map((s, i) => <Polyline key={`green-${i}`} positions={s} color={theme.greenColor} weight={4} opacity={0.9} />)}
+        {routeRevealed && overlayVisibility.narrow && narrowChunks.map((s, i) => <Polyline key={`narrow-${i}`} positions={s} color={theme.narrowColor} weight={4} opacity={0.9} />)}
+        {routeRevealed && overlayVisibility.disruptions && disruptionChunks.map((s, i) => <Polyline key={`dis-${i}`} positions={s} color={theme.disruptionColor} weight={5} opacity={0.9} />)}
+        {routeRevealed && (overlayVisibility.barriers || overlayVisibility.signals || overlayVisibility.junctionDanger || overlayVisibility.calming) && (
           <NodeHighlightMarkers
             nodeHighlights={nodeHighlights}
-            showBarriers={overlayFlags.barriers}
-            showSignals={overlayFlags.signals}
-            showJunctionDanger={overlayFlags.junctionDanger}
-            showCalming={overlayFlags.calming}
+            showBarriers={overlayVisibility.barriers}
+            showSignals={overlayVisibility.signals}
+            showJunctionDanger={overlayVisibility.junctionDanger}
+            showCalming={overlayVisibility.calming}
             theme={theme}
           />
         )}
       </MapContainer>
 
-      {/* TEST MODE PANEL */}
+      {/* TEST MODE PANEL (routing overrides — separate from route overlay picker) */}
       {testMode && (
-      <div style={{ position: "absolute", bottom: "90px", right: "20px", width: "240px", maxHeight: "55vh", overflowY: "auto", padding: "15px", background: theme.bg, borderRadius: "8px", boxShadow: "0 4px 15px rgba(0,0,0,0.5)", zIndex: 1000 }}>
+      <div style={{ position: "absolute", bottom: "200px", right: "20px", width: "240px", maxHeight: "45vh", overflowY: "auto", padding: "15px", background: theme.bg, borderRadius: "8px", boxShadow: "0 4px 15px rgba(0,0,0,0.5)", zIndex: 1000 }}>
           <h4 style={{ margin: "0 0 4px 0", color: theme.textMain }}>Test Mode</h4>
           <p style={{ fontSize: "10px", color: theme.textSub, margin: "0 0 8px 0", borderBottom: `1px solid ${theme.border}`, paddingBottom: "6px" }}>Overrides active profile</p>
           <div style={{ fontSize: "10px", fontWeight: "bold", color: theme.textSub, marginBottom: "6px", textTransform: "uppercase" }}>Safety</div>
@@ -1082,6 +1070,16 @@ function App() {
           <Toggle label="Green / scenic" isOn={useGreen} setIsOn={setUseGreen} activeColor="#00796B" theme={theme} />
       </div>
       )}
+
+      <RouteOverlayPicker
+        theme={theme}
+        visibility={overlayVisibility}
+        setVisibility={setOverlayVisibility}
+        routeRevealed={routeRevealed}
+        onRefreshDisruptions={handleRefreshDisruptions}
+        disruptionStatus={disruptionStatusLabel}
+        apiBase={API_BASE}
+      />
 
       {/* STATS PANEL */}
       {routeRevealed && fastestData && safestData && (
