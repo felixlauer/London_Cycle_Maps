@@ -6,6 +6,10 @@ Traffic_signals, mini_roundabout, crossing remain on NODES.
 
 When changing parsed tags, build rules, or pipeline steps, update:
   0_documentation/GRAPH.md
+
+After changing parsed tags here, rebuild the graph manually (build_graph → elevation →
+tag_attractions_osm, …). Do NOT run run_graph_pipeline.py automatically — full rebuild
+is slow and is done on the operator's schedule.
 """
 import argparse
 import networkx as nx
@@ -117,6 +121,10 @@ def main():
         tags->'hgv'                 as hgv,
         tags->'traffic_calming'     as traffic_calming,
 
+        -- Access & service sub-type (osm2pgsql columns, not tags hstore)
+        access,
+        service,
+
         -- Geometry
         ST_Length(ST_Transform(way, 4326)::geography) as length_meters,
         ST_AsText(ST_Transform(way, 4326)) as wkt,
@@ -143,6 +151,8 @@ def main():
         'cycleway_width', 'cycleway_surface', 'smoothness', 'cycleway_smoothness',
         # New: traffic
         'hgv', 'traffic_calming',
+        # Access & OSM service=* (e.g. alley, parking_aisle); bicycle already above
+        'access', 'service',
     ]
     df[text_cols] = df[text_cols].fillna('')
 
@@ -213,6 +223,10 @@ def main():
             # Traffic stress
             'hgv':              str(row['hgv']),
             'traffic_calming':  str(row['traffic_calming']),
+            # Access & service sub-type
+            'access':           str(row['access']),
+            'service':          str(row['service']),
+            'bicycle':          str(row['bicycle']),
         }
 
         # 4. DIRECTION LOGIC (unchanged)
@@ -275,6 +289,9 @@ def main():
         highway,
         barrier,
         tags->'crossing' as crossing,
+        access,
+        bicycle,
+        tags->'locked' as locked,
         ST_X(ST_Transform(way, 4326)) as lon,
         ST_Y(ST_Transform(way, 4326)) as lat
     FROM planet_osm_point
@@ -284,7 +301,7 @@ def main():
     """
 
     df_points = pd.read_sql(sql_points, engine)
-    point_text_cols = ['highway', 'barrier', 'crossing']
+    point_text_cols = ['highway', 'barrier', 'crossing', 'access', 'bicycle', 'locked']
     df_points[point_text_cols] = df_points[point_text_cols].fillna('')
 
     print(f"   -> Loaded {len(df_points)} point features.")
@@ -404,6 +421,14 @@ def main():
             return 0.0
         return max(0.0, 1.0 - d_orth_m / threshold_m)
 
+    def _barrier_point_tags(row):
+        """OSM access/bicycle/locked from barrier node -> edge attrs (see barrier_clusters.py)."""
+        return {
+            'barrier_access': str(row['access']).strip().lower(),
+            'barrier_bicycle': str(row['bicycle']).strip().lower(),
+            'barrier_locked': str(row['locked']).strip().lower(),
+        }
+
     if edge_list:
         geoms = [item[2] for item in edge_list]
         strtree = STRtree(geoms)
@@ -434,15 +459,18 @@ def main():
                 kerb_no_pedestrian_way += 1
                 continue
             u, v, _ = edge_list[best_idx]
+            pt_tags = _barrier_point_tags(row)
             G.edges[u, v]['barrier'] = 'kerb'
             G.edges[u, v]['barrier_lon'] = lon
             G.edges[u, v]['barrier_lat'] = lat
             G.edges[u, v]['barrier_confidence'] = 1.0
+            G.edges[u, v].update(pt_tags)
             if G.has_edge(v, u):
                 G.edges[v, u]['barrier'] = 'kerb'
                 G.edges[v, u]['barrier_lon'] = lon
                 G.edges[v, u]['barrier_lat'] = lat
                 G.edges[v, u]['barrier_confidence'] = 1.0
+                G.edges[v, u].update(pt_tags)
             kerb_snap += 1
 
         # --- Other barriers: snap to nearest edge, set barrier_confidence from orthogonal distance ---
@@ -474,15 +502,18 @@ def main():
             else:
                 confidence_band_1 += 1
             barrier_type = str(row['barrier']).strip().lower()
+            pt_tags = _barrier_point_tags(row)
             G.edges[u, v]['barrier'] = barrier_type
             G.edges[u, v]['barrier_lon'] = lon
             G.edges[u, v]['barrier_lat'] = lat
             G.edges[u, v]['barrier_confidence'] = conf
+            G.edges[u, v].update(pt_tags)
             if G.has_edge(v, u):
                 G.edges[v, u]['barrier'] = barrier_type
                 G.edges[v, u]['barrier_lon'] = lon
                 G.edges[v, u]['barrier_lat'] = lat
                 G.edges[v, u]['barrier_confidence'] = conf
+                G.edges[v, u].update(pt_tags)
             barrier_snap += 1
 
         # --- Give way & Stop: snap to nearest edge, only tag edge that ENDS at the sign (direction rule) ---
@@ -784,6 +815,8 @@ def generate_report(G, df_lines, df_points, snap_count, snap_miss,
         'cycleway_width', 'cycleway_surface', 'cycleway_smoothness',
         'lcn_ref', 'rcn_ref', 'ncn_ref', 'cycle_network',
         'hgv', 'traffic_calming',
+        'access', 'service', 'bicycle',
+        'barrier_access', 'barrier_bicycle', 'barrier_locked',
         'barrier_confidence', 'traffic_calming_point', 'traffic_calming_point_lat', 'traffic_calming_point_lon',
     ]
 

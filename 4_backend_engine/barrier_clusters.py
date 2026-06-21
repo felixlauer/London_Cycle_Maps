@@ -10,6 +10,8 @@ cycle_barrier is group 3 and motorcycle_barrier is group 2 by current policy —
 """
 from __future__ import annotations
 
+from cost_masks import BARRIER_ACCESS_DENIED, effective_access_denied
+
 BARRIER_HARD_COST = 1e9
 
 # Additive penalties (virtual metres), scaled by barrier_confidence on edge.
@@ -112,9 +114,21 @@ def barrier_confidence(edge_data: dict) -> float:
         return 1.0
 
 
+def barrier_access_denied(edge_data: dict | None) -> bool:
+    if not edge_data:
+        return False
+    return effective_access_denied(
+        edge_data.get("barrier_access"),
+        edge_data.get("barrier_bicycle"),
+        BARRIER_ACCESS_DENIED,
+    )
+
+
 def barrier_is_hard_block(edge_data: dict | None) -> bool:
     if not edge_data:
         return False
+    if barrier_access_denied(edge_data):
+        return True
     tag = normalize_barrier_tag(edge_data.get("barrier"))
     if not tag:
         return False
@@ -125,14 +139,23 @@ def barrier_additive_penalty(edge_data: dict | None) -> float:
     """Virtual-metre additive A_barrier (groups 2–4). Group 1 → 0. Hard blocks → 0 here (use is_hard_block)."""
     if not edge_data:
         return 0.0
+    if barrier_access_denied(edge_data):
+        return 0.0
     tag = normalize_barrier_tag(edge_data.get("barrier"))
     if not tag:
         return 0.0
     cluster = barrier_cluster_for_tag(tag)
     if cluster in (CLUSTER_FREE_FLOW, CLUSTER_IMPASSABLE):
         return 0.0
+    # Park entrances: waive stop/push cluster (gate, entrance, …) when access is not denied.
+    if cluster == CLUSTER_STOP_PUSH and _is_yes_attr(edge_data.get("is_park")):
+        return 0.0
     base = CLUSTER_PENALTY[cluster]
     return base * barrier_confidence(edge_data)
+
+
+def _is_yes_attr(val) -> bool:
+    return str(val or "").strip().lower() in ("yes", "true", "1")
 
 
 def barrier_cluster_meta(edge_data: dict | None) -> dict | None:

@@ -34,7 +34,14 @@ from barrier_clusters import (
     barrier_is_hard_block,
     barrier_cluster_meta,
 )
-from cost_masks import is_segregated_cycling, is_steps, is_vehicular_free, routing_width_m
+from cost_masks import (
+    is_segregated_cycling,
+    is_service_access_denied,
+    is_service_alley,
+    is_vehicular_free,
+    masks_surface_and_hill,
+    routing_width_m,
+)
 import user_profiles
 import park_opening_hours
 
@@ -148,13 +155,20 @@ def _has_dedicated_cycle_infrastructure(d):
     return any(str(d.get(k, '')).strip() for k in CYCLEWAY_TAG_KEYS)
 
 
-def _highway_type_multiplier(d):
+def _highway_type_multiplier(d, pedestrian_highway_m: float | None = None):
     """Length multiplier for pedestrian ways without dedicated cycle infrastructure."""
     highway = str(d.get('type', '')).strip().lower()
     if highway == 'steps':
         return STEPS_HIGHWAY_M
+    ped_m = pedestrian_highway_m if pedestrian_highway_m is not None else PEDESTRIAN_HIGHWAY_M
+    if highway == 'service':
+        if is_service_access_denied(d):
+            return 1.0  # hard-blocked earlier in weight_fn
+        if is_service_alley(d):
+            return ped_m
+        return STEPS_HIGHWAY_M
     if highway in PEDESTRIAN_HIGHWAY_TYPES and not _has_dedicated_cycle_infrastructure(d):
-        return PEDESTRIAN_HIGHWAY_M
+        return ped_m
     return 1.0
 
 
@@ -529,6 +543,8 @@ def _park_edge_blocked(d, hours_map, fallback_open):
 
 def make_weight_fastest(hours_map, fallback_open):
     def weight_fn(u, v, d):
+        if is_service_access_denied(d):
+            return BARRIER_HARD_COST
         if barrier_is_hard_block(d):
             return BARRIER_HARD_COST
         if _park_edge_blocked(d, hours_map, fallback_open):
@@ -567,8 +583,13 @@ def make_weight_optimized(w, hours_map, fallback_open):
     hill_on = w_hill > 0
     hard_cost = BARRIER_HARD_COST
     junction_suppressed = JUNCTION_CLUSTER_SUPPRESSED
+    ped_highway_m = w.get("pedestrian_highway_m")
+    if ped_highway_m is not None:
+        ped_highway_m = float(ped_highway_m)
 
     def weight_fn(u, v, d):
+        if is_service_access_denied(d):
+            return hard_cost
         if barrier_is_hard_block(d):
             return hard_cost
         if _park_edge_blocked(d, hours_map, fallback_open):
@@ -583,7 +604,7 @@ def make_weight_optimized(w, hours_map, fallback_open):
         length = float(d.get('length', 1.0))
 
         vehicular_free = is_vehicular_free(d)
-        on_steps = is_steps(d)
+        on_steps = masks_surface_and_hill(d)
 
         risk_penalty = 0.0 if vehicular_free else float(d.get('risk', 0.0)) * w_risk
         light_penalty = (0.0 if is_lit(d) else 0.5) * w_light
@@ -658,7 +679,7 @@ def make_weight_optimized(w, hours_map, fallback_open):
             if sev_mult > 1.0:
                 M_total *= sev_mult
 
-        M_highway = _highway_type_multiplier(d)
+        M_highway = _highway_type_multiplier(d, ped_highway_m)
         return (length * M_total * M_highway * R) + A_total + H
     return weight_fn
 
@@ -752,7 +773,7 @@ def calculate_path_stats(path_nodes, calming_source='way'):
         l = float(edge_data.get('length', 0))
         total_length += l
         vehicular_free = is_vehicular_free(edge_data)
-        on_steps = is_steps(edge_data)
+        on_steps = masks_surface_and_hill(edge_data)
         if not vehicular_free:
             total_accidents += float(edge_data.get('risk', 0))
         if is_lit(edge_data): lit_length += l

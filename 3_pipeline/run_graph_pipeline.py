@@ -18,6 +18,10 @@ Graph I/O: pickle-only by default at every graph-save step (load_graph prefers .
 Pass --write-graphml to also export .graphml (slow; fails after park catalog without list fix).
 
 When changing pipeline order, update 0_documentation/GRAPH.md.
+
+After code changes that alter parsed tags in build_graph.py, rebuild manually when ready
+(build_graph → elevation → tag_attractions_osm, …). Do not auto-run this script as part
+of feature implementation — full pipeline runs are slow and operator-scheduled.
 """
 from __future__ import annotations
 

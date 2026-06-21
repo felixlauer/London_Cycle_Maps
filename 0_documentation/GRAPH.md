@@ -135,6 +135,8 @@ All of the following are stored on **every edge** in the graph produced by `buil
 | Tag | Description |
 |-----|-------------|
 | `hgv` | HGV access (e.g. no, designated) |
+| `access` | OSM `access=*` column (not hstore); routing uses `bicycle` override then hard-block for service |
+| `service` | OSM `service=*` sub-type when `type=service` (e.g. `alley`, `parking_aisle`) |
 | `traffic_calming` | From **planet_osm_line** (way tag): e.g. bump, hump, cushion, choker |
 | `traffic_calming_point` | From **planet_osm_point** (step 4c): value from point tag when snapped to this edge |
 | `traffic_calming_point_lat`, `traffic_calming_point_lon` | Original OSM position of the calming point (for plotting) |
@@ -210,7 +212,10 @@ To re-run the check or get highway-type breakdown on lines: **`python 6_verifica
 |-----|-------------|
 | `barrier` | Barrier type (e.g. bollard, gate) from planet_osm_point snapped to this edge |
 | `barrier_lat`, `barrier_lon` | **Original OSM position** of the barrier (for plotting a point only, not the segment) |
-| `barrier_confidence` | Float 0–1. Kerbs on pedestrian ways: 1.0. Other barriers: straight segments use orthogonal distance (4 m threshold, linear 1→0); curved (length/straight_line &gt; 1.05) → 0.5. Used to scale barrier penalty in routing. |
+| `barrier_access` | OSM `access` column from barrier node (`bicycle` override, then private/no hard block) |
+| `barrier_bicycle` | OSM `bicycle` column from barrier node (overrides restrictive `barrier_access`) |
+| `barrier_locked` | OSM `locked=*` from hstore on barrier node (ingested; routing rule TBD) |
+| `barrier_confidence` | Float 0–1. Kerbs on pedestrian ways: 1.0. Other barriers: straight segments use orthogonal distance (4 m threshold, linear 1→0); curved (length/straight_line &gt; 1.05) → 0.5. Scales **soft** barrier penalty only; access-denied and cluster-5 barriers ignore confidence. |
 | `give_way` | `"yes"` only on the edge that **ends** at the give-way sign |
 | `give_way_lat`, `give_way_lon` | Original OSM position of the sign |
 | `stop_sign` | `"yes"` only on the edge that **ends** at the stop sign |

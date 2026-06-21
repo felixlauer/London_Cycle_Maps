@@ -1,11 +1,18 @@
 """
-Routing cost masks: vehicular-free edges and steps double-penalty rules.
+Routing cost masks: vehicular-free edges, steps double-penalty rules, service/access.
 
 Spec: 0_documentation/tasks/cost_function_brainstorming.md
+
+Requires graph rebuild after build_graph.py ingests access/service tags — not auto-run.
 """
 from __future__ import annotations
 
 CYCLEWAY_TAG_KEYS = ("cycleway", "cycleway_left", "cycleway_right", "cycleway_both")
+
+SERVICE_ACCESS_DENIED = frozenset({"private", "no", "customers"})
+BARRIER_ACCESS_DENIED = frozenset({"private", "no"})
+# Positive bicycle=* overrides restrictive access=* (OSM access hierarchy for cyclists).
+BICYCLE_POSITIVE_OVERRIDE = frozenset({"yes", "designated", "permissive"})
 
 VEHICULAR_FREE_HIGHWAY_TYPES = frozenset({
     "cycleway", "path", "pedestrian", "footway", "bridleway",
@@ -69,6 +76,61 @@ def is_steps(d: dict | None) -> bool:
     if not d:
         return False
     return str(d.get("type", "")).strip().lower() == "steps"
+
+
+def _norm_access(val) -> str:
+    return str(val or "").strip().lower()
+
+
+def bicycle_overrides_restrictive_access(bicycle_val) -> bool:
+    """True when bicycle=yes/designated/permissive wins over access=private/no/…"""
+    return _norm_access(bicycle_val) in BICYCLE_POSITIVE_OVERRIDE
+
+
+def effective_access_denied(access_val, bicycle_val, denied: frozenset) -> bool:
+    """Apply OSM hierarchy: positive bicycle tag overrides restrictive access."""
+    if bicycle_overrides_restrictive_access(bicycle_val):
+        return False
+    return _norm_access(access_val) in denied
+
+
+def is_service_highway(d: dict | None) -> bool:
+    if not d:
+        return False
+    return str(d.get("type", "")).strip().lower() == "service"
+
+
+def is_service_alley(d: dict | None) -> bool:
+    if not is_service_highway(d):
+        return False
+    return _norm_access(d.get("service")) == "alley"
+
+
+def is_service_access_denied(d: dict | None) -> bool:
+    if not is_service_highway(d):
+        return False
+    return effective_access_denied(d.get("access"), d.get("bicycle"), SERVICE_ACCESS_DENIED)
+
+
+def is_barrier_access_denied(d: dict | None) -> bool:
+    if not d or not str(d.get("barrier", "")).strip():
+        return False
+    return effective_access_denied(
+        d.get("barrier_access"), d.get("barrier_bicycle"), BARRIER_ACCESS_DENIED
+    )
+
+
+def is_service_steps_like(d: dict | None) -> bool:
+    """Non-alley service ways (after access filter) — M_highway and surface/hill like steps."""
+    if not is_service_highway(d):
+        return False
+    if is_service_access_denied(d):
+        return False
+    return not is_service_alley(d)
+
+
+def masks_surface_and_hill(d: dict | None) -> bool:
+    return is_steps(d) or is_service_steps_like(d)
 
 
 def is_vehicular_free(d: dict | None) -> bool:
