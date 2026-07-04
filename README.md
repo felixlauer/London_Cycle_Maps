@@ -7,8 +7,8 @@
 The primary goal of the London Cycle Maps project is to deliver a routing application specifically tuned for cyclists in London. The system processes raw geographic data into a custom directed graph, factoring in elevation, traffic speed stress, cyclist collision history, and cycleway infrastructure. It currently consists of a fully functional data processing pipeline, a multi-factor routing backend with live disruption awareness, a user-facing map app, and an extensive debug application for data validation. Preset ride modes (**Fast**, **Safe**, **Leisure**) are designed and dependency-mapped, but not yet wired into the UI.
 https://tuned-cycling.subscribepage.io/
 
-*Main routing app (screenshot placeholder — replace with current UI):*
-<img width="1917" height="906" alt="Main routing app" src="https://github.com/user-attachments/assets/13b9a73f-e0f5-4c31-a56c-2571e25b1ee0" />
+*Main routing app: route from South Kensington to Piccadilly Circus*
+<img width="959" height="452" alt="Screenshot 2026-06-18 190105" src="https://github.com/user-attachments/assets/3df32217-ee3b-4b17-af05-0c0d89bf2015" />
 ---
 
 ## Project Overview & Current Results
