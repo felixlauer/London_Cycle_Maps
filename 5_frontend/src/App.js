@@ -7,10 +7,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, CircleMarker, Popup, useMapEvents, useMap, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import './ui.css';
 
 import LocationSearchInput from './LocationSearchInput';
 import MapFlyTo from './MapFlyTo';
 import RouteOverlayPicker from './RouteOverlayPicker';
+import PresetWizard from './wizard/PresetWizard';
 import { emptyOverlayVisibility, defaultOverlayVisibility } from './routeOverlayCatalog';
 import { getMapboxToken } from './mapboxGeocoding';
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -25,39 +27,14 @@ L.Marker.prototype.options.icon = DefaultIcon;
 const API_BASE = 'http://127.0.0.1:5000';
 const R_MIN = 0.1;
 
-const WEIGHT_FIELD_GROUPS = [
-  {
-    title: 'Safety',
-    fields: [
-      { key: 'risk_weight', label: 'Avoid Accidents' },
-      { key: 'light_weight', label: 'Lit roads' },
-      { key: 'tfl_cycleway_weight', label: 'TfL Cycleways' },
-      { key: 'width_weight', label: 'Narrow facility' },
-      { key: 'speed_weight', label: 'Speed stress' },
-      { key: 'signal_weight', label: 'Traffic signals' },
-      { key: 'barrier_weight', label: 'Barriers' },
-      { key: 'junction_weight', label: 'Junction danger' },
-      { key: 'tfl_live_weight', label: 'Live disruptions' },
-    ],
-  },
-  {
-    title: 'Comfort',
-    fields: [
-      { key: 'surface_weight', label: 'Road Bike (Smooth)' },
-      { key: 'hill_weight', label: 'Flat Route' },
-      { key: 'calming_weight', label: 'Traffic calming' },
-    ],
-  },
-  {
-    title: 'Scenery',
-    fields: [
-      { key: 'tfl_quietway_weight', label: 'TfL Quietways' },
-      { key: 'green_weight', label: 'Green / scenic' },
-    ],
-  },
+// Schema v2 routing keys (width removed, quietway merged into cycleway,
+// vehicular_free added) - must match backend user_profiles.ROUTING_WEIGHT_KEYS.
+const ALL_WEIGHT_KEYS = [
+  'risk_weight', 'light_weight', 'surface_weight', 'hill_weight',
+  'tfl_cycleway_weight', 'vehicular_free_weight', 'speed_weight',
+  'green_weight', 'barrier_weight', 'calming_weight', 'junction_weight',
+  'signal_weight', 'tfl_live_weight',
 ];
-
-const ALL_WEIGHT_KEYS = WEIGHT_FIELD_GROUPS.flatMap((g) => g.fields.map((f) => f.key));
 
 const METRIC_ROWS = [
   { label: 'Accidents', key: 'accidents', unit: '', invertDiff: false, integer: true },
@@ -77,12 +54,6 @@ const METRIC_ROWS = [
   { label: 'Disruptions', key: 'disruption_count', unit: '', invertDiff: false, integer: true },
 ];
 
-const clampWeight = (value) => {
-  const n = parseFloat(value);
-  if (Number.isNaN(n)) return 0;
-  return Math.min(1, Math.max(0, n));
-};
-
 const emptyWeights = () => Object.fromEntries(ALL_WEIGHT_KEYS.map((k) => [k, 0]));
 
 const togglesToWeights = (t) => ({
@@ -91,9 +62,8 @@ const togglesToWeights = (t) => ({
   surface_weight: t.useRoadBike ? 1 : 0,
   hill_weight: t.useHillRouting ? 1 : 0,
   tfl_cycleway_weight: t.useTflCycleway ? 1 : 0,
-  tfl_quietway_weight: t.useTflQuietway ? 1 : 0,
+  vehicular_free_weight: t.useVehicularFree ? 1.5 : 0,
   speed_weight: t.useSpeedStress ? 1 : 0,
-  width_weight: t.useWidth ? 1 : 0,
   green_weight: t.useGreen ? 1 : 0,
   barrier_weight: t.useBarriers ? 1 : 0,
   calming_weight: t.useCalming ? 1 : 0,
@@ -102,11 +72,15 @@ const togglesToWeights = (t) => ({
   tfl_live_weight: (t.useTflLive || t.useTomtomLive) ? 1 : 0,
 });
 
+// Mirrors routing_heuristic.py reward lerps (saturation floors at each cap).
 const computeMinWeightPerM = (weights) => {
   let r = 1.0;
-  if ((weights.tfl_cycleway_weight || 0) > 0) r *= 0.75;
-  if ((weights.tfl_quietway_weight || 0) > 0) r *= 0.75;
-  if ((weights.green_weight || 0) > 0) r *= 0.8;
+  const wTfl = weights.tfl_cycleway_weight || 0;
+  if (wTfl > 0) r *= 1.0 - 0.45 * Math.min(wTfl, 1.0);
+  const wGreen = weights.green_weight || 0;
+  if (wGreen > 0) r *= 1.0 - 0.4 * Math.min(wGreen, 1.0);
+  const wVf = weights.vehicular_free_weight || 0;
+  if (wVf > 0) r *= 1.0 - 0.15 * Math.min(wVf, 3.0);
   return Math.max(R_MIN, r);
 };
 
@@ -117,13 +91,6 @@ const formatRouteStatus = (minWeight, timingMs, profileName) => {
   const profileBit = profileName ? ` | ${profileName}` : '';
   return `Route calculated in ${timeLabel} | min weight/m: ${minWeight.toFixed(3)}${profileBit}`;
 };
-
-const isWeightFormValid = (weights) =>
-  ALL_WEIGHT_KEYS.every((k) => {
-    const v = weights[k];
-    const n = parseFloat(v);
-    return !Number.isNaN(n) && n >= 0 && n <= 1;
-  });
 
 // --- STYLES & COMPONENTS ---
 
@@ -211,124 +178,6 @@ const CondensedStatRow = ({ label, fastest, optimized, unit, invertDiff, integer
       <span style={{ color: theme.textMain, fontWeight: '600', width: '38%' }}>{label}</span>
       <span style={{ color: theme.textMain, width: '32%', textAlign: 'right' }}>{fmt(o)}{unit ? ` ${unit}` : ''}</span>
       <span style={{ color: diffColor, width: '30%', textAlign: 'right' }}>{displayDiff}{unit ? ` ${unit}` : ''}</span>
-    </div>
-  );
-};
-
-const WeightSlider = ({ label, value, onChange, theme }) => (
-  <div style={{ marginBottom: '10px' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', fontSize: '12px' }}>
-      <span>{label}</span>
-      <span style={{ fontWeight: 'bold', color: theme.textMain, minWidth: '36px', textAlign: 'right' }}>
-        {clampWeight(value).toFixed(2)}
-      </span>
-    </div>
-    <input
-      type="range"
-      min="0"
-      max="1"
-      step="0.05"
-      value={clampWeight(value)}
-      onChange={(e) => onChange(clampWeight(e.target.value))}
-      style={{ width: '100%', accentColor: theme.routeOptimized, cursor: 'pointer' }}
-    />
-  </div>
-);
-
-const CreateProfileModal = ({ theme, templateWeights, onClose, onCreated }) => {
-  const [name, setName] = useState('');
-  const [weights, setWeights] = useState({ ...templateWeights });
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleWeightChange = (key, raw) => {
-    setWeights((prev) => ({ ...prev, [key]: clampWeight(raw) }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (!name.trim()) { setError('Profile name is required'); return; }
-    if (!isWeightFormValid(weights)) { setError('All weights must be between 0.0 and 1.0'); return; }
-    setSubmitting(true);
-    try {
-      const payload = {
-        name: name.trim(),
-        weights: Object.fromEntries(ALL_WEIGHT_KEYS.map((k) => [k, clampWeight(weights[k])])),
-      };
-      const res = await fetch(`${API_BASE}/profiles`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || 'Failed to create profile'); return; }
-      onCreated(data);
-    } catch {
-      setError('Backend connection error');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 3000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
-    }}>
-      <div style={{
-        background: theme.bg, color: theme.textMain, borderRadius: '10px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.4)', width: '100%', maxWidth: '420px',
-        maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
-        border: `1px solid ${theme.border}`,
-      }}>
-        <div style={{ padding: '14px 16px', borderBottom: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <strong style={{ fontSize: '15px' }}>Create Profile</strong>
-          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', color: theme.textSub, cursor: 'pointer', fontSize: '16px' }}>✕</button>
-        </div>
-        <form onSubmit={handleSubmit} style={{ overflowY: 'auto', padding: '14px 16px', flex: 1 }}>
-          <p style={{ fontSize: '11px', color: theme.textSub, margin: '0 0 12px 0' }}>
-            Weights are activation scalars: 0 = off, 1 = full (100%). Backend penalties handle magnitude.
-          </p>
-          <label style={{ display: 'block', marginBottom: '12px', fontSize: '12px' }}>
-            <span style={{ fontWeight: 'bold' }}>Profile name</span>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              style={{ display: 'block', width: '100%', marginTop: '4px', padding: '8px', borderRadius: '4px', border: `1px solid ${theme.border}`, background: theme.bg, color: theme.textMain, boxSizing: 'border-box' }}
-              placeholder="My custom route style"
-            />
-          </label>
-          {WEIGHT_FIELD_GROUPS.map((group) => (
-            <div key={group.title} style={{ marginBottom: '12px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 'bold', color: theme.textSub, textTransform: 'uppercase', marginBottom: '6px' }}>{group.title}</div>
-              {group.fields.map(({ key, label }) => (
-                <WeightSlider
-                  key={key}
-                  label={label}
-                  value={weights[key] ?? 0}
-                  onChange={(v) => handleWeightChange(key, v)}
-                  theme={theme}
-                />
-              ))}
-            </div>
-          ))}
-          {error && <p style={{ color: '#f44336', fontSize: '12px', margin: '8px 0 0' }}>{error}</p>}
-          <button
-            type="submit"
-            disabled={submitting || !isWeightFormValid(weights) || !name.trim()}
-            style={{
-              marginTop: '12px', width: '100%', padding: '10px', borderRadius: '6px', border: 'none',
-              background: submitting ? theme.toggleInactive : theme.routeOptimized,
-              color: 'white', fontWeight: 'bold', cursor: submitting ? 'default' : 'pointer',
-              opacity: (!isWeightFormValid(weights) || !name.trim()) ? 0.5 : 1,
-            }}
-          >
-            {submitting ? 'Saving…' : 'Create Profile'}
-          </button>
-        </form>
-      </div>
     </div>
   );
 };
@@ -518,11 +367,11 @@ function App() {
 
   const [profiles, setProfiles] = useState([]);
   const [activeProfileId, setActiveProfileId] = useState(
-    () => localStorage.getItem('activeProfileId') || 'safe_commuter'
+    () => localStorage.getItem('activeProfileId') || 'preset_safe'
   );
   const [activeProfile, setActiveProfile] = useState(null);
   const [testMode, setTestMode] = useState(false);
-  const [showCreateProfile, setShowCreateProfile] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
   const [routeRevealed, setRouteRevealed] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [lastRouteMeta, setLastRouteMeta] = useState(null);
@@ -550,7 +399,7 @@ function App() {
   const [useSafetyRouting, setUseSafetyRouting] = useState(true);
   const [useLighting, setUseLighting] = useState(false);
   const [useTflCycleway, setUseTflCycleway] = useState(false);
-  const [useWidth, setUseWidth] = useState(false);
+  const [useVehicularFree, setUseVehicularFree] = useState(false);
   const [useSpeedStress, setUseSpeedStress] = useState(false);
   const [useSignals, setUseSignals] = useState(false);
   const [useBarriers, setUseBarriers] = useState(false);
@@ -564,7 +413,6 @@ function App() {
   const [useRoadBike, setUseRoadBike] = useState(false);
   const [useHillRouting, setUseHillRouting] = useState(false);
   const [useCalming, setUseCalming] = useState(false);
-  const [useTflQuietway, setUseTflQuietway] = useState(false);
   const [useGreen, setUseGreen] = useState(false);
 
   const [inspectorData, setInspectorData] = useState(null);
@@ -591,7 +439,7 @@ function App() {
 
   const toggleState = {
     useSafetyRouting, useLighting, useRoadBike, useHillRouting,
-    useTflCycleway, useTflQuietway, useGreen, useSpeedStress, useWidth,
+    useTflCycleway, useGreen, useSpeedStress, useVehicularFree,
     useBarriers, useCalming, useJunctionDanger, useSignals, useTflLive, useTomtomLive,
   };
 
@@ -628,6 +476,13 @@ function App() {
   }, [activeProfileId, loadActiveProfile]);
 
   useEffect(() => {
+    // Dev override via `npm start -- --day|--night` (see 5_frontend/start.js).
+    const forcedMode = (process.env.REACT_APP_FORCE_MODE || '').toLowerCase();
+    if (forcedMode === 'day' || forcedMode === 'night') {
+        setUseLighting(forcedMode === 'night');
+        setStatus(`Forced ${forcedMode} mode (dev). Tuned Cycling — click map to start.`);
+        return;
+    }
     const checkDaylight = async () => {
         try {
             const response = await fetch("https://api.sunrise-sunset.org/json?lat=51.5&lng=-0.1&formatted=0");
@@ -729,7 +584,12 @@ function App() {
         const minWeight = meta.cost_per_m_lower_bound ?? minWeightPreview;
         const timingMs = meta.timing_ms?.total ?? 0;
         const profileName = testMode ? 'Test Mode' : (activeProfile?.name || '');
-        const metaBundle = { minWeight, timingMs, profileName };
+        const metaBundle = {
+          minWeight, timingMs, profileName,
+          bikeType: meta.bike_type, preset: meta.preset,
+          clamps: meta.translation_clamps || [],
+          lightGatedOff: !!meta.light_gated_off,
+        };
         setLastRouteMeta(metaBundle);
         setStatus(routeRevealedRef.current
           ? formatRouteStatus(minWeight, timingMs, profileName)
@@ -745,7 +605,7 @@ function App() {
   }, [
     start, end, testMode, activeProfileId, activeProfile, minWeightPreview,
     useSafetyRouting, useLighting, useRoadBike, useHillRouting,
-    useTflCycleway, useTflQuietway, useGreen, useSpeedStress, useWidth,
+    useTflCycleway, useGreen, useSpeedStress, useVehicularFree,
     useBarriers, useCalming, useJunctionDanger, useSignals, useTflLive, useTomtomLive,
   ]);
 
@@ -757,7 +617,7 @@ function App() {
   }, [
     start, end, activeProfileId, testMode,
     useSafetyRouting, useLighting, useRoadBike, useHillRouting,
-    useTflCycleway, useTflQuietway, useGreen, useSpeedStress, useWidth,
+    useTflCycleway, useGreen, useSpeedStress, useVehicularFree,
     useBarriers, useCalming, useJunctionDanger, useSignals, useTflLive, useTomtomLive,
   ]);
 
@@ -785,7 +645,7 @@ function App() {
   const handleProfileChange = (e) => setActiveProfileId(e.target.value);
 
   const handleProfileCreated = async (profile) => {
-    setShowCreateProfile(false);
+    setShowWizard(false);
     await loadProfileList();
     setActiveProfileId(profile.id);
     setActiveProfile(profile);
@@ -897,10 +757,8 @@ function App() {
     return null;
   }
 
-  const templateWeights = activeProfile?.weights || emptyWeights();
-
   return (
-    <div style={{ height: "100vh", position: "relative", fontFamily: "Segoe UI, Arial, sans-serif" }}>
+    <div className="app-root" data-theme={theme.mode} style={{ height: "100vh", position: "relative", fontFamily: "Segoe UI, Arial, sans-serif" }}>
       <style>{`.leaflet-tile { filter: ${theme.tileFilter} !important; }`}</style>
 
       <div style={{
@@ -919,19 +777,16 @@ function App() {
       </div>
 
       {/* PROFILE SELECTOR */}
-      <div style={{
+      <div className="ui-panel" style={{
         position: "absolute", top: "60px", left: "20px", width: "260px", padding: "12px",
-        background: theme.bg, borderRadius: "8px", boxShadow: "0 4px 15px rgba(0,0,0,0.5)",
-        zIndex: 1000, border: `1px solid ${theme.border}`,
+        zIndex: 1000,
       }}>
-        <div style={{ fontSize: "11px", fontWeight: "bold", color: theme.textSub, textTransform: "uppercase", marginBottom: "6px" }}>Active Profile</div>
+        <div className="ui-panel-title">Active Profile</div>
         <select
+          className="ui-select"
           value={activeProfileId}
           onChange={handleProfileChange}
-          style={{
-            width: "100%", padding: "8px", borderRadius: "4px", border: `1px solid ${theme.border}`,
-            background: theme.bg, color: theme.textMain, fontSize: "13px", marginBottom: "10px",
-          }}
+          style={{ marginBottom: "10px" }}
         >
           {profiles.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
@@ -956,37 +811,27 @@ function App() {
         />
         <button
           type="button"
-          onClick={() => setShowCreateProfile(true)}
-          style={{
-            width: "100%", padding: "8px", marginBottom: "8px", borderRadius: "4px",
-            border: `1px solid ${theme.border}`, background: theme.toggleInactive,
-            color: theme.textMain, fontSize: "12px", fontWeight: "bold", cursor: "pointer",
-          }}
+          className="ui-btn"
+          onClick={() => setShowWizard(true)}
+          style={{ marginBottom: "8px" }}
         >
-          Create Profile
+          New Profile Wizard
         </button>
         <button
           type="button"
+          className="ui-btn primary"
           onClick={handleGetRoute}
           disabled={!start || !end}
-          style={{
-            width: "100%", padding: "10px", borderRadius: "6px", border: "none",
-            background: (!start || !end) ? theme.toggleInactive : theme.routeOptimized,
-            color: "white", fontSize: "13px", fontWeight: "bold",
-            cursor: (!start || !end) ? "default" : "pointer",
-            opacity: (!start || !end) ? 0.55 : 1,
-            boxShadow: start && end ? "0 2px 8px rgba(0,0,0,0.25)" : "none",
-          }}
         >
           {isCalculating && routeRevealed ? 'Calculating...' : 'Get Route'}
         </button>
       </div>
 
-      {showCreateProfile && (
-        <CreateProfileModal
-          theme={theme}
-          templateWeights={templateWeights}
-          onClose={() => setShowCreateProfile(false)}
+      {showWizard && (
+        <PresetWizard
+          apiBase={API_BASE}
+          themeMode={theme.mode}
+          onClose={() => setShowWizard(false)}
           onCreated={handleProfileCreated}
         />
       )}
@@ -1035,14 +880,14 @@ function App() {
 
       {/* TEST MODE PANEL (routing overrides — separate from route overlay picker) */}
       {testMode && (
-      <div style={{ position: "absolute", bottom: "200px", right: "20px", width: "240px", maxHeight: "45vh", overflowY: "auto", padding: "15px", background: theme.bg, borderRadius: "8px", boxShadow: "0 4px 15px rgba(0,0,0,0.5)", zIndex: 1000 }}>
+      <div className="ui-panel" style={{ position: "absolute", bottom: "200px", right: "20px", width: "240px", maxHeight: "45vh", overflowY: "auto", padding: "15px", zIndex: 1000 }}>
           <h4 style={{ margin: "0 0 4px 0", color: theme.textMain }}>Test Mode</h4>
           <p style={{ fontSize: "10px", color: theme.textSub, margin: "0 0 8px 0", borderBottom: `1px solid ${theme.border}`, paddingBottom: "6px" }}>Overrides active profile</p>
           <div style={{ fontSize: "10px", fontWeight: "bold", color: theme.textSub, marginBottom: "6px", textTransform: "uppercase" }}>Safety</div>
           <Toggle label="Avoid Accidents" isOn={useSafetyRouting} setIsOn={setUseSafetyRouting} activeColor={theme.routeOptimized} theme={theme} />
           <Toggle label="Night Mode" isOn={useLighting} setIsOn={setUseLighting} activeColor="#1976D2" theme={theme} />
-          <Toggle label="TfL Cycleways" isOn={useTflCycleway} setIsOn={setUseTflCycleway} activeColor="#1976D2" theme={theme} />
-          <Toggle label="Narrow facility" isOn={useWidth} setIsOn={setUseWidth} activeColor="#7B1FA2" theme={theme} />
+          <Toggle label="TfL network (incl. quietways)" isOn={useTflCycleway} setIsOn={setUseTflCycleway} activeColor="#1976D2" theme={theme} />
+          <Toggle label="Car-free corridors" isOn={useVehicularFree} setIsOn={setUseVehicularFree} activeColor="#7B1FA2" theme={theme} />
           <Toggle label="Speed stress" isOn={useSpeedStress} setIsOn={setUseSpeedStress} activeColor="#E65100" theme={theme} />
           <Toggle label="Traffic signals" isOn={useSignals} setIsOn={setUseSignals} activeColor="#F57C00" theme={theme} />
           <Toggle label="Barriers" isOn={useBarriers} setIsOn={setUseBarriers} activeColor="#5D4037" theme={theme} />
@@ -1066,7 +911,6 @@ function App() {
           <Toggle label="Flat Route" isOn={useHillRouting} setIsOn={setUseHillRouting} activeColor="#FFA500" theme={theme} />
           <Toggle label="Traffic calming" isOn={useCalming} setIsOn={setUseCalming} activeColor="#00838F" theme={theme} />
           <div style={{ fontSize: "10px", fontWeight: "bold", color: theme.textSub, marginTop: "8px", marginBottom: "6px", textTransform: "uppercase" }}>Scenery</div>
-          <Toggle label="TfL Quietways" isOn={useTflQuietway} setIsOn={setUseTflQuietway} activeColor="#388E3C" theme={theme} />
           <Toggle label="Green / scenic" isOn={useGreen} setIsOn={setUseGreen} activeColor="#00796B" theme={theme} />
       </div>
       )}
@@ -1083,8 +927,20 @@ function App() {
 
       {/* STATS PANEL */}
       {routeRevealed && fastestData && safestData && (
-      <div style={{ position: "absolute", bottom: "30px", left: "20px", width: "260px", maxHeight: "70vh", overflowY: "auto", padding: "15px", background: theme.bg, borderRadius: "8px", boxShadow: "0 4px 15px rgba(0,0,0,0.5)", zIndex: 1000 }}>
+      <div className="ui-panel" style={{ position: "absolute", bottom: "30px", left: "20px", width: "260px", maxHeight: "70vh", overflowY: "auto", padding: "15px", zIndex: 1000 }}>
           <h4 style={{ margin: "0 0 10px 0", borderBottom: `1px solid ${theme.border}`, paddingBottom: "5px", color: theme.textMain }}>Route Analysis</h4>
+          {lastRouteMeta?.bikeType && (
+            <div style={{ fontSize: "10px", color: theme.textSub, marginBottom: "8px" }}>
+              {lastRouteMeta.bikeType}{lastRouteMeta.preset ? ` · ${lastRouteMeta.preset} preset` : ''}
+              {lastRouteMeta.lightGatedOff ? ' · lighting off (daylight)' : ''}
+              {lastRouteMeta.clamps?.length > 0 && (
+                <div style={{ marginTop: "2px" }}>
+                  ⚖ {lastRouteMeta.clamps.length} conflict clamp{lastRouteMeta.clamps.length > 1 ? 's' : ''} applied
+                  ({lastRouteMeta.clamps.map((c) => c.clamped_weight.replace('_weight', '')).join(', ')})
+                </div>
+              )}
+            </div>
+          )}
           <HeroStat label="Time" fastest={fastestData.stats.duration_min} optimized={safestData.stats.duration_min} unit="min" theme={theme} optimizedColor={theme.textMain} />
           <HeroStat label="Distance" fastest={(fastestData.stats.length_m / 1000).toFixed(1)} optimized={(safestData.stats.length_m / 1000).toFixed(1)} unit="km" theme={theme} optimizedColor={theme.textMain} />
           <div style={{ borderTop: `1px solid ${theme.border}`, marginTop: "8px", paddingTop: "6px" }}>

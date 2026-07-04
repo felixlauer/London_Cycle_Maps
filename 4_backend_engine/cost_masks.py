@@ -133,6 +133,87 @@ def masks_surface_and_hill(d: dict | None) -> bool:
     return is_steps(d) or is_service_steps_like(d)
 
 
+# --- Configurable vehicular-free classes (preset wizard infrastructure question) ---
+# Precomputed per edge at graph load (app bootstrap sets d['_vf'] = vf_flags(d)),
+# so per-request evaluation is a single int AND - no tag parsing on the hot path.
+VF_MASK_CORE = 1        # physically separated (cycleway, track/separate/exclusive, kerb/bollard, superhighway)
+VF_MASK_SHARED_PATH = 2  # shared with pedestrians (footway/path/pedestrian/bridleway, no physical cycle tags)
+VF_MASK_BUS_LANE = 4    # share_busway only
+VF_REWARD_CORE = 8      # reward-eligible core (excludes parks)
+VF_REWARD_BUS_LANE = 16  # reward-eligible bus lane (excludes parks)
+
+VF_MASK_ALL = VF_MASK_CORE | VF_MASK_SHARED_PATH | VF_MASK_BUS_LANE
+VF_REWARD_ALL = VF_REWARD_CORE | VF_REWARD_BUS_LANE
+
+_PHYSICAL_NONBUS_TAG_VALUES = frozenset({"track", "separate", "exclusive"})
+
+
+def _has_physical_nonbus_cycleway_tag(d: dict) -> bool:
+    for key in CYCLEWAY_TAG_KEYS:
+        for tok in _tag_tokens(d.get(key)):
+            if tok in _PHYSICAL_NONBUS_TAG_VALUES:
+                return True
+    return False
+
+
+def _has_share_busway_tag(d: dict) -> bool:
+    for key in CYCLEWAY_TAG_KEYS:
+        for tok in _tag_tokens(d.get(key)):
+            if tok == "share_busway":
+                return True
+    return False
+
+
+def vf_flags(d: dict | None) -> int:
+    """Bitmask classification of vehicular-free character for an edge.
+
+    Mask bits (risk/speed/calming masking) and reward bits (segregated reward)
+    are separate so the user's infrastructure selection can gate each. With all
+    classes allowed, behaviour equals is_vehicular_free / is_segregated_cycling.
+    """
+    if not d:
+        return 0
+    flags = 0
+    highway = str(d.get("type", "")).strip().lower()
+    core = (
+        highway == "cycleway"
+        or _has_physical_nonbus_cycleway_tag(d)
+        or _has_physical_cycleway_separation(d)
+        or _has_tfl_superhighway(d)
+    )
+    shared_path = (
+        not core
+        and highway in ("path", "pedestrian", "footway", "bridleway")
+    )
+    bus_lane = not core and _has_share_busway_tag(d)
+
+    if core:
+        flags |= VF_MASK_CORE
+    if shared_path:
+        flags |= VF_MASK_SHARED_PATH
+    if bus_lane:
+        flags |= VF_MASK_BUS_LANE
+
+    if not _is_yes_attr(d.get("is_park")):
+        if core:
+            flags |= VF_REWARD_CORE
+        if bus_lane:
+            flags |= VF_REWARD_BUS_LANE
+    return flags
+
+
+def vf_allowed_masks(shared_path: bool = True, bus_lane: bool = True) -> tuple[int, int]:
+    """(mask_allowed, reward_allowed) bitmasks from the user's infrastructure toggles."""
+    mask_allowed = VF_MASK_CORE
+    reward_allowed = VF_REWARD_CORE
+    if shared_path:
+        mask_allowed |= VF_MASK_SHARED_PATH
+    if bus_lane:
+        mask_allowed |= VF_MASK_BUS_LANE
+        reward_allowed |= VF_REWARD_BUS_LANE
+    return mask_allowed, reward_allowed
+
+
 def is_vehicular_free(d: dict | None) -> bool:
     """
     True when the cyclist is physically separated from general motor traffic.

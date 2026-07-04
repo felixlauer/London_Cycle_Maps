@@ -20,13 +20,12 @@ import tfl_live
 import tomtom_live
 import live_disruptions
 from routing_heuristic import (
-    TFL_CYCLEWAY_REWARD,
-    TFL_QUIETWAY_REWARD,
-    GREEN_REWARD,
-    VEHICULAR_FREE_REWARD,
     compute_optimized_cost_per_metre_lower_bound,
+    green_reward,
     make_heuristic,
     set_penalty_floors,
+    tfl_network_reward,
+    vehicular_free_reward,
 )
 from barrier_clusters import (
     BARRIER_HARD_COST,
@@ -41,7 +40,11 @@ from cost_masks import (
     is_vehicular_free,
     masks_surface_and_hill,
     routing_width_m,
+    vf_allowed_masks,
+    vf_flags,
 )
+import night_time
+import translation_layer
 import user_profiles
 import park_opening_hours
 
@@ -94,6 +97,17 @@ def bootstrap_routing_engine():
     t0 = time.perf_counter()
     live_disruptions.init(G)
     print(f"--> Live disruption index: {time.perf_counter() - t0:.1f}s")
+
+    # Precompute vehicular-free class flags per edge (configurable VF set is then
+    # a single int AND per edge on the routing hot path - no tag parsing).
+    t0 = time.perf_counter()
+    vf_edges = 0
+    for _u, _v, d in G.edges(data=True):
+        flags = vf_flags(d)
+        d['_vf'] = flags
+        if flags:
+            vf_edges += 1
+    print(f"--> VF edge flags: {vf_edges} flagged edges ({time.perf_counter() - t0:.1f}s)")
     print(f"--- Bootstrap complete in {time.perf_counter() - t_boot:.1f}s ---")
 
 
@@ -116,10 +130,10 @@ BAD_SURFACES = frozenset([
 BAD_SMOOTHNESS = frozenset(['bad', 'very_bad', 'horrible', 'impassable'])
 
 # --- BASE PHYSICS (implementation.md) ---
-CYCLIST_SPEED_MPS = 16.0 / 3.6   # ~4.44 m/s (16 km/h)
+CYCLIST_SPEED_MPS = 16.0 / 3.6   # ~4.44 m/s (16 km/h) - penalty physics reference speed
+DEFAULT_STATS_SPEED_KMH = 16.0   # duration_min fallback when no bike type given
+WIDTH_STD_M = 1.5                # narrow stats/overlay threshold (width_weight removed from cost)
 SIGNAL_WAIT_SECONDS = 20         # Slightly increased so signal penalty is more visible
-WIDTH_STD_M = 1.5
-WIDTH_MIN_M = 1.25
 SPEED_DIFF_NEGLIGIBLE_KMH = 20
 SPEED_DIFF_LOW_KMH = 30
 M_MIN = 0.1   # Ensure edge weight never zero/negative for A*
@@ -212,6 +226,12 @@ def _is_tfl_cycleway_or_superhighway(d):
 
 def _is_tfl_quietway(d):
     return 'quietway' in _tfl_programmes(d)
+
+_TFL_NETWORK_PROGRAMMES = frozenset(['cycleway', 'superhighway', 'quietway'])
+
+def _is_tfl_network(d):
+    """Merged TfL network: cycleways, superhighways and quietways share one reward."""
+    return any(p in _TFL_NETWORK_PROGRAMMES for p in _tfl_programmes(d))
 
 def _is_yes_attr(val):
     return str(val or '').strip().lower() in ('yes', 'true', '1')
@@ -382,18 +402,6 @@ def _speed_stress_multiplier(d):
     return 0.35
 
 
-def _width_penalty_multiplier(d):
-    """Width < 1.5m: slight; < 1.25m: moderate (not impassable)."""
-    w = _get_width_m(d)
-    if w is None:
-        return 0.0
-    if w >= WIDTH_STD_M:
-        return 0.0
-    if w >= WIDTH_MIN_M:
-        return 0.2
-    return 0.5
-
-
 def _junction_cluster_score(node_id):
     """Higher = preferred representative for junction_weight penalties in a cluster."""
     if node_id not in G.nodes:
@@ -474,7 +482,6 @@ def _build_heuristic_penalty_floors(graph):
     has_lit = False
     has_good_surface = False
     has_zero_speed_stress = False
-    has_zero_width_penalty = False
 
     for _u, _v, d in graph.edges(data=True):
         risk = float(d.get('risk', 0.0))
@@ -490,16 +497,12 @@ def _build_heuristic_penalty_floors(graph):
             has_good_surface = True
         if _speed_stress_multiplier(d) <= 0:
             has_zero_speed_stress = True
-        width_m = _get_width_m(d)
-        if width_m is None or width_m >= WIDTH_STD_M:
-            has_zero_width_penalty = True
 
     floors = {
         'risk_weight': 0.0 if has_zero_risk else (min_risk if min_risk != float('inf') else 0.0),
         'light_weight': 0.0 if has_lit else 0.5,
         'surface_weight': 0.0 if has_good_surface else 3.0,
         'speed_weight': 0.0 if has_zero_speed_stress else 0.15,
-        'width_weight': 0.0 if has_zero_width_penalty else 0.2,
     }
     set_penalty_floors(floors)
     print(
@@ -549,6 +552,9 @@ def make_weight_fastest(hours_map, fallback_open):
             return BARRIER_HARD_COST
         if _park_edge_blocked(d, hours_map, fallback_open):
             return BARRIER_HARD_COST
+        disruption = live_disruptions.get_edge_disruption(u, v)
+        if disruption and (disruption.get('has_closure') or disruption.get('is_closed')):
+            return BARRIER_HARD_COST
         return float(d.get('length', 1.0)) * _highway_type_multiplier(d)
     return weight_fn
 
@@ -556,17 +562,16 @@ def make_weight_fastest(hours_map, fallback_open):
 def make_weight_optimized(w, hours_map, fallback_open):
     """
     Return a weight function (u, v, d) -> cost using request-scoped weights (no globals).
-    Rewards (TfL, green) are implemented as multiplier R < 1 on length, not negative penalty,
-    to keep A* heuristic well-behaved.
+    Rewards (TfL network, green, vehicular-free) are multipliers R < 1 on length -
+    never subtraction - lerped by weight with saturation floors (routing_heuristic
+    owns the formulas so the A* lower bound stays admissible in lockstep).
     """
     w_risk = w.get('risk_weight', 0.0)
     w_light = w.get('light_weight', 0.0)
     w_surface = w.get('surface_weight', 0.0)
     w_hill = w.get('hill_weight', 0.0)
     w_tfl_cw = w.get('tfl_cycleway_weight', 0.0)
-    w_tfl_qw = w.get('tfl_quietway_weight', 0.0)
     w_speed = w.get('speed_weight', 0.0)
-    w_width = w.get('width_weight', 0.0)
     w_green = w.get('green_weight', 0.0)
     w_barrier = w.get('barrier_weight', 0.0)
     w_calming = w.get('calming_weight', 0.0)
@@ -575,12 +580,20 @@ def make_weight_optimized(w, hours_map, fallback_open):
     w_tfl_live = w.get('tfl_live_weight', 0.0)
     w_vf = w.get('vehicular_free_weight', 0.0)
     calming_src = w.get('calming_source', 'way')
-    tfl_live_on = w_tfl_live > 0
+    bike_type = str(w.get('bike_type', 'standard'))
     tfl_cw_on = w_tfl_cw > 0
-    tfl_qw_on = w_tfl_qw > 0
     green_on = w_green > 0
     vf_on = w_vf > 0
     hill_on = w_hill > 0
+    # Rewards precomputed once per request (formulas shared with the heuristic).
+    r_tfl = tfl_network_reward(w_tfl_cw)
+    r_green = green_reward(w_green)
+    r_vf = vehicular_free_reward(w_vf)
+    # Configurable vehicular-free set (infrastructure question): int AND per edge.
+    vf_mask_allowed, vf_reward_allowed = vf_allowed_masks(
+        shared_path=bool(w.get('vf_shared_path', True)),
+        bus_lane=bool(w.get('vf_bus_lane', True)),
+    )
     hard_cost = BARRIER_HARD_COST
     junction_suppressed = JUNCTION_CLUSTER_SUPPRESSED
     ped_highway_m = w.get("pedestrian_highway_m")
@@ -590,20 +603,21 @@ def make_weight_optimized(w, hours_map, fallback_open):
     def weight_fn(u, v, d):
         if is_service_access_denied(d):
             return hard_cost
-        if barrier_is_hard_block(d):
+        if barrier_is_hard_block(d, bike_type):
             return hard_cost
         if _park_edge_blocked(d, hours_map, fallback_open):
             return hard_cost
 
-        disruption = None
-        if tfl_live_on:
-            disruption = live_disruptions.get_edge_disruption(u, v)
-            if disruption and (disruption.get('has_closure') or disruption.get('is_closed')):
-                return hard_cost
+        # Live closures always hard-block, independent of tfl_live_weight;
+        # the weight only scales the soft jam/works penalties below.
+        disruption = live_disruptions.get_edge_disruption(u, v)
+        if disruption and (disruption.get('has_closure') or disruption.get('is_closed')):
+            return hard_cost
 
         length = float(d.get('length', 1.0))
 
-        vehicular_free = is_vehicular_free(d)
+        edge_vf = d.get('_vf', 0)
+        vehicular_free = bool(edge_vf & vf_mask_allowed)
         on_steps = masks_surface_and_hill(d)
 
         risk_penalty = 0.0 if vehicular_free else float(d.get('risk', 0.0)) * w_risk
@@ -613,20 +627,17 @@ def make_weight_optimized(w, hours_map, fallback_open):
             0.0 if on_steps else (3.0 if surface in BAD_SURFACES else 0.0) * w_surface
         )
         speed_m = 0.0 if vehicular_free else _speed_stress_multiplier(d) * w_speed
-        width_m = _width_penalty_multiplier(d) * w_width
 
-        M_total = 1.0 + risk_penalty + light_penalty + surface_penalty + speed_m + width_m
+        M_total = 1.0 + risk_penalty + light_penalty + surface_penalty + speed_m
         M_total = max(M_MIN, M_total)
 
         R = 1.0
-        if tfl_cw_on and _is_tfl_cycleway_or_superhighway(d):
-            R *= TFL_CYCLEWAY_REWARD
-        if tfl_qw_on and _is_tfl_quietway(d):
-            R *= TFL_QUIETWAY_REWARD
+        if tfl_cw_on and _is_tfl_network(d):
+            R *= r_tfl
         if green_on and _has_attraction_edge(d):
-            R *= GREEN_REWARD
-        if vf_on and is_segregated_cycling(d):
-            R *= 1.0 - (1.0 - VEHICULAR_FREE_REWARD) * w_vf
+            R *= r_green
+        if vf_on and (edge_vf & vf_reward_allowed):
+            R *= r_vf
         R = max(R_MIN, R)
 
         node_v = G.nodes[v] if v in G.nodes else {}
@@ -663,6 +674,8 @@ def make_weight_optimized(w, hours_map, fallback_open):
             H = hill_cost * w_hill
 
         if disruption:
+            # Soft jam/works penalties scale with tfl_live_weight (jam-comfort
+            # question); closures were already hard-blocked above.
             if disruption.get('is_diversion'):
                 M_total += 5.0 * w_tfl_live
             cat = disruption.get('category', '')
@@ -674,10 +687,10 @@ def make_weight_optimized(w, hours_map, fallback_open):
             if disruption.get('temporary_bad_surface'):
                 M_total += 3.0 * w_tfl_live
             if disruption.get('environmental_hazard'):
-                M_total *= 1.3
+                M_total *= 1.0 + 0.3 * min(w_tfl_live, 1.0)
             sev_mult = disruption.get('severity_multiplier', 1.0)
             if sev_mult > 1.0:
-                M_total *= sev_mult
+                M_total *= 1.0 + (sev_mult - 1.0) * min(w_tfl_live, 1.0)
 
         M_highway = _highway_type_multiplier(d, ped_highway_m)
         return (length * M_total * M_highway * R) + A_total + H
@@ -744,7 +757,7 @@ def _snap_meta(snap):
     }
 
 # --- STATS ---
-def calculate_path_stats(path_nodes, calming_source='way'):
+def calculate_path_stats(path_nodes, calming_source='way', speed_kmh=None):
     total_length = 0.0
     total_accidents = 0.0
     lit_length = 0.0
@@ -821,7 +834,8 @@ def calculate_path_stats(path_nodes, calming_source='way'):
             junction_count += 1
         if live_disruptions.get_edge_disruption(u, v): disruption_count += 1
 
-    duration_min = total_length / (CYCLIST_SPEED_MPS * 60.0) if CYCLIST_SPEED_MPS else total_length / 266.0
+    speed_mps = (float(speed_kmh) if speed_kmh else DEFAULT_STATS_SPEED_KMH) / 3.6
+    duration_min = total_length / (speed_mps * 60.0)
     pct_lit = (lit_length / total_length * 100) if total_length > 0 else 0
     pct_rough = (rough_length / total_length * 100) if total_length > 0 else 0
     narrow_km = narrow_length / 1000.0
@@ -1248,12 +1262,27 @@ def create_profile():
         body = request.get_json(silent=True) or {}
         name = body.get("name", "")
         weights = body.get("weights", {})
-        profile, err = user_profiles.create_profile(name, weights)
+        profile, err = user_profiles.create_profile(
+            name,
+            weights,
+            bike_type=body.get("bike_type"),
+            preset=body.get("preset"),
+            toggles=body.get("toggles"),
+        )
         if err:
             return jsonify({"error": err}), 400
         return jsonify(profile), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/preset_config', methods=['GET'])
+def get_preset_config():
+    """Generated wizard config (see 6_verification/generate_preset_config.py)."""
+    cfg = user_profiles.load_preset_config()
+    if cfg is None:
+        return jsonify({"error": "preset_config.json not found - run generate_preset_config.py"}), 404
+    return jsonify(cfg)
 
 
 # --- ROUTING ENDPOINTS ---
@@ -1268,16 +1297,43 @@ def get_route():
 
         profile_id = (request.args.get('profile_id') or '').strip() or None
         active_profile_id = None
+        bike_type = user_profiles.DEFAULT_BIKE_TYPE
+        preset = None
+        translation_clamps = []
+        light_gated_off = False
 
         if profile_id:
-            profile_weights = user_profiles.get_profile_weights(profile_id)
-            if profile_weights is None:
+            profile = user_profiles.get_profile(profile_id)
+            if profile is None:
                 return jsonify({"error": f"Profile not found: {profile_id}"}), 404
-            w = user_profiles.clamp_weights(profile_weights)
+            w = dict(profile["weights"])
             w["calming_source"] = user_profiles.CALMING_SOURCE
             active_profile_id = profile_id
+            bike_type = profile["bike_type"]
+            preset = profile.get("preset")
+            toggles = profile["toggles"]
+
+            # Dependency-matrix clamping (mode_dominant per preset).
+            w, translation_clamps = translation_layer.apply_preset_clamps(w, preset)
+
+            # Illumination only matters in the dark: gate light_weight (from the
+            # lit-at-night toggle or a translation clamp) on actual darkness.
+            if not night_time.is_dark():
+                if w.get("light_weight", 0.0) > 0:
+                    light_gated_off = True
+                w["light_weight"] = 0.0
+
+            vf_sel = toggles.get("vf_infrastructure", {})
+            w["vf_shared_path"] = bool(vf_sel.get("shared_path", True))
+            w["vf_bus_lane"] = bool(vf_sel.get("bus_lane", True))
         else:
             w = user_profiles.build_weight_dict_from_request(request.args)
+            bt_arg = (request.args.get('bike_type') or '').strip().lower()
+            if bt_arg in user_profiles.BIKE_TYPES:
+                bike_type = bt_arg
+
+        w["bike_type"] = bike_type
+        speed_kmh = user_profiles.BIKE_SPEEDS_KMH.get(bike_type, 15.0)
 
         t_route = time.perf_counter()
         start_snap = tfl_live.snap_to_edge(start_lat, start_lon)
@@ -1302,9 +1358,13 @@ def get_route():
         coords_fastest = apply_endpoint_stubs(
             reconstruct_path_geometry(path_fastest), start_snap, end_snap
         )
-        stats_fastest = calculate_path_stats(path_fastest)
+        stats_fastest = calculate_path_stats(path_fastest, speed_kmh=speed_kmh)
 
-        scale = compute_optimized_cost_per_metre_lower_bound(w)
+        # Optional bounded-suboptimal A* (weighted heuristic): cost <= (1+eps) x optimal.
+        # Default 0.0 = strictly admissible. Deep preset weight vectors can make the
+        # admissible search very slow (documented in get_presets_notes.md).
+        eps = float(os.environ.get("ROUTE_HEURISTIC_EPSILON", "0") or 0)
+        scale = compute_optimized_cost_per_metre_lower_bound(w) * (1.0 + max(0.0, eps))
         h_opt = make_heuristic(end_node, G, cost_per_m=scale)
         weight_optimized = make_weight_optimized(w, hours_map, fallback_open)
         t0 = time.perf_counter()
@@ -1320,7 +1380,9 @@ def get_route():
         coords_optimized = apply_endpoint_stubs(
             reconstruct_path_geometry(path_optimized), start_snap, end_snap
         )
-        stats_optimized = calculate_path_stats(path_optimized, calming_source=user_profiles.CALMING_SOURCE)
+        stats_optimized = calculate_path_stats(
+            path_optimized, calming_source=user_profiles.CALMING_SOURCE, speed_kmh=speed_kmh
+        )
 
         # Route-only overlay chunks (only segments on path_optimized that match each criterion)
         lit_chunks = get_lit_sections(path_optimized)
@@ -1339,6 +1401,11 @@ def get_route():
                 "active_profile_id": active_profile_id,
                 "weights": {k: w[k] for k in user_profiles.ROUTING_WEIGHT_KEYS},
                 "calming_source": user_profiles.CALMING_SOURCE,
+                "bike_type": bike_type,
+                "preset": preset,
+                "speed_kmh": speed_kmh,
+                "translation_clamps": translation_clamps,
+                "light_gated_off": light_gated_off,
                 "timing_ms": {
                     "snap": round(t_snap * 1000, 1),
                     "fastest_astar": round(t_fast * 1000, 1),
@@ -1372,4 +1439,19 @@ def get_route():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Tuned Cycling routing backend")
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument("--day", action="store_true",
+                            help="Force day mode (light_weight always gated off)")
+    mode_group.add_argument("--night", action="store_true",
+                            help="Force night mode (light_weight always active)")
+    args = parser.parse_args()
+
+    if args.day:
+        night_time.set_forced_mode("day")
+    elif args.night:
+        night_time.set_forced_mode("night")
+
     app.run(debug=True, port=5000, use_reloader=USE_RELOADER)

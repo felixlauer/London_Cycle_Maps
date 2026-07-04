@@ -1,6 +1,10 @@
 """
-Local mock user profile store for profile-driven routing.
-Weights are activation scalars in [0.0, 1.0] only (0%–100% of each routing factor).
+Local mock user profile store for profile-driven routing (schema v2).
+
+Weights are on the sweep/multiplier scale with per-weight caps (see WEIGHT_CAPS,
+kept in sync with preset_config.json). Profiles additionally carry bike_type,
+preset id, and toggle answers from the preset wizard.
+
 When changing schema or API, update 0_documentation/APP_MAIN.md.
 """
 import json
@@ -15,9 +19,8 @@ ROUTING_WEIGHT_KEYS = (
     "surface_weight",
     "hill_weight",
     "tfl_cycleway_weight",
-    "tfl_quietway_weight",
+    "vehicular_free_weight",
     "speed_weight",
-    "width_weight",
     "green_weight",
     "barrier_weight",
     "calming_weight",
@@ -26,19 +29,74 @@ ROUTING_WEIGHT_KEYS = (
     "tfl_live_weight",
 )
 
+# Sweep-scale caps (single runtime source: preset_config.json; these are the
+# fallback and must match generate_preset_config.WEIGHT_CAPS).
+_FALLBACK_WEIGHT_CAPS = {
+    "signal_weight": 2.0,
+    "speed_weight": 2.0,
+    "junction_weight": 3.0,
+    "risk_weight": 2.0,
+    "hill_weight": 3.0,
+    "calming_weight": 1.5,
+    "barrier_weight": 1.5,
+    "green_weight": 1.0,
+    "vehicular_free_weight": 3.0,
+    "tfl_cycleway_weight": 1.0,
+    "light_weight": 1.0,
+    "surface_weight": 1.0,
+    "tfl_live_weight": 1.0,
+}
+
 CALMING_SOURCE = "both"
 WEIGHT_MIN = 0.0
-WEIGHT_MAX = 1.0
+EPSILON = 0.0001
 
-_PROFILES_PATH = os.path.join(os.path.dirname(__file__), "user_profiles.json")
+BIKE_TYPES = ("standard", "road", "ebike", "cargo")
+BIKE_SPEEDS_KMH = {"standard": 15.0, "road": 20.0, "ebike": 17.0, "cargo": 15.0}
+DEFAULT_BIKE_TYPE = "standard"
+
+DEFAULT_TOGGLES = {
+    "light_night": False,
+    "surface": False,
+    "jam_comfort": True,
+    "vf_infrastructure": {"shared_path": True, "bus_lane": True},
+}
+
+_BASE_DIR = os.path.dirname(__file__)
+_PROFILES_PATH = os.path.join(_BASE_DIR, "user_profiles.json")
+_PRESET_CONFIG_PATH = os.path.join(_BASE_DIR, "preset_config.json")
 
 
-def clamp_weight(value: float) -> float:
-    return max(WEIGHT_MIN, min(WEIGHT_MAX, float(value)))
+def _load_weight_caps() -> dict[str, float]:
+    try:
+        with open(_PRESET_CONFIG_PATH, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        caps = cfg.get("weight_caps") or {}
+        if all(k in caps for k in ROUTING_WEIGHT_KEYS):
+            return {k: float(caps[k]) for k in ROUTING_WEIGHT_KEYS}
+    except (OSError, ValueError):
+        pass
+    return dict(_FALLBACK_WEIGHT_CAPS)
+
+
+WEIGHT_CAPS = _load_weight_caps()
+
+
+def load_preset_config() -> dict | None:
+    try:
+        with open(_PRESET_CONFIG_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def clamp_weight(key: str, value: float) -> float:
+    cap = WEIGHT_CAPS.get(key, 1.0)
+    return max(WEIGHT_MIN, min(cap, float(value)))
 
 
 def clamp_weights(weights: dict) -> dict:
-    return {key: clamp_weight(weights.get(key, 0.0)) for key in ROUTING_WEIGHT_KEYS}
+    return {key: clamp_weight(key, weights.get(key, 0.0)) for key in ROUTING_WEIGHT_KEYS}
 
 
 def validate_weights(weights: dict) -> tuple[bool, str | None]:
@@ -51,27 +109,50 @@ def validate_weights(weights: dict) -> tuple[bool, str | None]:
             val = float(weights[key])
         except (TypeError, ValueError):
             return False, f"{key} must be a number"
-        if val < WEIGHT_MIN or val > WEIGHT_MAX:
-            return False, f"{key} must be between {WEIGHT_MIN} and {WEIGHT_MAX}"
+        cap = WEIGHT_CAPS.get(key, 1.0)
+        if val < WEIGHT_MIN or val > cap:
+            return False, f"{key} must be between {WEIGHT_MIN} and {cap}"
     extra = set(weights.keys()) - set(ROUTING_WEIGHT_KEYS)
     if extra:
         return False, f"unknown weight keys: {', '.join(sorted(extra))}"
     return True, None
 
 
+def _normalize_toggles(toggles: Any) -> dict:
+    out = {
+        "light_night": bool((toggles or {}).get("light_night", False)),
+        "surface": bool((toggles or {}).get("surface", False)),
+        "jam_comfort": bool((toggles or {}).get("jam_comfort", True)),
+    }
+    vf = (toggles or {}).get("vf_infrastructure") or {}
+    out["vf_infrastructure"] = {
+        "shared_path": bool(vf.get("shared_path", True)),
+        "bus_lane": bool(vf.get("bus_lane", True)),
+    }
+    return out
+
+
+def _normalize_bike_type(bike_type: Any) -> str:
+    bt = str(bike_type or DEFAULT_BIKE_TYPE).strip().lower()
+    return bt if bt in BIKE_TYPES else DEFAULT_BIKE_TYPE
+
+
 def _load_store() -> dict:
     if not os.path.isfile(_PROFILES_PATH):
-        return {"profiles": {}}
+        return {"schema": 2, "profiles": {}}
     with open(_PROFILES_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
-    return data if isinstance(data, dict) else {"profiles": {}}
+    return data if isinstance(data, dict) else {"schema": 2, "profiles": {}}
 
 
 def _save_store(data: dict) -> None:
+    data["schema"] = 2
     profiles = data.get("profiles", {})
     for entry in profiles.values():
         if "weights" in entry:
             entry["weights"] = clamp_weights(entry["weights"])
+        entry["bike_type"] = _normalize_bike_type(entry.get("bike_type"))
+        entry["toggles"] = _normalize_toggles(entry.get("toggles"))
     dir_name = os.path.dirname(_PROFILES_PATH)
     fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix=".json")
     try:
@@ -93,7 +174,15 @@ def _slugify(name: str) -> str:
 def list_profiles() -> list[dict[str, str]]:
     store = _load_store()
     profiles = store.get("profiles", {})
-    return [{"id": pid, "name": entry.get("name", pid)} for pid, entry in sorted(profiles.items())]
+    return [
+        {
+            "id": pid,
+            "name": entry.get("name", pid),
+            "preset": entry.get("preset"),
+            "bike_type": _normalize_bike_type(entry.get("bike_type")),
+        }
+        for pid, entry in sorted(profiles.items())
+    ]
 
 
 def get_profile(user_id: str) -> dict[str, Any] | None:
@@ -101,11 +190,13 @@ def get_profile(user_id: str) -> dict[str, Any] | None:
     entry = store.get("profiles", {}).get(user_id)
     if not entry:
         return None
-    weights = clamp_weights(entry.get("weights", {}))
     return {
         "id": user_id,
         "name": entry.get("name", user_id),
-        "weights": weights,
+        "preset": entry.get("preset"),
+        "bike_type": _normalize_bike_type(entry.get("bike_type")),
+        "toggles": _normalize_toggles(entry.get("toggles")),
+        "weights": clamp_weights(entry.get("weights", {})),
     }
 
 
@@ -116,7 +207,13 @@ def get_profile_weights(user_id: str) -> dict[str, float] | None:
     return profile["weights"]
 
 
-def create_profile(name: str, weights: dict) -> tuple[dict[str, Any] | None, str | None]:
+def create_profile(
+    name: str,
+    weights: dict,
+    bike_type: str | None = None,
+    preset: str | None = None,
+    toggles: dict | None = None,
+) -> tuple[dict[str, Any] | None, str | None]:
     name = (name or "").strip()
     if not name:
         return None, "name is required"
@@ -133,20 +230,25 @@ def create_profile(name: str, weights: dict) -> tuple[dict[str, Any] | None, str
         user_id = f"{base_id}_{n}"
         n += 1
 
-    normalized = {key: float(weights[key]) for key in ROUTING_WEIGHT_KEYS}
-    profiles[user_id] = {"name": name, "weights": normalized}
+    profiles[user_id] = {
+        "name": name,
+        "preset": (str(preset).strip().lower() or None) if preset else None,
+        "bike_type": _normalize_bike_type(bike_type),
+        "toggles": _normalize_toggles(toggles),
+        "weights": {key: float(weights[key]) for key in ROUTING_WEIGHT_KEYS},
+    }
     _save_store(store)
     return get_profile(user_id), None
 
 
 def build_weight_dict_from_request(args, defaults: dict | None = None) -> dict:
-    """Parse explicit query-param weights; clamp each to [0.0, 1.0]."""
+    """Parse explicit query-param weights; clamp each to [0, cap] on the sweep scale."""
     base = defaults or {key: 0.0 for key in ROUTING_WEIGHT_KEYS}
     w = {}
     for key in ROUTING_WEIGHT_KEYS:
         if key in args and args.get(key) is not None and str(args.get(key)).strip() != "":
-            w[key] = clamp_weight(float(args.get(key)))
+            w[key] = clamp_weight(key, float(args.get(key)))
         else:
-            w[key] = clamp_weight(base.get(key, 0.0))
+            w[key] = clamp_weight(key, base.get(key, 0.0))
     w["calming_source"] = CALMING_SOURCE
     return w

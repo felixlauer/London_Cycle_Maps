@@ -1,0 +1,84 @@
+/* Shared app design system: floating panels, cards, buttons.
+   Theme via data-theme on the app root (dark = night lighting mode). */
+
+.app-root {
+  --ui-bg: #ffffff;
+  --ui-bg-soft: #f6f7f9;
+  --ui-text: #23272d;
+  --ui-text-sub: #667085;
+  --ui-border: #e4e7ec;
+  --ui-accent: #d32f2f;
+  --ui-shadow: 0 8px 28px rgba(16, 24, 40, 0.16);
+  --ui-radius: 12px;
+}
+
+.app-root[data-theme='dark'] {
+  --ui-bg: #1d2025;
+  --ui-bg-soft: #24282e;
+  --ui-text: #e6e8eb;
+  --ui-text-sub: #9aa4b2;
+  --ui-border: #343a43;
+  --ui-accent: #40e0d0;
+  --ui-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+}
+
+.ui-panel {
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+}
+
+.ui-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-text-sub);
+  margin-bottom: 6px;
+}
+
+.ui-btn {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-bg-soft);
+  color: var(--ui-text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ui-btn:hover:not(:disabled) {
+  border-color: var(--ui-accent);
+}
+
+.ui-btn.primary {
+  background: var(--ui-accent);
+  border-color: var(--ui-accent);
+  color: #fff;
+}
+
+.app-root[data-theme='dark'] .ui-btn.primary {
+  color: #10231f;
+}
+
+.ui-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ui-select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font-size: 13px;
+  font-family: inherit;
+}

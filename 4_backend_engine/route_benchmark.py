@@ -84,8 +84,13 @@ def _build_fixtures():
 WEIGHT_COMBOS = [
     ("no rewards", {}),
     ("green only", {"green_weight": 1.0}),
-    ("all scenery", {"tfl_cycleway_weight": 1.0, "tfl_quietway_weight": 1.0, "green_weight": 1.0}),
-    ("safety+live", {"risk_weight": 1.0, "signal_weight": 1.0, "junction_weight": 1.0, "tfl_live_weight": 1.0}),
+    ("all scenery", {"tfl_cycleway_weight": 1.0, "green_weight": 1.0, "vehicular_free_weight": 3.0}),
+    ("safety+live", {"risk_weight": 2.0, "signal_weight": 2.0, "junction_weight": 3.0, "tfl_live_weight": 1.0}),
+    ("preset safe", {
+        "risk_weight": 1.2, "speed_weight": 2.0, "junction_weight": 2.0,
+        "vehicular_free_weight": 2.5, "tfl_cycleway_weight": 0.5, "green_weight": 0.15,
+        "hill_weight": 0.3, "barrier_weight": 0.3, "tfl_live_weight": 0.4,
+    }),
 ]
 
 
@@ -96,9 +101,8 @@ def _base_weights():
         "surface_weight": 0.0,
         "hill_weight": 0.0,
         "tfl_cycleway_weight": 0.0,
-        "tfl_quietway_weight": 0.0,
+        "vehicular_free_weight": 0.0,
         "speed_weight": 0.0,
-        "width_weight": 0.0,
         "green_weight": 0.0,
         "barrier_weight": 0.0,
         "calming_weight": 0.0,

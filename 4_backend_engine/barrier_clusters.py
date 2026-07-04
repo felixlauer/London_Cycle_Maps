@@ -4,9 +4,10 @@ Barrier routing clusters (OSM barrier=* on snapped edges).
 Five groups: free flow (0), permeable (+15m), stop/push (+35m), hostile (+90m), impassable (1e9).
 Single source of truth for app.py routing and app_debug overlay colours.
 
-TODO (future): scale penalties by bike type (cargo / longtail / standard) and a user
-preference for how willing they are to dismount or lift (barrier tolerance slider).
-cycle_barrier is group 3 and motorcycle_barrier is group 2 by current policy — revisit then.
+Cargo bikes: barriers a regular bike squeezes/pushes through can be impassable for
+a long/wide cargo bike. CARGO_IMPASSABLE_TAGS lists those tags; they become hard
+blocks when bike_type == "cargo" (see barrier_is_hard_block(bike_type=...)).
+Assumptions documented in 0_documentation/feature_requests/get_presets_notes.md.
 """
 from __future__ import annotations
 
@@ -53,6 +54,16 @@ CLUSTER_PENALTY = {
 
 # Unknown tags in London extract → moderate stop/push (group 3).
 DEFAULT_CLUSTER = CLUSTER_STOP_PUSH
+
+# Impassable for cargo bikes only (length/width): chicane-style cycle barriers,
+# motorcycle barriers, width restrictors, pinch points, narrow wicket gates.
+CARGO_IMPASSABLE_TAGS = frozenset({
+    "cycle_barrier",
+    "motorcycle_barrier",
+    "width_restrictor",
+    "pinch point",
+    "wicket_gate",
+})
 
 _GROUP1 = frozenset({
     "height_restrictor", "lift_gate", "width_restrictor", "automatic lifting gate",
@@ -124,7 +135,7 @@ def barrier_access_denied(edge_data: dict | None) -> bool:
     )
 
 
-def barrier_is_hard_block(edge_data: dict | None) -> bool:
+def barrier_is_hard_block(edge_data: dict | None, bike_type: str = "standard") -> bool:
     if not edge_data:
         return False
     if barrier_access_denied(edge_data):
@@ -132,6 +143,8 @@ def barrier_is_hard_block(edge_data: dict | None) -> bool:
     tag = normalize_barrier_tag(edge_data.get("barrier"))
     if not tag:
         return False
+    if bike_type == "cargo" and tag in CARGO_IMPASSABLE_TAGS:
+        return True
     return barrier_cluster_for_tag(tag) == CLUSTER_IMPASSABLE
 
 

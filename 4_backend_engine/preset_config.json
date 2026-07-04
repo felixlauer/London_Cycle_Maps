@@ -1,0 +1,1362 @@
+{
+  "version": "2026-07-04",
+  "source": {
+    "sweep": "6_verification/parameter_sweeps/2026-06-19",
+    "couplings": "4_backend_engine/weight_dependencies/weight_couplings.json",
+    "generator": "6_verification/generate_preset_config.py"
+  },
+  "epsilon": 0.0001,
+  "speeds_kmh": {
+    "standard": 15.0,
+    "road": 20.0,
+    "ebike": 17.0,
+    "cargo": 15.0
+  },
+  "weight_caps": {
+    "signal_weight": 2.0,
+    "speed_weight": 2.0,
+    "junction_weight": 3.0,
+    "risk_weight": 2.0,
+    "hill_weight": 3.0,
+    "calming_weight": 1.5,
+    "barrier_weight": 1.5,
+    "green_weight": 1.0,
+    "vehicular_free_weight": 3.0,
+    "tfl_cycleway_weight": 1.0,
+    "light_weight": 1.0,
+    "surface_weight": 1.0,
+    "tfl_live_weight": 1.0
+  },
+  "exemplary_route": {
+    "avg_km": 12.61,
+    "n_routes": 11,
+    "minutes_by_bike": {
+      "standard": 50.5,
+      "road": 37.8,
+      "ebike": 44.5,
+      "cargo": 50.5
+    },
+    "disclaimer": "Estimates below are for an average London route of 12.6 km, computed from our 11 verification routes. Your actual detour scales with route length and location."
+  },
+  "bike_types": {
+    "standard": {
+      "label": "Standard bike",
+      "speed_kmh": 15.0,
+      "rules": {},
+      "note": "The default. All preferences available."
+    },
+    "road": {
+      "label": "Road bike",
+      "speed_kmh": 20.0,
+      "rules": {
+        "surface_auto_value": 0.6,
+        "hide_surface_question": true
+      },
+      "note": "Smooth-surface routing is enabled automatically - thin tyres and gravel do not mix."
+    },
+    "ebike": {
+      "label": "E-bike",
+      "speed_kmh": 17.0,
+      "rules": {
+        "hill_weight_epsilon": true
+      },
+      "note": "Hill avoidance is disabled - the motor does the climbing. Speed is capped at 25 km/h, so the average assumes 17 km/h."
+    },
+    "cargo": {
+      "label": "Cargo bike",
+      "speed_kmh": 15.0,
+      "rules": {
+        "hill_weight_epsilon": true,
+        "cargo_barriers": true
+      },
+      "note": "Assumed to be an e-cargo bike: hill avoidance is disabled. Barriers that a regular bike squeezes through (cycle gates, chicanes, narrow gaps) are treated as impassable."
+    }
+  },
+  "sliders": {
+    "signal_weight": {
+      "label": "Fewer traffic lights",
+      "question": "How many minutes of detour would you accept to remove most traffic lights from your route?",
+      "help": "Penalises signalised crossings. Higher values push the route onto corridors with fewer lights - this can mean bigger roads (pair with Safety) or quiet back streets with speed bumps.",
+      "cap": 2.0,
+      "target_metric": "signal_count",
+      "metric_direction": "decrease",
+      "anchors": [
+        {
+          "value": 0.0,
+          "delta_km_avg": 0.0,
+          "minutes_by_bike": {
+            "standard": 0.0,
+            "road": 0.0,
+            "ebike": 0.0,
+            "cargo": 0.0
+          },
+          "metric_change_pct": 0.0,
+          "routes_affected": 0
+        },
+        {
+          "value": 0.4,
+          "delta_km_avg": 0.516,
+          "minutes_by_bike": {
+            "standard": 2.06,
+            "road": 1.55,
+            "ebike": 1.82,
+            "cargo": 2.06
+          },
+          "metric_change_pct": 46.2,
+          "routes_affected": 10
+        },
+        {
+          "value": 2.0,
+          "delta_km_avg": 1.772,
+          "minutes_by_bike": {
+            "standard": 7.09,
+            "road": 5.32,
+            "ebike": 6.26,
+            "cargo": 7.09
+          },
+          "metric_change_pct": 92.6,
+          "routes_affected": 11
+        }
+      ]
+    },
+    "speed_weight": {
+      "label": "Avoid fast traffic",
+      "question": "How many minutes of detour would you accept to ride mostly on roads where cars are slower?",
+      "help": "Penalises streets where motor traffic is much faster than you. Reduces stress from overtaking cars; strong settings favour residential streets.",
+      "cap": 2.0,
+      "target_metric": "speed_stress_pct",
+      "metric_direction": "decrease",
+      "anchors": [
+        {
+          "value": 0.0,
+          "delta_km_avg": 0.0,
+          "minutes_by_bike": {
+            "standard": 0.0,
+            "road": 0.0,
+            "ebike": 0.0,
+            "cargo": 0.0
+          },
+          "metric_change_pct": 0.0,
+          "routes_affected": 0
+        },
+        {
+          "value": 0.6,
+          "delta_km_avg": 0.171,
+          "minutes_by_bike": {
+            "standard": 0.69,
+            "road": 0.51,
+            "ebike": 0.61,
+            "cargo": 0.69
+          },
+          "metric_change_pct": 64.6,
+          "routes_affected": 6
+        },
+        {
+          "value": 2.0,
+          "delta_km_avg": 0.247,
+          "minutes_by_bike": {
+            "standard": 0.99,
+            "road": 0.74,
+            "ebike": 0.87,
+            "cargo": 0.99
+          },
+          "metric_change_pct": 78.6,
+          "routes_affected": 7
+        }
+      ]
+    },
+    "junction_weight": {
+      "label": "Maximize flow (fewer stops)",
+      "question": "How many minutes of detour would you accept to reduce big junctions on your route?",
+      "help": "Penalises major junctions, mini-roundabouts, stop signs and give-ways. Keeps you rolling instead of stopping, at the cost of less direct routing.",
+      "cap": 3.0,
+      "target_metric": "junction_count",
+      "metric_direction": "decrease",
+      "anchors": [
+        {
+          "value": 0.0,
+          "delta_km_avg": 0.0,
+          "minutes_by_bike": {
+            "standard": 0.0,
+            "road": 0.0,
+            "ebike": 0.0,
+            "cargo": 0.0
+          },
+          "metric_change_pct": 0.0,
+          "routes_affected": 0
+        },
+        {
+          "value": 1.0,
+          "delta_km_avg": 0.057,
+          "minutes_by_bike": {
+            "standard": 0.23,
+            "road": 0.17,
+            "ebike": 0.2,
+            "cargo": 0.23
+          },
+          "metric_change_pct": 9.0,
+          "routes_affected": 10
+        },
+        {
+          "value": 3.0,
+          "delta_km_avg": 0.215,
+          "minutes_by_bike": {
+            "standard": 0.86,
+            "road": 0.65,
+            "ebike": 0.76,
+            "cargo": 0.86
+          },
+          "metric_change_pct": 24.4,
+          "routes_affected": 11
+        }
+      ]
+    },
+    "risk_weight": {
+      "label": "Safer route",
+      "question": "How many minutes of detour would you accept to reduce the number of roads where cycling accidents previously occurred?",
+      "help": "Penalises road segments weighted by recorded cycling accidents. The single most important lever for a safety-first route.",
+      "cap": 2.0,
+      "target_metric": "accidents",
+      "metric_direction": "decrease",
+      "anchors": [
+        {
+          "value": 0.0,
+          "delta_km_avg": 0.0,
+          "minutes_by_bike": {
+            "standard": 0.0,
+            "road": 0.0,
+            "ebike": 0.0,
+            "cargo": 0.0
+          },
+          "metric_change_pct": 0.0,
+          "routes_affected": 0
+        },
+        {
+          "value": 0.6,
+          "delta_km_avg": 0.388,
+          "minutes_by_bike": {
+            "standard": 1.55,
+            "road": 1.17,
+            "ebike": 1.37,
+            "cargo": 1.55
+          },
+          "metric_change_pct": 43.4,
+          "routes_affected": 10
+        },
+        {
+          "value": 2.0,
+          "delta_km_avg": 1.16,
+          "minutes_by_bike": {
+            "standard": 4.64,
+            "road": 3.48,
+            "ebike": 4.09,
+            "cargo": 4.64
+          },
+          "metric_change_pct": 86.8,
+          "routes_affected": 11
+        }
+      ]
+    },
+    "hill_weight": {
+      "label": "Bypass steep hills",
+      "question": "How many minutes of detour would you accept to reduce the total elevation gain of your route?",
+      "help": "Penalises climbs (quadratically for steep grades) and steep descents. Disabled for e-bikes - the motor does the climbing.",
+      "cap": 3.0,
+      "target_metric": "elevation_gain",
+      "metric_direction": "decrease",
+      "anchors": [
+        {
+          "value": 0.0,
+          "delta_km_avg": 0.0,
+          "minutes_by_bike": {
+            "standard": 0.0,
+            "road": 0.0,
+            "ebike": 0.0,
+            "cargo": 0.0
+          },
+          "metric_change_pct": 0.0,
+          "routes_affected": 0
+        },
+        {
+          "value": 0.6,
+          "delta_km_avg": 0.424,
+          "minutes_by_bike": {
+            "standard": 1.69,
+            "road": 1.27,
+            "ebike": 1.5,
+            "cargo": 1.69
+          },
+          "metric_change_pct": 43.5,
+          "routes_affected": 11
+        },
+        {
+          "value": 3.0,
+          "delta_km_avg": 1.439,
+          "minutes_by_bike": {
+            "standard": 5.76,
+            "road": 4.32,
+            "ebike": 5.08,
+            "cargo": 5.76
+          },
+          "metric_change_pct": 62.6,
+          "routes_affected": 11
+        }
+      ]
+    },
+    "calming_weight": {
+      "label": "Avoid speed bumps",
+      "question": "How many minutes of detour would you accept to avoid calming infrastructure like speed bumps or cushions?",
+      "help": "Penalises traffic-calmed streets. Useful for comfort; conflicts with avoiding traffic lights (quiet shortcuts are usually the calmed ones).",
+      "cap": 1.5,
+      "target_metric": "calming_count",
+      "metric_direction": "decrease",
+      "anchors": [
+        {
+          "value": 0.0,
+          "delta_km_avg": 0.0,
+          "minutes_by_bike": {
+            "standard": 0.0,
+            "road": 0.0,
+            "ebike": 0.0,
+            "cargo": 0.0
+          },
+          "metric_change_pct": 0.0,
+          "routes_affected": 0
+        },
+        {
+          "value": 0.6,
+          "delta_km_avg": 0.013,
+          "minutes_by_bike": {
+            "standard": 0.05,
+            "road": 0.04,
+            "ebike": 0.05,
+            "cargo": 0.05
+          },
+          "metric_change_pct": 29.6,
+          "routes_affected": 3
+        },
+        {
+          "value": 1.5,
+          "delta_km_avg": 0.025,
+          "minutes_by_bike": {
+            "standard": 0.1,
+            "road": 0.08,
+            "ebike": 0.09,
+            "cargo": 0.1
+          },
+          "metric_change_pct": 46.2,
+          "routes_affected": 6
+        }
+      ]
+    },
+    "barrier_weight": {
+      "label": "Avoid barriers",
+      "question": "How many minutes of detour would you accept to avoid dismounting or squeezing through tight barriers like gates?",
+      "help": "Penalises passable but awkward barriers (gates, chicanes, bollard clusters). Impassable barriers are always blocked regardless of this slider.",
+      "cap": 1.5,
+      "target_metric": "barrier_penalty_count",
+      "metric_direction": "decrease",
+      "anchors": [
+        {
+          "value": 0.0,
+          "delta_km_avg": 0.0,
+          "minutes_by_bike": {
+            "standard": 0.0,
+            "road": 0.0,
+            "ebike": 0.0,
+            "cargo": 0.0
+          },
+          "metric_change_pct": 0.0,
+          "routes_affected": 0
+        },
+        {
+          "value": 0.6,
+          "delta_km_avg": 0.011,
+          "minutes_by_bike": {
+            "standard": 0.05,
+            "road": 0.03,
+            "ebike": 0.04,
+            "cargo": 0.05
+          },
+          "metric_change_pct": 35.4,
+          "routes_affected": 4
+        },
+        {
+          "value": 1.5,
+          "delta_km_avg": 0.064,
+          "minutes_by_bike": {
+            "standard": 0.26,
+            "road": 0.19,
+            "ebike": 0.23,
+            "cargo": 0.26
+          },
+          "metric_change_pct": 73.4,
+          "routes_affected": 7
+        }
+      ]
+    },
+    "green_weight": {
+      "label": "Green & scenic",
+      "question": "How many minutes of detour would you accept to cycle alongside parks, the river or tourist sights?",
+      "help": "Rewards edges along parks, rivers and sights. Scenic pulls may use unpaved or unlit paths - pair with Smooth surfaces or lighting if that matters to you.",
+      "cap": 1.0,
+      "target_metric": "green_pct",
+      "metric_direction": "increase",
+      "anchors": [
+        {
+          "value": 0.0,
+          "delta_km_avg": 0.0,
+          "minutes_by_bike": {
+            "standard": 0.0,
+            "road": 0.0,
+            "ebike": 0.0,
+            "cargo": 0.0
+          },
+          "metric_change_pct": 0.0,
+          "routes_affected": 0
+        },
+        {
+          "value": 0.5,
+          "delta_km_avg": 0.126,
+          "minutes_by_bike": {
+            "standard": 0.5,
+            "road": 0.38,
+            "ebike": 0.44,
+            "cargo": 0.5
+          },
+          "metric_change_pct": 9.2,
+          "routes_affected": 6
+        },
+        {
+          "value": 1.0,
+          "delta_km_avg": 0.126,
+          "minutes_by_bike": {
+            "standard": 0.5,
+            "road": 0.38,
+            "ebike": 0.44,
+            "cargo": 0.5
+          },
+          "metric_change_pct": 9.2,
+          "routes_affected": 6
+        }
+      ]
+    },
+    "vehicular_free_weight": {
+      "label": "Car-free corridors",
+      "question": "How many minutes of detour would you accept to increase the share of segregated cycling infrastructure?",
+      "help": "Rewards physically separated cycle infrastructure. Assumes you ride faster on segregated paths than in mixed traffic, especially in rush hour - the detour often pays part of itself back.",
+      "cap": 3.0,
+      "target_metric": "vehicular_free_pct",
+      "metric_direction": "increase",
+      "anchors": [
+        {
+          "value": 0.0,
+          "delta_km_avg": 0.0,
+          "minutes_by_bike": {
+            "standard": 0.0,
+            "road": 0.0,
+            "ebike": 0.0,
+            "cargo": 0.0
+          },
+          "metric_change_pct": 0.0,
+          "routes_affected": 0
+        },
+        {
+          "value": 1.5,
+          "delta_km_avg": 0.213,
+          "minutes_by_bike": {
+            "standard": 0.85,
+            "road": 0.64,
+            "ebike": 0.75,
+            "cargo": 0.85
+          },
+          "metric_change_pct": 15.8,
+          "routes_affected": 9
+        },
+        {
+          "value": 3.0,
+          "delta_km_avg": 0.933,
+          "minutes_by_bike": {
+            "standard": 3.73,
+            "road": 2.8,
+            "ebike": 3.29,
+            "cargo": 3.73
+          },
+          "metric_change_pct": 25.0,
+          "routes_affected": 10
+        }
+      ]
+    },
+    "tfl_cycleway_weight": {
+      "label": "TfL cycle network",
+      "question": "How many minutes of detour would you accept to follow the signed TfL cycle network?",
+      "help": "Rewards TfL Cycleways, Superhighways and Quietways (treated as one network). These are not necessarily car-free, but they are signposted on the ground, which makes navigation much easier.",
+      "cap": 1.0,
+      "target_metric": "tfl_cycleway_pct",
+      "metric_direction": "increase",
+      "anchors": [
+        {
+          "value": 0.0,
+          "delta_km_avg": 0.0,
+          "minutes_by_bike": {
+            "standard": 0.0,
+            "road": 0.0,
+            "ebike": 0.0,
+            "cargo": 0.0
+          },
+          "metric_change_pct": 0.0,
+          "routes_affected": 0
+        },
+        {
+          "value": 0.55,
+          "delta_km_avg": 0.564,
+          "minutes_by_bike": {
+            "standard": 2.25,
+            "road": 1.69,
+            "ebike": 1.99,
+            "cargo": 2.25
+          },
+          "metric_change_pct": 29.6,
+          "routes_affected": 9
+        },
+        {
+          "value": 1.0,
+          "delta_km_avg": 0.564,
+          "minutes_by_bike": {
+            "standard": 2.25,
+            "road": 1.69,
+            "ebike": 1.99,
+            "cargo": 2.25
+          },
+          "metric_change_pct": 29.6,
+          "routes_affected": 9
+        }
+      ]
+    }
+  },
+  "toggles": {
+    "light_night": {
+      "question": "Do you prefer illuminated roads at night?",
+      "help": "When it is dark in London, unlit streets get a penalty so your route sticks to lit roads. Has no effect during daylight.",
+      "weight_key": "light_weight",
+      "on_value": 0.6,
+      "night_gated": true
+    },
+    "surface": {
+      "question": "Do you want to stay on smooth, paved surfaces?",
+      "help": "Penalises gravel, dirt and rough paving. Road bikes get this automatically at a stronger setting; for other bikes it is a softer preference.",
+      "weight_key": "surface_weight",
+      "on_value": 0.3,
+      "road_auto_value": 0.6,
+      "hidden_for": [
+        "road"
+      ]
+    },
+    "jam_comfort": {
+      "question": "Are you comfortable wiggling through a traffic jam to save time?",
+      "help": "Live traffic data always blocks full road closures. This only decides how strongly congestion, roadworks and incidents push your route away: comfortable riders keep a small penalty, cautious riders a larger one.",
+      "weight_key": "tfl_live_weight",
+      "comfortable_value": 0.1,
+      "cautious_value": 0.4
+    },
+    "vf_infrastructure": {
+      "question": "Which cycling infrastructure do you feel safe on?",
+      "help": "Controls what counts as 'car-free' for the car-free corridors preference. Segregated tracks always count; shared paths with pedestrians and shared bus lanes are your call.",
+      "options": {
+        "shared_path": {
+          "label": "Shared paths (with pedestrians)",
+          "default": true
+        },
+        "bus_lane": {
+          "label": "Shared bus lanes",
+          "default": true
+        }
+      }
+    }
+  },
+  "presets": {
+    "fast": {
+      "label": "Fast",
+      "description": "Direct and flowing. Fewer traffic lights and flat ground beat scenic detours.",
+      "weights": {
+        "signal_weight": 1.2,
+        "junction_weight": 0.2,
+        "speed_weight": 0.3,
+        "risk_weight": 0.3,
+        "hill_weight": 1.8,
+        "calming_weight": 0.6,
+        "barrier_weight": 0.6,
+        "green_weight": 0.0001,
+        "vehicular_free_weight": 1.5,
+        "tfl_cycleway_weight": 0.3
+      },
+      "toggles": {
+        "light_night": false,
+        "surface": false,
+        "jam_comfort": true
+      },
+      "estimated_detour_min_by_bike": {
+        "standard": 11.5,
+        "road": 8.5,
+        "ebike": 10.5,
+        "cargo": 11.5
+      }
+    },
+    "safe": {
+      "label": "Safe",
+      "description": "Maximum protection from traffic. Accident history, fast cars and big junctions are avoided.",
+      "weights": {
+        "signal_weight": 0.0001,
+        "junction_weight": 2.0,
+        "speed_weight": 2.0,
+        "risk_weight": 1.2,
+        "hill_weight": 0.3,
+        "calming_weight": 0.0001,
+        "barrier_weight": 0.3,
+        "green_weight": 0.15,
+        "vehicular_free_weight": 2.5,
+        "tfl_cycleway_weight": 0.5
+      },
+      "toggles": {
+        "light_night": true,
+        "surface": false,
+        "jam_comfort": false
+      },
+      "estimated_detour_min_by_bike": {
+        "standard": 10.0,
+        "road": 7.5,
+        "ebike": 9.0,
+        "cargo": 10.0
+      }
+    },
+    "leisure": {
+      "label": "Leisure",
+      "description": "Relaxed riding through parks and along the river. Time matters less than the journey.",
+      "weights": {
+        "signal_weight": 0.3,
+        "junction_weight": 1.0,
+        "speed_weight": 1.0,
+        "risk_weight": 0.5,
+        "hill_weight": 1.8,
+        "calming_weight": 0.3,
+        "barrier_weight": 0.3,
+        "green_weight": 0.6,
+        "vehicular_free_weight": 2.5,
+        "tfl_cycleway_weight": 0.5
+      },
+      "toggles": {
+        "light_night": true,
+        "surface": false,
+        "jam_comfort": false
+      },
+      "estimated_detour_min_by_bike": {
+        "standard": 13.0,
+        "road": 9.5,
+        "ebike": 11.5,
+        "cargo": 13.0
+      }
+    }
+  },
+  "conflict_warnings": {
+    "fast": [
+      {
+        "id": "signal_risk_arterial",
+        "weights": [
+          "signal_weight",
+          "risk_weight"
+        ],
+        "winner": "signal_weight",
+        "severity": "high",
+        "warning": "Fewer lights may use busier roads — keep Safety above Low."
+      },
+      {
+        "id": "signal_calming_rat_run",
+        "weights": [
+          "signal_weight",
+          "calming_weight"
+        ],
+        "winner": "signal_weight",
+        "severity": "high",
+        "warning": "Shortcut streets may have more speed bumps."
+      },
+      {
+        "id": "signal_light_night",
+        "weights": [
+          "signal_weight",
+          "light_weight"
+        ],
+        "winner": "signal_weight",
+        "severity": "high",
+        "warning": "Enable well-lit streets for night routing when avoiding traffic lights."
+      },
+      {
+        "id": "speed_risk_twickenham",
+        "weights": [
+          "speed_weight",
+          "risk_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Avoiding fast traffic may use less safe corridors."
+      },
+      {
+        "id": "speed_calming_rat_run",
+        "weights": [
+          "speed_weight",
+          "calming_weight"
+        ],
+        "winner": "calming_weight",
+        "severity": "high",
+        "warning": "Quiet back-street detours may have many speed bumps."
+      },
+      {
+        "id": "junction_risk_arterial",
+        "weights": [
+          "junction_weight",
+          "risk_weight"
+        ],
+        "winner": "junction_weight",
+        "severity": "high",
+        "warning": "Maximizing flow may use busier roads — increase Safety."
+      },
+      {
+        "id": "hill_green_preset",
+        "weights": [
+          "hill_weight",
+          "green_weight"
+        ],
+        "winner": "hill_weight",
+        "severity": "medium",
+        "warning": "Flat routes and scenic routes may pull in opposite directions."
+      },
+      {
+        "id": "hill_risk_valley",
+        "weights": [
+          "hill_weight",
+          "risk_weight"
+        ],
+        "winner": "hill_weight",
+        "severity": "high",
+        "warning": "Very flat routes may use busier valley roads."
+      },
+      {
+        "id": "hill_calming_tottenham",
+        "weights": [
+          "hill_weight",
+          "calming_weight"
+        ],
+        "winner": "hill_weight",
+        "severity": "medium",
+        "warning": "Flat bypasses may thread through speed-calmed streets."
+      },
+      {
+        "id": "barrier_risk_greenwich",
+        "weights": [
+          "barrier_weight",
+          "risk_weight"
+        ],
+        "winner": "barrier_weight",
+        "severity": "high",
+        "warning": "Avoiding barriers may use less safe detours."
+      },
+      {
+        "id": "calming_risk_arterial",
+        "weights": [
+          "calming_weight",
+          "risk_weight"
+        ],
+        "winner": "calming_weight",
+        "severity": "high",
+        "warning": "Avoiding speed bumps may use busier roads with more signals."
+      },
+      {
+        "id": "green_barrier_twickenham",
+        "weights": [
+          "green_weight",
+          "barrier_weight"
+        ],
+        "winner": "barrier_weight",
+        "severity": "medium",
+        "warning": "Scenic routes may pass through more gates and barriers."
+      },
+      {
+        "id": "surface_green_parks",
+        "weights": [
+          "surface_weight",
+          "green_weight"
+        ],
+        "winner": "surface_weight",
+        "severity": "medium",
+        "warning": "Smooth surfaces may skip unpaved park paths."
+      },
+      {
+        "id": "surface_speed_tottenham",
+        "weights": [
+          "surface_weight",
+          "speed_weight"
+        ],
+        "winner": "surface_weight",
+        "severity": "medium",
+        "warning": "Paved-only routing may use busier motor corridors."
+      },
+      {
+        "id": "surface_risk_tottenham",
+        "weights": [
+          "surface_weight",
+          "risk_weight"
+        ],
+        "winner": "surface_weight",
+        "severity": "medium",
+        "warning": "Smooth-surface detours may be less safe."
+      },
+      {
+        "id": "tfl_cycleway_calming_bromley",
+        "weights": [
+          "tfl_cycleway_weight",
+          "calming_weight"
+        ],
+        "winner": "tfl_cycleway_weight",
+        "severity": "medium",
+        "warning": "Cycle network detours may include speed-calmed links."
+      },
+      {
+        "id": "tfl_live_risk_kings_cross",
+        "weights": [
+          "tfl_live_weight",
+          "risk_weight"
+        ],
+        "winner": "tfl_live_weight",
+        "severity": "high",
+        "warning": "Closure detours may use less safe roads."
+      },
+      {
+        "id": "tfl_live_surface_earls",
+        "weights": [
+          "tfl_live_weight",
+          "surface_weight"
+        ],
+        "winner": "tfl_live_weight",
+        "severity": "medium",
+        "warning": "Closure detours may include rough surfaces."
+      },
+      {
+        "id": "tfl_live_calming_wembley",
+        "weights": [
+          "tfl_live_weight",
+          "calming_weight"
+        ],
+        "winner": "tfl_live_weight",
+        "severity": "high",
+        "warning": "Avoiding closures may route through many speed bumps."
+      },
+      {
+        "id": "vehicular_free_risk_accidents",
+        "weights": [
+          "vehicular_free_weight",
+          "risk_weight"
+        ],
+        "winner": "vehicular_free_weight",
+        "severity": "medium",
+        "warning": "Car-free detours may pass through less safe segments."
+      },
+      {
+        "id": "risk_light_floor",
+        "weights": [
+          "risk_weight",
+          "light_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Well-lit routes work best with Safety enabled — especially at night."
+      },
+      {
+        "id": "risk_surface_floor",
+        "weights": [
+          "risk_weight",
+          "surface_weight"
+        ],
+        "winner": "surface_weight",
+        "severity": "medium",
+        "warning": "Safer routes may use rough paths — enable Smooth Surfaces for paved only."
+      },
+      {
+        "id": "signal_junction_paradox",
+        "weights": [
+          "signal_weight",
+          "junction_weight"
+        ],
+        "winner": "signal_weight",
+        "severity": "medium",
+        "warning": "Combining flow and light-avoidance may produce long zig-zag routes."
+      }
+    ],
+    "safe": [
+      {
+        "id": "signal_risk_arterial",
+        "weights": [
+          "signal_weight",
+          "risk_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Fewer lights may use busier roads — keep Safety above Low."
+      },
+      {
+        "id": "signal_calming_rat_run",
+        "weights": [
+          "signal_weight",
+          "calming_weight"
+        ],
+        "winner": "signal_weight",
+        "severity": "high",
+        "warning": "Shortcut streets may have more speed bumps."
+      },
+      {
+        "id": "signal_light_night",
+        "weights": [
+          "signal_weight",
+          "light_weight"
+        ],
+        "winner": "light_weight",
+        "severity": "high",
+        "warning": "Enable well-lit streets for night routing when avoiding traffic lights."
+      },
+      {
+        "id": "speed_risk_twickenham",
+        "weights": [
+          "speed_weight",
+          "risk_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Avoiding fast traffic may use less safe corridors."
+      },
+      {
+        "id": "speed_calming_rat_run",
+        "weights": [
+          "speed_weight",
+          "calming_weight"
+        ],
+        "winner": "speed_weight",
+        "severity": "high",
+        "warning": "Quiet back-street detours may have many speed bumps."
+      },
+      {
+        "id": "junction_risk_arterial",
+        "weights": [
+          "junction_weight",
+          "risk_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Maximizing flow may use busier roads — increase Safety."
+      },
+      {
+        "id": "hill_green_preset",
+        "weights": [
+          "hill_weight",
+          "green_weight"
+        ],
+        "winner": "green_weight",
+        "severity": "medium",
+        "warning": "Flat routes and scenic routes may pull in opposite directions."
+      },
+      {
+        "id": "hill_risk_valley",
+        "weights": [
+          "hill_weight",
+          "risk_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Very flat routes may use busier valley roads."
+      },
+      {
+        "id": "hill_calming_tottenham",
+        "weights": [
+          "hill_weight",
+          "calming_weight"
+        ],
+        "winner": "hill_weight",
+        "severity": "medium",
+        "warning": "Flat bypasses may thread through speed-calmed streets."
+      },
+      {
+        "id": "barrier_risk_greenwich",
+        "weights": [
+          "barrier_weight",
+          "risk_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Avoiding barriers may use less safe detours."
+      },
+      {
+        "id": "calming_risk_arterial",
+        "weights": [
+          "calming_weight",
+          "risk_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Avoiding speed bumps may use busier roads with more signals."
+      },
+      {
+        "id": "green_barrier_twickenham",
+        "weights": [
+          "green_weight",
+          "barrier_weight"
+        ],
+        "winner": "green_weight",
+        "severity": "medium",
+        "warning": "Scenic routes may pass through more gates and barriers."
+      },
+      {
+        "id": "surface_green_parks",
+        "weights": [
+          "surface_weight",
+          "green_weight"
+        ],
+        "winner": "green_weight",
+        "severity": "medium",
+        "warning": "Smooth surfaces may skip unpaved park paths."
+      },
+      {
+        "id": "surface_speed_tottenham",
+        "weights": [
+          "surface_weight",
+          "speed_weight"
+        ],
+        "winner": "speed_weight",
+        "severity": "medium",
+        "warning": "Paved-only routing may use busier motor corridors."
+      },
+      {
+        "id": "surface_risk_tottenham",
+        "weights": [
+          "surface_weight",
+          "risk_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "medium",
+        "warning": "Smooth-surface detours may be less safe."
+      },
+      {
+        "id": "tfl_cycleway_calming_bromley",
+        "weights": [
+          "tfl_cycleway_weight",
+          "calming_weight"
+        ],
+        "winner": "tfl_cycleway_weight",
+        "severity": "medium",
+        "warning": "Cycle network detours may include speed-calmed links."
+      },
+      {
+        "id": "tfl_live_risk_kings_cross",
+        "weights": [
+          "tfl_live_weight",
+          "risk_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Closure detours may use less safe roads."
+      },
+      {
+        "id": "tfl_live_surface_earls",
+        "weights": [
+          "tfl_live_weight",
+          "surface_weight"
+        ],
+        "winner": "tfl_live_weight",
+        "severity": "medium",
+        "warning": "Closure detours may include rough surfaces."
+      },
+      {
+        "id": "tfl_live_calming_wembley",
+        "weights": [
+          "tfl_live_weight",
+          "calming_weight"
+        ],
+        "winner": "tfl_live_weight",
+        "severity": "high",
+        "warning": "Avoiding closures may route through many speed bumps."
+      },
+      {
+        "id": "vehicular_free_risk_accidents",
+        "weights": [
+          "vehicular_free_weight",
+          "risk_weight"
+        ],
+        "winner": "vehicular_free_weight",
+        "severity": "medium",
+        "warning": "Car-free detours may pass through less safe segments."
+      },
+      {
+        "id": "risk_light_floor",
+        "weights": [
+          "risk_weight",
+          "light_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Well-lit routes work best with Safety enabled — especially at night."
+      },
+      {
+        "id": "risk_surface_floor",
+        "weights": [
+          "risk_weight",
+          "surface_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "medium",
+        "warning": "Safer routes may use rough paths — enable Smooth Surfaces for paved only."
+      },
+      {
+        "id": "signal_junction_paradox",
+        "weights": [
+          "signal_weight",
+          "junction_weight"
+        ],
+        "winner": "junction_weight",
+        "severity": "medium",
+        "warning": "Combining flow and light-avoidance may produce long zig-zag routes."
+      }
+    ],
+    "leisure": [
+      {
+        "id": "signal_risk_arterial",
+        "weights": [
+          "signal_weight",
+          "risk_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Fewer lights may use busier roads — keep Safety above Low."
+      },
+      {
+        "id": "signal_calming_rat_run",
+        "weights": [
+          "signal_weight",
+          "calming_weight"
+        ],
+        "winner": "calming_weight",
+        "severity": "high",
+        "warning": "Shortcut streets may have more speed bumps."
+      },
+      {
+        "id": "signal_light_night",
+        "weights": [
+          "signal_weight",
+          "light_weight"
+        ],
+        "winner": "light_weight",
+        "severity": "high",
+        "warning": "Enable well-lit streets for night routing when avoiding traffic lights."
+      },
+      {
+        "id": "speed_risk_twickenham",
+        "weights": [
+          "speed_weight",
+          "risk_weight"
+        ],
+        "winner": "speed_weight",
+        "severity": "high",
+        "warning": "Avoiding fast traffic may use less safe corridors."
+      },
+      {
+        "id": "speed_calming_rat_run",
+        "weights": [
+          "speed_weight",
+          "calming_weight"
+        ],
+        "winner": "speed_weight",
+        "severity": "high",
+        "warning": "Quiet back-street detours may have many speed bumps."
+      },
+      {
+        "id": "junction_risk_arterial",
+        "weights": [
+          "junction_weight",
+          "risk_weight"
+        ],
+        "winner": "junction_weight",
+        "severity": "high",
+        "warning": "Maximizing flow may use busier roads — increase Safety."
+      },
+      {
+        "id": "hill_green_preset",
+        "weights": [
+          "hill_weight",
+          "green_weight"
+        ],
+        "winner": "green_weight",
+        "severity": "medium",
+        "warning": "Flat routes and scenic routes may pull in opposite directions."
+      },
+      {
+        "id": "hill_risk_valley",
+        "weights": [
+          "hill_weight",
+          "risk_weight"
+        ],
+        "winner": "hill_weight",
+        "severity": "high",
+        "warning": "Very flat routes may use busier valley roads."
+      },
+      {
+        "id": "hill_calming_tottenham",
+        "weights": [
+          "hill_weight",
+          "calming_weight"
+        ],
+        "winner": "hill_weight",
+        "severity": "medium",
+        "warning": "Flat bypasses may thread through speed-calmed streets."
+      },
+      {
+        "id": "barrier_risk_greenwich",
+        "weights": [
+          "barrier_weight",
+          "risk_weight"
+        ],
+        "winner": "barrier_weight",
+        "severity": "high",
+        "warning": "Avoiding barriers may use less safe detours."
+      },
+      {
+        "id": "calming_risk_arterial",
+        "weights": [
+          "calming_weight",
+          "risk_weight"
+        ],
+        "winner": "calming_weight",
+        "severity": "high",
+        "warning": "Avoiding speed bumps may use busier roads with more signals."
+      },
+      {
+        "id": "green_barrier_twickenham",
+        "weights": [
+          "green_weight",
+          "barrier_weight"
+        ],
+        "winner": "green_weight",
+        "severity": "medium",
+        "warning": "Scenic routes may pass through more gates and barriers."
+      },
+      {
+        "id": "surface_green_parks",
+        "weights": [
+          "surface_weight",
+          "green_weight"
+        ],
+        "winner": "green_weight",
+        "severity": "medium",
+        "warning": "Smooth surfaces may skip unpaved park paths."
+      },
+      {
+        "id": "surface_speed_tottenham",
+        "weights": [
+          "surface_weight",
+          "speed_weight"
+        ],
+        "winner": "speed_weight",
+        "severity": "medium",
+        "warning": "Paved-only routing may use busier motor corridors."
+      },
+      {
+        "id": "surface_risk_tottenham",
+        "weights": [
+          "surface_weight",
+          "risk_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "medium",
+        "warning": "Smooth-surface detours may be less safe."
+      },
+      {
+        "id": "tfl_cycleway_calming_bromley",
+        "weights": [
+          "tfl_cycleway_weight",
+          "calming_weight"
+        ],
+        "winner": "tfl_cycleway_weight",
+        "severity": "medium",
+        "warning": "Cycle network detours may include speed-calmed links."
+      },
+      {
+        "id": "tfl_live_risk_kings_cross",
+        "weights": [
+          "tfl_live_weight",
+          "risk_weight"
+        ],
+        "winner": "tfl_live_weight",
+        "severity": "high",
+        "warning": "Closure detours may use less safe roads."
+      },
+      {
+        "id": "tfl_live_surface_earls",
+        "weights": [
+          "tfl_live_weight",
+          "surface_weight"
+        ],
+        "winner": "tfl_live_weight",
+        "severity": "medium",
+        "warning": "Closure detours may include rough surfaces."
+      },
+      {
+        "id": "tfl_live_calming_wembley",
+        "weights": [
+          "tfl_live_weight",
+          "calming_weight"
+        ],
+        "winner": "tfl_live_weight",
+        "severity": "high",
+        "warning": "Avoiding closures may route through many speed bumps."
+      },
+      {
+        "id": "vehicular_free_risk_accidents",
+        "weights": [
+          "vehicular_free_weight",
+          "risk_weight"
+        ],
+        "winner": "vehicular_free_weight",
+        "severity": "medium",
+        "warning": "Car-free detours may pass through less safe segments."
+      },
+      {
+        "id": "risk_light_floor",
+        "weights": [
+          "risk_weight",
+          "light_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "high",
+        "warning": "Well-lit routes work best with Safety enabled — especially at night."
+      },
+      {
+        "id": "risk_surface_floor",
+        "weights": [
+          "risk_weight",
+          "surface_weight"
+        ],
+        "winner": "risk_weight",
+        "severity": "medium",
+        "warning": "Safer routes may use rough paths — enable Smooth Surfaces for paved only."
+      },
+      {
+        "id": "signal_junction_paradox",
+        "weights": [
+          "signal_weight",
+          "junction_weight"
+        ],
+        "winner": "junction_weight",
+        "severity": "medium",
+        "warning": "Combining flow and light-avoidance may produce long zig-zag routes."
+      }
+    ]
+  },
+  "notes": {
+    "budget_bar": "Per-slider minute costs are independent single-weight sweep estimates. Combined weights interact; totals are a linear-sum approximation and must be labelled 'Estimated detour' in the UI.",
+    "reward_scale": "green_weight and tfl_cycleway_weight anchors above the old 0.2 gate reuse gate-sweep effect data as an approximation until the preset sweep provides lerped-reward measurements."
+  }
+}
