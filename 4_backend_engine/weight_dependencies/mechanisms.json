@@ -1,0 +1,227 @@
+{
+  "version": "2026-06-19",
+  "source": "6_verification/parameter_sweeps/2026-06-19",
+  "mechanisms": {
+    "arterial_bypass": {
+      "label": "Arterial bypass",
+      "description": "Router hops to larger roads with grade separation, roundabouts, or cycle highways to avoid signalised junctions, barriers, or calming furniture.",
+      "trigger_weights": ["signal_weight", "junction_weight", "light_weight", "barrier_weight", "calming_weight"],
+      "stat_signature": {
+        "primary": {"accidents": "increase", "illumination_pct": "decrease"},
+        "secondary": {"vehicular_free_pct": "decrease", "speed_stress_pct": "decrease", "calming_count": "stable_or_decrease"}
+      },
+      "conflicts_with_weights": ["risk_weight", "light_weight", "calming_weight"],
+      "synergizes_with_weights": ["tfl_cycleway_weight"],
+      "example_routes": ["route_07_putney_notting_hill", "route_01_imperial_kings_cross", "route_02_imperial_greenwich"],
+      "integration_test_checks": [
+        "If signal_weight or junction_weight aggressive and accidents spike vs fastest, check for arterial geometry on map",
+        "Putney toxic snap @0.6 signal — accidents +94% with illumination drop"
+      ],
+      "preset_guidance": "Bundle with risk_weight >= 0.5; cap signal if risk < 0.4. Night: add light_weight >= 0.4."
+    },
+    "rat_run": {
+      "label": "Residential rat run",
+      "description": "Router threads residential side streets with dense traffic-calming furniture to avoid signals, motor stress, or junction clusters.",
+      "trigger_weights": ["signal_weight", "speed_weight", "junction_weight", "tfl_cycleway_weight", "tfl_live_weight"],
+      "stat_signature": {
+        "primary": {"calming_count": "increase", "dist_km": "increase"},
+        "secondary": {"illumination_pct": "decrease", "speed_stress_pct": "decrease"}
+      },
+      "conflicts_with_weights": ["calming_weight", "light_weight"],
+      "synergizes_with_weights": [],
+      "example_routes": ["route_10_bromley_ealing", "route_03_imperial_spitalfields", "route_05_wembley_kings_college"],
+      "integration_test_checks": [
+        "Check calming_count on map when signal or speed aggressive — Bromley 55→265 @signal 2.0",
+        "Wembley calming +411% on tfl_live reroute"
+      ],
+      "preset_guidance": "Cap signal_weight at 0.4 if calming_weight > 0 (Comfort Flow). Do not max signal without calming counter."
+    },
+    "valley_trap": {
+      "label": "Valley trap",
+      "description": "Aggressive hill avoidance routes through long flat arterial corridors at valley floor, trading climb for distance and exposure.",
+      "trigger_weights": ["hill_weight"],
+      "stat_signature": {
+        "primary": {"elevation_gain": "decrease", "dist_km": "increase"},
+        "secondary": {"accidents": "increase", "green_pct": "decrease"}
+      },
+      "conflicts_with_weights": ["risk_weight", "green_weight"],
+      "synergizes_with_weights": [],
+      "example_routes": ["route_10_bromley_ealing", "route_02_imperial_greenwich", "route_08_tottenham_hampstead"],
+      "integration_test_checks": [
+        "Hill @3.0 — verify accidents not spiking >40% vs baseline on Greenwich/Bromley/Wembley",
+        "Wembley +4.9 km @5.0 rejected — never expose beyond cap 3.0"
+      ],
+      "preset_guidance": "Counter-balance with risk_weight and speed_weight in profile; hill slider guarantees flattest plateau, not holistic safety."
+    },
+    "scenic_park_detour": {
+      "label": "Scenic park detour",
+      "description": "Router pulls through parks, rivers, or green corridors — often unpaved or unlit — to satisfy green or risk objectives.",
+      "trigger_weights": ["green_weight", "risk_weight"],
+      "stat_signature": {
+        "primary": {"green_pct": "increase", "vehicular_free_pct": "increase"},
+        "secondary": {"rough_pct": "increase", "illumination_pct": "decrease", "barrier_count": "increase"}
+      },
+      "conflicts_with_weights": ["surface_weight", "light_weight", "barrier_weight"],
+      "synergizes_with_weights": ["vehicular_free_weight"],
+      "example_routes": ["route_06_battersea_temple", "route_07_putney_notting_hill", "route_04_twickenham_st_pauls"],
+      "integration_test_checks": [
+        "Putney @risk 0.8 — rough 27% and illumination 58% on safe path",
+        "Green @0.2 Twickenham — barrier_count 0→8"
+      ],
+      "preset_guidance": "Explorer preset may accept; Commuter needs surface_weight floor for road bikes."
+    },
+    "paved_only_tension": {
+      "label": "Paved-only tension",
+      "description": "Smooth-surface preference forces routing off park gravel and onto paved arterials or residential streets.",
+      "trigger_weights": ["surface_weight"],
+      "stat_signature": {
+        "primary": {"rough_pct": "decrease"},
+        "secondary": {"green_pct": "decrease", "speed_stress_pct": "increase", "accidents": "increase"}
+      },
+      "conflicts_with_weights": ["green_weight", "speed_weight", "risk_weight"],
+      "synergizes_with_weights": [],
+      "example_routes": ["route_08_tottenham_hampstead", "route_11_hill_elmers_streatham"],
+      "integration_test_checks": [
+        "Surface ON — verify green_pct drop on Tottenham/Hill",
+        "Tottenham accidents +28% on paved detour"
+      ],
+      "preset_guidance": "Road bike hardware override sets surface_weight floor; conflicts with Explorer green preference."
+    },
+    "live_closure_reroute": {
+      "label": "Live closure reroute",
+      "description": "Live TfL/TomTom disruption avoidance forces long residential or rough-surface bypasses around closures.",
+      "trigger_weights": ["tfl_live_weight"],
+      "stat_signature": {
+        "primary": {"disruption_count": "decrease", "dist_km": "increase"},
+        "secondary": {"accidents": "mixed", "calming_count": "increase", "rough_pct": "increase"}
+      },
+      "conflicts_with_weights": ["risk_weight", "surface_weight", "calming_weight"],
+      "synergizes_with_weights": [],
+      "example_routes": ["route_05_wembley_kings_college", "route_01_imperial_kings_cross", "route_09_earls_court_piccadilly"],
+      "integration_test_checks": [
+        "tfl_live @0.2 Wembley — +1.76 km and +411% calming",
+        "Never expose multipliers above 0.2 — Spitalfields disruption doubles @1.0"
+      ],
+      "preset_guidance": "Binary toggle only at 0.2; pair with risk_weight for Kings Cross accident spike."
+    },
+    "barrier_avoidance_detour": {
+      "label": "Barrier avoidance detour",
+      "description": "Dodging gates and bollards routes onto longer paths with different stress profiles.",
+      "trigger_weights": ["barrier_weight"],
+      "stat_signature": {
+        "primary": {"barrier_penalty_count": "decrease", "dist_km": "increase"},
+        "secondary": {"accidents": "increase", "calming_count": "increase"}
+      },
+      "conflicts_with_weights": ["risk_weight", "calming_weight"],
+      "synergizes_with_weights": [],
+      "example_routes": ["route_02_imperial_greenwich", "route_01_imperial_kings_cross"],
+      "integration_test_checks": [
+        "Greenwich accidents +53% @barrier 0.6",
+        "Reject @2.0+ — Greenwich accidents +129%"
+      ],
+      "preset_guidance": "Pair with risk_weight at aggressive; cap at 1.5."
+    },
+    "segregated_infrastructure_pull": {
+      "label": "Segregated infrastructure pull",
+      "description": "Reward for cycleways, quietways, or car-free corridors pulls route onto TfL CS networks or segregated paths.",
+      "trigger_weights": ["vehicular_free_weight", "tfl_cycleway_weight", "risk_weight"],
+      "stat_signature": {
+        "primary": {"tfl_cycleway_pct": "increase", "vehicular_free_pct": "increase", "speed_stress_pct": "decrease"},
+        "secondary": {"accidents": "decrease", "dist_km": "increase", "elevation_gain": "increase"}
+      },
+      "conflicts_with_weights": ["hill_weight"],
+      "synergizes_with_weights": ["vehicular_free_weight", "tfl_cycleway_weight", "risk_weight"],
+      "example_routes": ["route_06_battersea_temple", "route_04_twickenham_st_pauls", "route_02_imperial_greenwich"],
+      "integration_test_checks": [
+        "vehicular_free Battersea tfl_cycleway 5.4%→73.8% @2.0",
+        "Twickenham speed_stress −96% @vehicular_free 3.0"
+      ],
+      "preset_guidance": "Natural pair vehicular_free + tfl_cycleway; watch Tottenham/Bromley accident side-effects."
+    },
+    "pedestrian_shortcut": {
+      "label": "Pedestrian shortcut",
+      "description": "High signal penalty causes micro-detours onto footway/path segments to bypass traffic lights — geographically stupid zig-zags.",
+      "trigger_weights": ["signal_weight"],
+      "stat_signature": {
+        "primary": {"dist_km": "increase", "signal_count": "decrease"},
+        "secondary": {"accidents": "increase"}
+      },
+      "conflicts_with_weights": ["junction_weight"],
+      "synergizes_with_weights": [],
+      "example_routes": ["route_01_imperial_kings_cross"],
+      "integration_test_checks": [
+        "Phase 1 note: pedestrian M bump mitigates but small sections north of Imperial may persist @signal 2.0",
+        "Check for footway/path stubs on Folium maps at aggressive signal"
+      ],
+      "preset_guidance": "Cap signal at 2.0 globally; ensure junction_weight anchors zig-zag cost."
+    },
+    "lit_arterial_corridor": {
+      "label": "Lit arterial corridor",
+      "description": "Well-lit routing preference pulls onto busier, lit motor corridors at the expense of safety and green.",
+      "trigger_weights": ["light_weight"],
+      "stat_signature": {
+        "primary": {"illumination_pct": "increase", "accidents": "increase"},
+        "secondary": {"green_pct": "decrease", "speed_stress_pct": "increase"}
+      },
+      "conflicts_with_weights": ["risk_weight", "green_weight"],
+      "synergizes_with_weights": ["risk_weight"],
+      "example_routes": ["route_08_tottenham_hampstead", "route_02_imperial_greenwich", "route_10_bromley_ealing"],
+      "integration_test_checks": [
+        "Light ON — Tottenham accidents +44%, Greenwich +55%",
+        "Night Ride Mode: light + risk both >= 0.4"
+      ],
+      "preset_guidance": "Night Ride bundle: light_weight + risk_weight >= 0.4. Never high light with low risk."
+    },
+    "quietway_only_detour": {
+      "label": "Quietway-only detour",
+      "description": "Standalone quietway reward causes long detours on the few corridors where quietway tags exist — 82% of routes inert.",
+      "trigger_weights": ["tfl_quietway_weight"],
+      "stat_signature": {
+        "primary": {"tfl_quietway_pct": "increase", "dist_km": "increase"},
+        "secondary": {"accidents": "increase", "elevation_gain": "increase"}
+      },
+      "conflicts_with_weights": ["risk_weight"],
+      "synergizes_with_weights": ["tfl_cycleway_weight"],
+      "example_routes": ["route_10_bromley_ealing", "route_09_earls_court_piccadilly"],
+      "integration_test_checks": [
+        "Do not ship standalone quietway UI — merge into cycleway toggle",
+        "Bromley +526 m @quietway 0.2 only"
+      ],
+      "preset_guidance": "ui_merge with tfl_cycleway_weight at 0.2 co-set."
+    },
+    "distance_wall": {
+      "label": "Distance wall",
+      "description": "Toxic detour beyond product cap — marginal target-metric gain for disproportionate distance or duration cost.",
+      "trigger_weights": ["signal_weight", "hill_weight", "vehicular_free_weight", "junction_weight", "tfl_live_weight", "risk_weight"],
+      "stat_signature": {
+        "primary": {"dist_km": "increase", "duration_min": "increase"},
+        "secondary": {}
+      },
+      "conflicts_with_weights": [],
+      "synergizes_with_weights": [],
+      "example_routes": ["route_10_bromley_ealing", "route_05_wembley_kings_college", "route_04_twickenham_st_pauls"],
+      "integration_test_checks": [
+        "Any route Δkm >= +1.5 km or Δmin >= +6 min at shipped multiplier — flag in distance_explosion_routes",
+        "Hill Wembley +4.9 km @5.0 rejected; vehicular_free Bromley +4.8 km @5.0 rejected"
+      ],
+      "preset_guidance": "Hard caps per weight in ui.cap — never expose rejected 5.0 multipliers in default UI."
+    },
+    "inert_weight": {
+      "label": "Inert weight",
+      "description": "Weight produces zero path change across entire test set — slider is meaningless.",
+      "trigger_weights": ["width_weight"],
+      "stat_signature": {
+        "primary": {},
+        "secondary": {}
+      },
+      "conflicts_with_weights": [],
+      "synergizes_with_weights": ["vehicular_free_weight", "tfl_cycleway_weight"],
+      "example_routes": [],
+      "integration_test_checks": [
+        "width_weight: all 11 routes byte-identical 0.0→5.0",
+        "Re-sweep gate: >=3/11 routes with >=10% narrow_km drop before UI work"
+      ],
+      "preset_guidance": "Backend width_weight = 0.0 always; hidden from UI."
+    }
+  }
+}

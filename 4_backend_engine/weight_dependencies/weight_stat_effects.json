@@ -1,0 +1,2499 @@
+{
+  "version": "2026-06-19",
+  "source": "6_verification/parameter_sweeps/2026-06-19",
+  "stat_to_weight": {
+    "dist_km": null,
+    "duration_min": null,
+    "accidents": "risk_weight",
+    "illumination_pct": "light_weight",
+    "rough_pct": "surface_weight",
+    "elevation_gain": "hill_weight",
+    "steep_count": "hill_weight",
+    "tfl_cycleway_pct": "tfl_cycleway_weight",
+    "tfl_quietway_pct": "tfl_quietway_weight",
+    "vehicular_free_pct": "vehicular_free_weight",
+    "speed_stress_km": "speed_weight",
+    "speed_stress_pct": "speed_weight",
+    "narrow_km": "width_weight",
+    "green_km": "green_weight",
+    "green_pct": "green_weight",
+    "barrier_count": "barrier_weight",
+    "barrier_penalty_count": "barrier_weight",
+    "calming_count": "calming_weight",
+    "junction_count": "junction_weight",
+    "give_way_count": "junction_weight",
+    "stop_sign_count": "junction_weight",
+    "signal_count": "signal_weight",
+    "disruption_count": "tfl_live_weight"
+  },
+  "weights": {
+    "signal_weight": {
+      "ui": {
+        "label": "Fewer Traffic Lights",
+        "shape": "three_step_slider",
+        "moderate": 0.4,
+        "aggressive": 2.0,
+        "cap": 2.0,
+        "inert_route_fraction": "1/11",
+        "inert_routes": [
+          "route_11_hill_elmers_streatham"
+        ],
+        "notes": "Route 11 inert until 0.6"
+      },
+      "target_metric": {
+        "stat": "signal_count",
+        "direction_better": "decrease"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.57,
+        "moderate_avg_delta_min": 2.1,
+        "aggressive_avg_delta_km": 1.77,
+        "aggressive_avg_delta_min": 6.6,
+        "distance_explosion_routes": [
+          {
+            "route": "route_03_imperial_spitalfields",
+            "delta_km": 2.99,
+            "delta_min": 11.2,
+            "at": "aggressive"
+          },
+          {
+            "route": "route_05_wembley_kings_college",
+            "delta_km": 2.93,
+            "delta_min": 11.0,
+            "at": "aggressive"
+          },
+          {
+            "route": "route_10_bromley_ealing",
+            "delta_km": 3.86,
+            "delta_min": 14.5,
+            "at": "aggressive"
+          },
+          {
+            "route": "route_04_twickenham_st_pauls",
+            "delta_km": 2.7,
+            "delta_min": 10.1,
+            "at": "aggressive"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "id": "signal_dist_moderate",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.4,
+            0.4
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_03_imperial_spitalfields",
+            "route_05_wembley_kings_college"
+          ],
+          "example_values": "avg +0.57 km @0.4",
+          "delta_km": 0.57,
+          "delta_min": 2.1,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "signal_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "signal_dist_aggressive",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "distance_wall",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_10_bromley_ealing",
+            "route_03_imperial_spitalfields"
+          ],
+          "example_values": "avg +1.77 km; Bromley +3.86 km @2.0",
+          "delta_km": 1.77,
+          "delta_min": 6.6,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "signal_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "signal_duration_aggressive",
+          "stat": "duration_min",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "distance_wall",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "+14.5 min Bromley @2.0",
+          "delta_km": 1.77,
+          "delta_min": 6.6,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "signal_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "signal_accidents_arterial",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.4,
+            2.0
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_02_imperial_greenwich",
+            "route_07_putney_notting_hill"
+          ],
+          "example_values": "Greenwich 150→210 @0.4; Putney 101→196 @0.6",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "signal_weight/slider_analysis.md §6.1"
+        },
+        {
+          "id": "signal_illumination_arterial",
+          "stat": "illumination_pct",
+          "direction": "decrease",
+          "strength": "strong",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            2.0
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_07_putney_notting_hill",
+            "route_05_wembley_kings_college"
+          ],
+          "example_values": "Putney 90%→60% @0.6",
+          "implies_tension_with": [
+            "light_weight"
+          ],
+          "is_intended": false,
+          "source_section": "signal_weight/slider_analysis.md §6.1"
+        },
+        {
+          "id": "signal_calming_rat_run",
+          "stat": "calming_count",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            0.4,
+            2.0
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_10_bromley_ealing",
+            "route_03_imperial_spitalfields"
+          ],
+          "example_values": "Bromley 55→265 @2.0",
+          "implies_tension_with": [
+            "calming_weight"
+          ],
+          "is_intended": false,
+          "source_section": "signal_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "signal_vehicular_free_down",
+          "stat": "vehicular_free_pct",
+          "direction": "decrease",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.4,
+            0.4
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "33.1%→15.1% @0.4",
+          "implies_tension_with": [
+            "vehicular_free_weight"
+          ],
+          "is_intended": false,
+          "source_section": "signal_weight/slider_analysis.md §6.1"
+        },
+        {
+          "id": "signal_speed_stress_win",
+          "stat": "speed_stress_pct",
+          "direction": "decrease",
+          "strength": "moderate",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_02_imperial_greenwich"
+          ],
+          "example_values": "3.1%→0.6% @2.0",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "signal_weight/slider_analysis.md §6.1"
+        },
+        {
+          "id": "signal_pedestrian_shortcut",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "aggressive",
+          "multiplier_band": [2.0, 2.0],
+          "mechanism_id": "pedestrian_shortcut",
+          "route_scope": "single_route",
+          "example_routes": ["route_01_imperial_kings_cross"],
+          "example_values": "Micro footway/path stubs to bypass lights @2.0 (Phase 1 Folium review)",
+          "implies_tension_with": ["junction_weight"],
+          "is_intended": false,
+          "source_section": "cost_function_brainstorming.md L114-117"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count",
+        "narrow_km"
+      ],
+      "hidden_wins_summary": [
+        "speed_stress_pct drops on CS corridors"
+      ],
+      "hidden_costs_summary": [
+        "Arterial bypass raises accidents; rat runs spike calming_count"
+      ]
+    },
+    "speed_weight": {
+      "ui": {
+        "label": "Avoid Fast Traffic",
+        "shape": "three_step_slider",
+        "moderate": 0.6,
+        "aggressive": 2.0,
+        "cap": 2.0,
+        "inert_route_fraction": "4/11",
+        "inert_routes": [
+          "route_01_imperial_kings_cross",
+          "route_06_battersea_temple",
+          "route_07_putney_notting_hill",
+          "route_09_earls_court_piccadilly"
+        ],
+        "notes": "36% fully inert — baseline speed_stress_km = 0"
+      },
+      "target_metric": {
+        "stat": "speed_stress_pct",
+        "direction_better": "decrease"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.27,
+        "moderate_avg_delta_min": 1.0,
+        "aggressive_avg_delta_km": 0.39,
+        "aggressive_avg_delta_min": 1.5,
+        "distance_explosion_routes": []
+      },
+      "effects": [
+        {
+          "id": "speed_dist_moderate",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_04_twickenham_st_pauls",
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "avg +0.27 km @0.6",
+          "delta_km": 0.27,
+          "delta_min": 1.0,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "speed_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "speed_dist_aggressive",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "avg +0.39 km @2.0",
+          "delta_km": 0.39,
+          "delta_min": 1.5,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "speed_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "speed_accidents_twickenham",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            1.0,
+            1.0
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_04_twickenham_st_pauls"
+          ],
+          "example_values": "257→696 (+171%) @1.0",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "speed_weight/slider_analysis.md §6.4"
+        },
+        {
+          "id": "speed_calming_rat_run",
+          "stat": "calming_count",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            3.0
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_05_wembley_kings_college",
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "Wembley 9→72 @3.0; Hill 44→98 @2.0",
+          "implies_tension_with": [
+            "calming_weight"
+          ],
+          "is_intended": false,
+          "source_section": "speed_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "speed_illumination_down",
+          "stat": "illumination_pct",
+          "direction": "decrease",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "73%→44% @2.0",
+          "implies_tension_with": [
+            "light_weight"
+          ],
+          "is_intended": false,
+          "source_section": "speed_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "speed_tfl_cycleway_down",
+          "stat": "tfl_cycleway_pct",
+          "direction": "decrease",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.4,
+            0.4
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead"
+          ],
+          "example_values": "4.9%→0.3% @0.4",
+          "implies_tension_with": [
+            "tfl_cycleway_weight"
+          ],
+          "is_intended": false,
+          "source_section": "speed_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "speed_stress_primary_win",
+          "stat": "speed_stress_pct",
+          "direction": "decrease",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_04_twickenham_st_pauls",
+            "route_08_tottenham_hampstead"
+          ],
+          "example_values": "Twickenham 35.6%→1.2% @2.0",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "speed_weight/slider_analysis.md §6.3"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count",
+        "narrow_km"
+      ],
+      "hidden_wins_summary": [
+        "Primary speed_stress_pct reduction; occasional accident drops on Hill/Spitalfields"
+      ],
+      "hidden_costs_summary": [
+        "Twickenham accident cliff; calming and illumination drops on rat-run detours"
+      ]
+    },
+    "junction_weight": {
+      "ui": {
+        "label": "Maximize Flow (Fewer Stops)",
+        "shape": "three_step_slider",
+        "moderate": 1.0,
+        "aggressive": 3.0,
+        "cap": 3.0,
+        "inert_route_fraction": "0/11",
+        "inert_routes": [],
+        "notes": "Route 11 worsens @0.6 — excluded from averages"
+      },
+      "target_metric": {
+        "stat": "junction_count",
+        "direction_better": "decrease"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.053,
+        "moderate_avg_delta_min": 0.2,
+        "aggressive_avg_delta_km": 0.206,
+        "aggressive_avg_delta_min": 0.8,
+        "distance_explosion_routes": []
+      },
+      "effects": [
+        {
+          "id": "junction_dist_moderate",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "weak",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            1.0,
+            1.0
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead"
+          ],
+          "example_values": "~50 m avg @1.0",
+          "delta_km": 0.053,
+          "delta_min": 0.2,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "junction_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "junction_dist_aggressive",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            3.0,
+            3.0
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "~250 m avg @3.0",
+          "delta_km": 0.206,
+          "delta_min": 0.8,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "junction_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "junction_accidents_arterial",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            3.0
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_01_imperial_kings_cross"
+          ],
+          "example_values": "87→203 (+133%) @2.0",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "junction_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "junction_calming_spike",
+          "stat": "calming_count",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            3.0,
+            3.0
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_03_imperial_spitalfields"
+          ],
+          "example_values": "6→48 (+700%) @3.0",
+          "implies_tension_with": [
+            "calming_weight"
+          ],
+          "is_intended": false,
+          "source_section": "junction_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "junction_green_down",
+          "stat": "green_pct",
+          "direction": "decrease",
+          "strength": "moderate",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_01_imperial_kings_cross"
+          ],
+          "example_values": "27%→0% @2.0",
+          "implies_tension_with": [
+            "green_weight"
+          ],
+          "is_intended": false,
+          "source_section": "junction_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "junction_speed_stress_win",
+          "stat": "speed_stress_pct",
+          "direction": "decrease",
+          "strength": "moderate",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead"
+          ],
+          "example_values": "20.5%→1.3% @2.0",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "junction_weight/slider_analysis.md §6.1"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count"
+      ],
+      "hidden_wins_summary": [
+        "give_way_count falls; speed_stress_pct can drop on simplified paths"
+      ],
+      "hidden_costs_summary": [
+        "Arterial road warning — accidents spike @2.0+; calming surges on long alternates"
+      ]
+    },
+    "risk_weight": {
+      "ui": {
+        "label": "Safer Route",
+        "shape": "three_step_slider",
+        "moderate": 0.6,
+        "aggressive": 2.0,
+        "cap": 2.0,
+        "inert_route_fraction": "0/11",
+        "inert_routes": [],
+        "notes": "Tottenham flat 1.0–3.0 on both axes"
+      },
+      "target_metric": {
+        "stat": "accidents",
+        "direction_better": "decrease"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.43,
+        "moderate_avg_delta_min": 1.6,
+        "aggressive_avg_delta_km": 1.16,
+        "aggressive_avg_delta_min": 4.3,
+        "distance_explosion_routes": [
+          {
+            "route": "route_10_bromley_ealing",
+            "delta_km": 3.52,
+            "delta_min": 13.2,
+            "at": "aggressive"
+          },
+          {
+            "route": "route_03_imperial_spitalfields",
+            "delta_km": 1.94,
+            "delta_min": 7.3,
+            "at": "aggressive"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "id": "risk_dist_moderate",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_03_imperial_spitalfields",
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "avg +0.43 km @0.6",
+          "delta_km": 0.43,
+          "delta_min": 1.6,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "risk_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "risk_dist_aggressive",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "distance_wall",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "avg +1.16 km; Bromley +3.52 km @2.0",
+          "delta_km": 1.16,
+          "delta_min": 4.3,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "risk_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "risk_illumination_down",
+          "stat": "illumination_pct",
+          "direction": "decrease",
+          "strength": "strong",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.8,
+            2.0
+          ],
+          "mechanism_id": "scenic_park_detour",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_07_putney_notting_hill",
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "Putney 90%→58% @0.8+; Hill 73%→59% @1.5",
+          "implies_tension_with": [
+            "light_weight"
+          ],
+          "is_intended": false,
+          "source_section": "risk_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "risk_rough_spike",
+          "stat": "rough_pct",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.8,
+            2.0
+          ],
+          "mechanism_id": "scenic_park_detour",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_07_putney_notting_hill"
+          ],
+          "example_values": "Putney 0%→27% @0.8+",
+          "implies_tension_with": [
+            "surface_weight"
+          ],
+          "is_intended": false,
+          "source_section": "risk_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "risk_elevation_up",
+          "stat": "elevation_gain",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            3.0,
+            5.0
+          ],
+          "mechanism_id": "valley_trap",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_03_imperial_spitalfields",
+            "route_09_earls_court_piccadilly"
+          ],
+          "example_values": "Spitalfields +62% elev @3.0; Earls Court +388% @5.0",
+          "implies_tension_with": [
+            "hill_weight"
+          ],
+          "is_intended": false,
+          "source_section": "risk_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "risk_calming_up",
+          "stat": "calming_count",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            3.0,
+            5.0
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_05_wembley_kings_college",
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "Wembley 9→91 @5.0; Bromley 55→161 @3.0",
+          "implies_tension_with": [
+            "calming_weight"
+          ],
+          "is_intended": false,
+          "source_section": "risk_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "risk_speed_stress_win",
+          "stat": "speed_stress_pct",
+          "direction": "decrease",
+          "strength": "moderate",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            5.0
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_04_twickenham_st_pauls",
+            "route_08_tottenham_hampstead"
+          ],
+          "example_values": "Twickenham 35.6%→7.2% @5.0",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "risk_weight/slider_analysis.md §6.1"
+        },
+        {
+          "id": "risk_tfl_cycleway_win",
+          "stat": "tfl_cycleway_pct",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_01_imperial_kings_cross",
+            "route_07_putney_notting_hill"
+          ],
+          "example_values": "Kings Cross 27%→40% @2.0",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "risk_weight/slider_analysis.md §6.1"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count",
+        "narrow_km"
+      ],
+      "hidden_wins_summary": [
+        "speed_stress drops; tfl_cycleway_pct and signal_count often improve on safer paths"
+      ],
+      "hidden_costs_summary": [
+        "Illumination and surface quality drop on park/path detours; elevation and calming can rise"
+      ]
+    },
+    "hill_weight": {
+      "ui": {
+        "label": "Bypass Steep Hills",
+        "shape": "three_step_slider",
+        "moderate": 0.6,
+        "aggressive": 3.0,
+        "cap": 3.0,
+        "inert_route_fraction": "1/11",
+        "inert_routes": [
+          "route_07_putney_notting_hill"
+        ],
+        "notes": "Putney stubborn at shipped steps; needs 5.0 (rejected)"
+      },
+      "target_metric": {
+        "stat": "elevation_gain",
+        "direction_better": "decrease"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.42,
+        "moderate_avg_delta_min": 1.6,
+        "aggressive_avg_delta_km": 1.57,
+        "aggressive_avg_delta_min": 5.9,
+        "distance_explosion_routes": [
+          {
+            "route": "route_10_bromley_ealing",
+            "delta_km": 4.04,
+            "delta_min": 15.2,
+            "at": "aggressive"
+          },
+          {
+            "route": "route_06_battersea_temple",
+            "delta_km": 1.77,
+            "delta_min": 6.6,
+            "at": "aggressive"
+          },
+          {
+            "route": "route_03_imperial_spitalfields",
+            "delta_km": 2.79,
+            "delta_min": 10.4,
+            "at": "aggressive"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "id": "hill_dist_moderate",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "valley_trap",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead",
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "avg +0.42 km @0.6",
+          "delta_km": 0.42,
+          "delta_min": 1.6,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "hill_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "hill_dist_aggressive",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            3.0,
+            3.0
+          ],
+          "mechanism_id": "distance_wall",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_10_bromley_ealing",
+            "route_03_imperial_spitalfields"
+          ],
+          "example_values": "avg +1.57 km; Bromley +4.04 km @3.0",
+          "delta_km": 1.57,
+          "delta_min": 5.9,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "hill_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "hill_accidents_valley",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            3.0,
+            3.0
+          ],
+          "mechanism_id": "valley_trap",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_02_imperial_greenwich",
+            "route_10_bromley_ealing",
+            "route_05_wembley_kings_college"
+          ],
+          "example_values": "Greenwich +155%; Bromley +72%; Wembley +76% @3.0",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "hill_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "hill_green_down",
+          "stat": "green_pct",
+          "direction": "decrease",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "valley_trap",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_01_imperial_kings_cross"
+          ],
+          "example_values": "27%→0% @0.6",
+          "implies_tension_with": [
+            "green_weight"
+          ],
+          "is_intended": false,
+          "source_section": "hill_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "hill_calming_tottenham",
+          "stat": "calming_count",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead"
+          ],
+          "example_values": "17→67 @0.2",
+          "implies_tension_with": [
+            "calming_weight"
+          ],
+          "is_intended": false,
+          "source_section": "hill_weight/slider_analysis.md §6.3"
+        },
+        {
+          "id": "hill_steep_win",
+          "stat": "steep_count",
+          "direction": "decrease",
+          "strength": "strong",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            3.0
+          ],
+          "mechanism_id": "valley_trap",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead",
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "Tottenham 127→32; Hill 118→25 @0.6",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "hill_weight/slider_analysis.md §6.1"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count"
+      ],
+      "hidden_wins_summary": [
+        "steep_count and speed_stress_pct drop on hill-heavy corridors"
+      ],
+      "hidden_costs_summary": [
+        "Valley-trap routing spikes accidents @3.0; green_pct and barriers can worsen"
+      ]
+    },
+    "light_weight": {
+      "ui": {
+        "label": "Well-Lit Streets",
+        "shape": "binary_toggle",
+        "moderate": 0.4,
+        "aggressive": null,
+        "cap": 0.4,
+        "inert_route_fraction": "3/11",
+        "inert_routes": [
+          "route_04_twickenham_st_pauls",
+          "route_05_wembley_kings_college",
+          "route_06_battersea_temple"
+        ],
+        "notes": "Near-ceiling illumination ≥97%; binary ON only"
+      },
+      "target_metric": {
+        "stat": "illumination_pct",
+        "direction_better": "increase"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.08,
+        "moderate_avg_delta_min": 0.3,
+        "aggressive_avg_delta_km": null,
+        "aggressive_avg_delta_min": null,
+        "distance_explosion_routes": []
+      },
+      "effects": [
+        {
+          "id": "light_dist_binary",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "weak",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.4,
+            0.4
+          ],
+          "mechanism_id": "lit_arterial_corridor",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead",
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "~80 m avg @0.4",
+          "delta_km": 0.08,
+          "delta_min": 0.3,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "light_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "light_accidents_up",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.4,
+            0.6
+          ],
+          "mechanism_id": "lit_arterial_corridor",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead",
+            "route_02_imperial_greenwich",
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "Tottenham +44%; Greenwich +55%; Bromley +12% @0.6",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "light_weight/slider_analysis.md §8"
+        },
+        {
+          "id": "light_green_down",
+          "stat": "green_pct",
+          "direction": "decrease",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "lit_arterial_corridor",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead"
+          ],
+          "example_values": "16.5%→5.3%",
+          "implies_tension_with": [
+            "green_weight"
+          ],
+          "is_intended": false,
+          "source_section": "light_weight/slider_analysis.md §8"
+        },
+        {
+          "id": "light_speed_stress_up",
+          "stat": "speed_stress_pct",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "lit_arterial_corridor",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "46%→65.8%",
+          "implies_tension_with": [
+            "speed_weight"
+          ],
+          "is_intended": false,
+          "source_section": "light_weight/slider_analysis.md §8"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count",
+        "narrow_km"
+      ],
+      "hidden_wins_summary": [
+        "Hill route rough_pct drops to 0% @0.6"
+      ],
+      "hidden_costs_summary": [
+        "Lit routing pulls onto busier arterial corridors — pair with risk_weight for night"
+      ]
+    },
+    "calming_weight": {
+      "ui": {
+        "label": "Avoid Speed Bumps",
+        "shape": "three_step_slider",
+        "moderate": 0.6,
+        "aggressive": 1.5,
+        "cap": 1.5,
+        "inert_route_fraction": "4/11",
+        "inert_routes": [
+          "route_06_battersea_temple",
+          "route_09_earls_court_piccadilly",
+          "route_04_twickenham_st_pauls",
+          "route_05_wembley_kings_college"
+        ],
+        "notes": "Wembley flat @9 calming"
+      },
+      "target_metric": {
+        "stat": "calming_count",
+        "direction_better": "decrease"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.03,
+        "moderate_avg_delta_min": 0.1,
+        "aggressive_avg_delta_km": 0.05,
+        "aggressive_avg_delta_min": 0.2,
+        "distance_explosion_routes": []
+      },
+      "effects": [
+        {
+          "id": "calming_dist_moderate",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "weak",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_07_putney_notting_hill"
+          ],
+          "example_values": "~30 m avg @0.6",
+          "delta_km": 0.03,
+          "delta_min": 0.1,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "calming_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "calming_dist_aggressive",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "weak",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            1.5,
+            1.5
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "multi_route",
+          "example_routes": [],
+          "example_values": "~50 m avg @1.5",
+          "delta_km": 0.05,
+          "delta_min": 0.2,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "calming_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "calming_signals_hill",
+          "stat": "signal_count",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "8→24 (+200%) @0.6",
+          "implies_tension_with": [
+            "signal_weight"
+          ],
+          "is_intended": false,
+          "source_section": "calming_weight/slider_analysis.md §6"
+        },
+        {
+          "id": "calming_accidents_up",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            1.5,
+            3.0
+          ],
+          "mechanism_id": "arterial_bypass",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead",
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "Tottenham +45%; Bromley +35% @1.5",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "calming_weight/slider_analysis.md §6"
+        },
+        {
+          "id": "calming_tfl_cycleway_win",
+          "stat": "tfl_cycleway_pct",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_07_putney_notting_hill"
+          ],
+          "example_values": "1.2%→6.7% (+458%)",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "calming_weight/slider_analysis.md §6"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count",
+        "narrow_km"
+      ],
+      "hidden_wins_summary": [
+        "Occasional tfl_cycleway_pct lift when avoiding humps"
+      ],
+      "hidden_costs_summary": [
+        "Avoiding bumps routes onto arterials — accidents and signals rise"
+      ]
+    },
+    "barrier_weight": {
+      "ui": {
+        "label": "Avoid Barriers",
+        "shape": "three_step_slider",
+        "moderate": 0.6,
+        "aggressive": 1.5,
+        "cap": 1.5,
+        "inert_route_fraction": "2/11",
+        "inert_routes": [
+          "route_04_twickenham_st_pauls",
+          "route_09_earls_court_piccadilly"
+        ],
+        "notes": "Zero barriers at all multipliers on inert routes"
+      },
+      "target_metric": {
+        "stat": "barrier_penalty_count",
+        "direction_better": "decrease"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.05,
+        "moderate_avg_delta_min": 0.2,
+        "aggressive_avg_delta_km": 0.15,
+        "aggressive_avg_delta_min": 0.6,
+        "distance_explosion_routes": []
+      },
+      "effects": [
+        {
+          "id": "barrier_dist_moderate",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "weak",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "barrier_avoidance_detour",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_01_imperial_kings_cross"
+          ],
+          "example_values": "~50 m avg @0.6",
+          "delta_km": 0.05,
+          "delta_min": 0.2,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "barrier_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "barrier_dist_aggressive",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "weak",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            1.5,
+            1.5
+          ],
+          "mechanism_id": "barrier_avoidance_detour",
+          "route_scope": "multi_route",
+          "example_routes": [],
+          "example_values": "~150 m avg @1.5",
+          "delta_km": 0.15,
+          "delta_min": 0.6,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "barrier_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "barrier_calming_kings_cross",
+          "stat": "calming_count",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "barrier_avoidance_detour",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_01_imperial_kings_cross"
+          ],
+          "example_values": "6→23 (+283%) @0.6",
+          "implies_tension_with": [
+            "calming_weight"
+          ],
+          "is_intended": false,
+          "source_section": "barrier_weight/slider_analysis.md §6"
+        },
+        {
+          "id": "barrier_accidents_greenwich",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            1.5
+          ],
+          "mechanism_id": "barrier_avoidance_detour",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_02_imperial_greenwich",
+            "route_08_tottenham_hampstead"
+          ],
+          "example_values": "Greenwich 150→230 (+53%) @0.6; +129% @2.0+",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "barrier_weight/slider_analysis.md §6"
+        },
+        {
+          "id": "barrier_elevation_win",
+          "stat": "elevation_gain",
+          "direction": "decrease",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.6,
+            0.6
+          ],
+          "mechanism_id": "barrier_avoidance_detour",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_01_imperial_kings_cross"
+          ],
+          "example_values": "−51% @0.6",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "barrier_weight/slider_analysis.md §6"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count",
+        "narrow_km"
+      ],
+      "hidden_wins_summary": [
+        "barrier_count drops; occasional elevation_gain reduction"
+      ],
+      "hidden_costs_summary": [
+        "Barrier avoidance trades into accident exposure and calming on detours"
+      ]
+    },
+    "green_weight": {
+      "ui": {
+        "label": "Green & Scenic Routes",
+        "shape": "two_step",
+        "moderate": 0.2,
+        "aggressive": 0.2,
+        "cap": 0.2,
+        "inert_route_fraction": "5/11",
+        "inert_routes": [
+          "route_01_imperial_kings_cross",
+          "route_05_wembley_kings_college",
+          "route_07_putney_notting_hill",
+          "route_08_tottenham_hampstead",
+          "route_11_hill_elmers_streatham"
+        ],
+        "notes": "Single snap at 0.2 — identical routes 0.2→5.0"
+      },
+      "target_metric": {
+        "stat": "green_pct",
+        "direction_better": "increase"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.23,
+        "moderate_avg_delta_min": 0.9,
+        "aggressive_avg_delta_km": 0.23,
+        "aggressive_avg_delta_min": 0.9,
+        "distance_explosion_routes": []
+      },
+      "effects": [
+        {
+          "id": "green_dist_moderate",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "scenic_park_detour",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_06_battersea_temple",
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "avg +0.23 km @0.2",
+          "delta_km": 0.23,
+          "delta_min": 0.9,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "green_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "green_vehicular_free_win",
+          "stat": "vehicular_free_pct",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "scenic_park_detour",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_06_battersea_temple"
+          ],
+          "example_values": "47.6%→81% @0.2",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "green_weight/slider_analysis.md §6.1"
+        },
+        {
+          "id": "green_accidents_bromley",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "scenic_park_detour",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "402→483 (+20%) @0.2",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "green_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "green_barriers_twickenham",
+          "stat": "barrier_count",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "scenic_park_detour",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_04_twickenham_st_pauls"
+          ],
+          "example_values": "0→8 @0.2",
+          "implies_tension_with": [
+            "barrier_weight"
+          ],
+          "is_intended": false,
+          "source_section": "green_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "green_elevation_up",
+          "stat": "elevation_gain",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "scenic_park_detour",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_02_imperial_greenwich",
+            "route_03_imperial_spitalfields"
+          ],
+          "example_values": "Greenwich and Spitalfields elevation rise",
+          "implies_tension_with": [
+            "hill_weight"
+          ],
+          "is_intended": false,
+          "source_section": "green_weight/slider_analysis.md §6.2"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count",
+        "narrow_km"
+      ],
+      "hidden_wins_summary": [
+        "vehicular_free_pct and tfl_cycleway_pct rise on park paths; occasional accident drops"
+      ],
+      "hidden_costs_summary": [
+        "Scenic detours add barriers, elevation, or accidents on some corridors"
+      ]
+    },
+    "surface_weight": {
+      "ui": {
+        "label": "Smooth Surfaces Only",
+        "shape": "binary_toggle",
+        "moderate": 0.2,
+        "aggressive": null,
+        "cap": 0.2,
+        "inert_route_fraction": "8/11",
+        "inert_routes": [
+          "route_01_imperial_kings_cross",
+          "route_02_imperial_greenwich",
+          "route_04_twickenham_st_pauls",
+          "route_05_wembley_kings_college",
+          "route_06_battersea_temple",
+          "route_07_putney_notting_hill",
+          "route_09_earls_court_piccadilly",
+          "route_10_bromley_ealing"
+        ],
+        "notes": "73% inert — only Spitalfields, Tottenham, Hill respond"
+      },
+      "target_metric": {
+        "stat": "rough_pct",
+        "direction_better": "decrease"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.12,
+        "moderate_avg_delta_min": 0.45,
+        "aggressive_avg_delta_km": null,
+        "aggressive_avg_delta_min": null,
+        "distance_explosion_routes": []
+      },
+      "effects": [
+        {
+          "id": "surface_dist_binary",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "weak",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "paved_only_tension",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead",
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "~120 m avg @0.2",
+          "delta_km": 0.12,
+          "delta_min": 0.45,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "surface_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "surface_rough_win",
+          "stat": "rough_pct",
+          "direction": "decrease",
+          "strength": "strong",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "paved_only_tension",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_03_imperial_spitalfields",
+            "route_08_tottenham_hampstead",
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "All responsive routes → 0% rough",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "surface_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "surface_accidents_tottenham",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "paved_only_tension",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead"
+          ],
+          "example_values": "112→143 (+28%) @0.2",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "surface_weight/slider_analysis.md §6.1"
+        },
+        {
+          "id": "surface_green_down",
+          "stat": "green_pct",
+          "direction": "decrease",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "paved_only_tension",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead",
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "Tottenham 13.7%→0%; Hill 17.7%→8.4%",
+          "implies_tension_with": [
+            "green_weight"
+          ],
+          "is_intended": false,
+          "source_section": "surface_weight/slider_analysis.md §6.1"
+        },
+        {
+          "id": "surface_speed_stress_up",
+          "stat": "speed_stress_pct",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "paved_only_tension",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead",
+            "route_11_hill_elmers_streatham"
+          ],
+          "example_values": "Tottenham +36%; Hill +7%",
+          "implies_tension_with": [
+            "speed_weight"
+          ],
+          "is_intended": false,
+          "source_section": "surface_weight/slider_analysis.md §6.1"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count",
+        "narrow_km"
+      ],
+      "hidden_wins_summary": [
+        "rough_pct → 0% on responsive routes; illumination can improve"
+      ],
+      "hidden_costs_summary": [
+        "Paved detours trade green, speed_stress, and accidents on Tottenham/Hill"
+      ]
+    },
+    "tfl_cycleway_weight": {
+      "ui": {
+        "label": "Prioritize TfL Cycle Network",
+        "shape": "binary_toggle",
+        "moderate": 0.2,
+        "aggressive": null,
+        "cap": 0.2,
+        "inert_route_fraction": "2/11",
+        "inert_routes": [
+          "route_08_tottenham_hampstead",
+          "route_11_hill_elmers_streatham"
+        ],
+        "notes": "Co-sets tfl_quietway_weight at 0.2"
+      },
+      "target_metric": {
+        "stat": "tfl_cycleway_pct",
+        "direction_better": "increase"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.7,
+        "moderate_avg_delta_min": 2.6,
+        "aggressive_avg_delta_km": null,
+        "aggressive_avg_delta_min": null,
+        "distance_explosion_routes": []
+      },
+      "effects": [
+        {
+          "id": "tfl_cycleway_dist_binary",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_04_twickenham_st_pauls",
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "+3 min / +0.7 km avg @0.2",
+          "delta_km": 0.7,
+          "delta_min": 2.6,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "tfl_cycleway_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "tfl_cycleway_accidents_win",
+          "stat": "accidents",
+          "direction": "decrease",
+          "strength": "strong",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_02_imperial_greenwich",
+            "route_03_imperial_spitalfields"
+          ],
+          "example_values": "Greenwich −55%; Spitalfields −61% @0.2",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "tfl_cycleway_weight/slider_analysis.md §6.1"
+        },
+        {
+          "id": "tfl_cycleway_calming_bromley",
+          "stat": "calming_count",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "rat_run",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "55→101 (+84%) @0.2",
+          "implies_tension_with": [
+            "calming_weight"
+          ],
+          "is_intended": false,
+          "source_section": "tfl_cycleway_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "tfl_cycleway_illumination_twickenham",
+          "stat": "illumination_pct",
+          "direction": "decrease",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_04_twickenham_st_pauls"
+          ],
+          "example_values": "97%→73% @0.2",
+          "implies_tension_with": [
+            "light_weight"
+          ],
+          "is_intended": false,
+          "source_section": "tfl_cycleway_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "tfl_cycleway_elevation_up",
+          "stat": "elevation_gain",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_03_imperial_spitalfields",
+            "route_04_twickenham_st_pauls"
+          ],
+          "example_values": "Spitalfields +49%; Twickenham +65%",
+          "implies_tension_with": [
+            "hill_weight"
+          ],
+          "is_intended": false,
+          "source_section": "tfl_cycleway_weight/slider_analysis.md §6.2"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count",
+        "narrow_km"
+      ],
+      "hidden_wins_summary": [
+        "Large accident and speed_stress drops; green and vehicular_free_pct rise on Battersea"
+      ],
+      "hidden_costs_summary": [
+        "Bromley calming spike; Twickenham illumination drop; elevation rises on some detours"
+      ]
+    },
+    "tfl_quietway_weight": {
+      "ui": {
+        "label": "TfL Quietway (merged)",
+        "shape": "merged",
+        "moderate": 0.2,
+        "aggressive": null,
+        "cap": 0.2,
+        "merged_into": "tfl_cycleway_weight",
+        "inert_route_fraction": "9/11",
+        "inert_routes": [
+          "route_01_imperial_kings_cross",
+          "route_02_imperial_greenwich",
+          "route_03_imperial_spitalfields",
+          "route_04_twickenham_st_pauls",
+          "route_05_wembley_kings_college",
+          "route_06_battersea_temple",
+          "route_07_putney_notting_hill",
+          "route_08_tottenham_hampstead",
+          "route_11_hill_elmers_streatham"
+        ],
+        "notes": "82% inert standalone — merged into cycleway toggle"
+      },
+      "target_metric": {
+        "stat": "tfl_quietway_pct",
+        "direction_better": "increase"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.29,
+        "moderate_avg_delta_min": 1.1,
+        "aggressive_avg_delta_km": null,
+        "aggressive_avg_delta_min": null,
+        "distance_explosion_routes": []
+      },
+      "effects": [
+        {
+          "id": "tfl_quietway_dist_binary",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "quietway_only_detour",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "+526 m Bromley @0.2",
+          "delta_km": 0.29,
+          "delta_min": 1.1,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "tfl_quietway_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "tfl_quietway_accidents_bromley",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "quietway_only_detour",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "402→424 (+5%) @0.2",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "tfl_quietway_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "tfl_quietway_elevation_earls",
+          "stat": "elevation_gain",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "quietway_only_detour",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_09_earls_court_piccadilly"
+          ],
+          "example_values": "+62% @0.2",
+          "implies_tension_with": [
+            "hill_weight"
+          ],
+          "is_intended": false,
+          "source_section": "tfl_quietway_weight/slider_analysis.md §6.2"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count",
+        "narrow_km",
+        "tfl_cycleway_pct"
+      ],
+      "hidden_wins_summary": [
+        "Earls Court small accident and illumination wins"
+      ],
+      "hidden_costs_summary": [
+        "Bromley accident and give_way spikes on quietway-only detour"
+      ]
+    },
+    "vehicular_free_weight": {
+      "ui": {
+        "label": "Car-Free Corridors",
+        "shape": "three_step_slider",
+        "moderate": 1.5,
+        "aggressive": 3.0,
+        "cap": 3.0,
+        "inert_route_fraction": "1/11",
+        "inert_routes": [
+          "route_09_earls_court_piccadilly"
+        ],
+        "notes": "Gradual multi-knee; Wembley +1.6 km leap @2.0"
+      },
+      "target_metric": {
+        "stat": "vehicular_free_pct",
+        "direction_better": "increase"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.29,
+        "moderate_avg_delta_min": 1.1,
+        "aggressive_avg_delta_km": 1.03,
+        "aggressive_avg_delta_min": 3.8,
+        "distance_explosion_routes": [
+          {
+            "route": "route_05_wembley_kings_college",
+            "delta_km": 1.6,
+            "delta_min": 6.0,
+            "at": "moderate",
+            "note": "leap @2.0 vs 1.5"
+          },
+          {
+            "route": "route_01_imperial_kings_cross",
+            "delta_km": 2.9,
+            "delta_min": 10.9,
+            "at": "rejected_5.0"
+          },
+          {
+            "route": "route_10_bromley_ealing",
+            "delta_km": 4.8,
+            "delta_min": 18.0,
+            "at": "rejected_5.0"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "id": "vehicular_free_dist_moderate",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            1.5,
+            1.5
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_03_imperial_spitalfields"
+          ],
+          "example_values": "avg +0.29 km (+300 m) @1.5",
+          "delta_km": 0.29,
+          "delta_min": 1.1,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "vehicular_free_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "vehicular_free_dist_aggressive",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            3.0,
+            3.0
+          ],
+          "mechanism_id": "distance_wall",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_05_wembley_kings_college",
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "avg +1.03 km @3.0; Wembley long-haul snap",
+          "delta_km": 1.03,
+          "delta_min": 3.8,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "vehicular_free_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "vehicular_free_duration_aggressive",
+          "stat": "duration_min",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            3.0,
+            3.0
+          ],
+          "mechanism_id": "distance_wall",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_05_wembley_kings_college"
+          ],
+          "example_values": "+4 min / +1.0 km product label",
+          "delta_km": 1.03,
+          "delta_min": 3.8,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "vehicular_free_weight/slider_analysis.md §1"
+        },
+        {
+          "id": "vehicular_free_wembley_explosion",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "moderate",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "distance_wall",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_05_wembley_kings_college"
+          ],
+          "example_values": "+1.6 km leap 1.5→2.0",
+          "delta_km": 1.6,
+          "delta_min": 6.0,
+          "implies_tension_with": [],
+          "is_intended": false,
+          "source_section": "vehicular_free_weight/slider_analysis.md §2"
+        },
+        {
+          "id": "vehicular_free_accidents_up",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            0.8,
+            3.0
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_08_tottenham_hampstead",
+            "route_10_bromley_ealing"
+          ],
+          "example_values": "Tottenham +45% @0.8; Bromley +20% @3.0",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "vehicular_free_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "vehicular_free_tfl_cycleway_win",
+          "stat": "tfl_cycleway_pct",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            2.0,
+            2.0
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_06_battersea_temple"
+          ],
+          "example_values": "5.4%→73.8% @2.0",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "vehicular_free_weight/slider_analysis.md §6.1"
+        },
+        {
+          "id": "vehicular_free_speed_stress_win",
+          "stat": "speed_stress_pct",
+          "direction": "decrease",
+          "strength": "strong",
+          "observed_at": "aggressive",
+          "multiplier_band": [
+            3.0,
+            3.0
+          ],
+          "mechanism_id": "segregated_infrastructure_pull",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_04_twickenham_st_pauls"
+          ],
+          "example_values": "35.6%→1.4% @3.0",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "vehicular_free_weight/slider_analysis.md §6.1"
+        }
+      ],
+      "stable_metrics": [
+        "disruption_count",
+        "narrow_km"
+      ],
+      "hidden_wins_summary": [
+        "tfl_cycleway_pct, green_pct, speed_stress drop on segregated pulls"
+      ],
+      "hidden_costs_summary": [
+        "Long-haul distance walls; Tottenham/Bromley accident rises — pair with risk_weight"
+      ]
+    },
+    "tfl_live_weight": {
+      "ui": {
+        "label": "Avoid Road Closures & Disruptions",
+        "shape": "binary_toggle",
+        "moderate": 0.2,
+        "aggressive": null,
+        "cap": 0.2,
+        "inert_route_fraction": "1/11",
+        "inert_routes": [
+          "route_11_hill_elmers_streatham"
+        ],
+        "notes": "Requires live TfL/TomTom feed; cap at 0.2"
+      },
+      "target_metric": {
+        "stat": "disruption_count",
+        "direction_better": "decrease"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": 0.57,
+        "moderate_avg_delta_min": 2.1,
+        "aggressive_avg_delta_km": null,
+        "aggressive_avg_delta_min": null,
+        "distance_explosion_routes": [
+          {
+            "route": "route_05_wembley_kings_college",
+            "delta_km": 1.76,
+            "delta_min": 6.6,
+            "at": "moderate"
+          }
+        ]
+      },
+      "effects": [
+        {
+          "id": "tfl_live_dist_binary",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "moderate",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "live_closure_reroute",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_05_wembley_kings_college",
+            "route_03_imperial_spitalfields"
+          ],
+          "example_values": "avg +0.57 km @0.2",
+          "delta_km": 0.57,
+          "delta_min": 2.1,
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "tfl_live_weight/slider_analysis.md §3"
+        },
+        {
+          "id": "tfl_live_wembley_explosion",
+          "stat": "dist_km",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "distance_wall",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_05_wembley_kings_college"
+          ],
+          "example_values": "+1.76 km @0.2",
+          "delta_km": 1.76,
+          "delta_min": 6.6,
+          "implies_tension_with": [],
+          "is_intended": false,
+          "source_section": "tfl_live_weight/slider_analysis.md §6"
+        },
+        {
+          "id": "tfl_live_accidents_kings_cross",
+          "stat": "accidents",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "live_closure_reroute",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_01_imperial_kings_cross"
+          ],
+          "example_values": "+68% @0.2",
+          "implies_tension_with": [
+            "risk_weight"
+          ],
+          "is_intended": false,
+          "source_section": "tfl_live_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "tfl_live_rough_earls",
+          "stat": "rough_pct",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "live_closure_reroute",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_09_earls_court_piccadilly"
+          ],
+          "example_values": "15% rough @0.2",
+          "implies_tension_with": [
+            "surface_weight"
+          ],
+          "is_intended": false,
+          "source_section": "tfl_live_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "tfl_live_calming_wembley",
+          "stat": "calming_count",
+          "direction": "increase",
+          "strength": "strong",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "live_closure_reroute",
+          "route_scope": "single_route",
+          "example_routes": [
+            "route_05_wembley_kings_college"
+          ],
+          "example_values": "+411% @0.2",
+          "implies_tension_with": [
+            "calming_weight"
+          ],
+          "is_intended": false,
+          "source_section": "tfl_live_weight/slider_analysis.md §6.2"
+        },
+        {
+          "id": "tfl_live_accidents_win",
+          "stat": "accidents",
+          "direction": "decrease",
+          "strength": "strong",
+          "observed_at": "binary_on",
+          "multiplier_band": [
+            0.2,
+            0.2
+          ],
+          "mechanism_id": "live_closure_reroute",
+          "route_scope": "multi_route",
+          "example_routes": [
+            "route_02_imperial_greenwich",
+            "route_09_earls_court_piccadilly"
+          ],
+          "example_values": "Greenwich −55%; Earls Court −59% @0.2",
+          "implies_tension_with": [],
+          "is_intended": true,
+          "source_section": "tfl_live_weight/slider_analysis.md §6.1"
+        }
+      ],
+      "stable_metrics": [
+        "narrow_km"
+      ],
+      "hidden_wins_summary": [
+        "Disruption count drops; Greenwich/Spitalfields/Earls Court accident improvements"
+      ],
+      "hidden_costs_summary": [
+        "Kings Cross accidents spike; Wembley distance wall and calming storm; Earls Court rough"
+      ]
+    },
+    "width_weight": {
+      "ui": {
+        "label": "Wider Paths",
+        "shape": "hidden",
+        "moderate": null,
+        "aggressive": null,
+        "cap": null,
+        "inert_route_fraction": "11/11",
+        "inert_routes": [
+          "route_01_imperial_kings_cross",
+          "route_02_imperial_greenwich",
+          "route_03_imperial_spitalfields",
+          "route_04_twickenham_st_pauls",
+          "route_05_wembley_kings_college",
+          "route_06_battersea_temple",
+          "route_07_putney_notting_hill",
+          "route_08_tottenham_hampstead",
+          "route_09_earls_court_piccadilly",
+          "route_10_bromley_ealing",
+          "route_11_hill_elmers_streatham"
+        ],
+        "notes": "100% inert — missing width tags; do not ship UI. Backend always 0.0"
+      },
+      "target_metric": {
+        "stat": "narrow_km",
+        "direction_better": "decrease"
+      },
+      "distance_effects": {
+        "moderate_avg_delta_km": null,
+        "moderate_avg_delta_min": null,
+        "aggressive_avg_delta_km": null,
+        "aggressive_avg_delta_min": null,
+        "distance_explosion_routes": []
+      },
+      "effects": [
+        {
+          "id": "width_inert_no_change",
+          "stat": "narrow_km",
+          "direction": "none",
+          "strength": "weak",
+          "observed_at": "any_elevated",
+          "multiplier_band": [0.0, 5.0],
+          "mechanism_id": "inert_weight",
+          "route_scope": "widespread",
+          "example_routes": ["route_01_imperial_kings_cross", "route_05_wembley_kings_college", "route_10_bromley_ealing"],
+          "example_values": "All 11 routes byte-identical 0.0→5.0; Wembley/Bromley locked at 0.02 km narrow",
+          "implies_tension_with": [],
+          "is_intended": false,
+          "source_section": "width_weight/slider_analysis.md §6"
+        }
+      ],
+      "stable_metrics": [
+        "ALL stats identical 0.0→5.0 on all 11 routes"
+      ],
+      "hidden_wins_summary": [
+        "None — weight produces zero path or metric change"
+      ],
+      "hidden_costs_summary": [
+        "None"
+      ]
+    }
+  }
+}

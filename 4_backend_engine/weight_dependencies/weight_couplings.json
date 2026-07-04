@@ -1,0 +1,1196 @@
+{
+  "version": "2026-06-19",
+  "source": "6_verification/parameter_sweeps/2026-06-19",
+  "couplings": [
+    {
+      "id": "signal_risk_arterial",
+      "type": "antagonistic",
+      "weights": [
+        "signal_weight",
+        "risk_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "arterial_bypass",
+      "trigger": {
+        "signal_weight": {
+          "gte": 0.6
+        },
+        "risk_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "accidents": "increase",
+        "illumination_pct": "decrease"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle",
+          "conditional_cap",
+          "counterweight"
+        ],
+        "ui_warning": "Fewer lights may use busier roads — keep Safety above Low.",
+        "preset_bundle": {
+          "risk_weight_min": 0.5
+        },
+        "conditional_cap": {
+          "signal_weight_max": 0.6,
+          "when": {
+            "risk_weight": {
+              "lt": 0.4
+            }
+          }
+        },
+        "counterweight": {
+          "risk_weight": 0.15,
+          "apply_when_deviation_from_preset": true
+        }
+      },
+      "effect_ids": [
+        "signal_accidents_arterial",
+        "signal_illumination_arterial"
+      ],
+      "sources": [
+        "signal_weight/slider_analysis.md §6.1",
+        "signal_weight/slider_analysis.md §6.3"
+      ],
+      "mode_dominant": {
+        "fast": "signal_weight",
+        "safe": "risk_weight",
+        "leisure": "risk_weight"
+      },
+      "tie_break_reason": "Safety is non-negotiable; signal avoidance via arterial bypass spikes accidents (Putney +94% @0.6). Translation layer preserves risk intent and caps or counterweights signal."
+    },
+    {
+      "id": "signal_calming_rat_run",
+      "type": "antagonistic",
+      "weights": [
+        "signal_weight",
+        "calming_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "rat_run",
+      "trigger": {
+        "signal_weight": {
+          "gte": 0.4
+        },
+        "calming_weight": {
+          "gte": 0.4
+        }
+      },
+      "stat_signature": {
+        "calming_count": "increase",
+        "dist_km": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle",
+          "counterweight"
+        ],
+        "ui_warning": "Shortcut streets may have more speed bumps.",
+        "preset_bundle": {
+          "signal_weight_max_when_calming_on": 0.4
+        },
+        "counterweight": {
+          "calming_weight": 0.1,
+          "apply_when_deviation_from_preset": true
+        }
+      },
+      "effect_ids": [
+        "signal_calming_rat_run"
+      ],
+      "sources": [
+        "signal_weight/slider_analysis.md §6.2",
+        "signal_weight/slider_analysis.md §6.3"
+      ],
+      "mode_dominant": {
+        "fast": "signal_weight",
+        "safe": "signal_weight",
+        "leisure": "calming_weight"
+      },
+      "tie_break_reason": "Rat-run speed bumps are false economy for fewer lights — Comfort Flow caps signal at 0.4 when calming is non-zero (signal §6.3)."
+    },
+    {
+      "id": "signal_light_night",
+      "type": "antagonistic",
+      "weights": [
+        "signal_weight",
+        "light_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "arterial_bypass",
+      "trigger": {
+        "signal_weight": {
+          "gte": 0.4
+        },
+        "light_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "illumination_pct": "decrease"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle"
+        ],
+        "ui_warning": "Enable well-lit streets for night routing when avoiding traffic lights.",
+        "preset_bundle": {
+          "label": "Night Flow",
+          "light_weight_min": 0.4,
+          "risk_weight_min": 0.4
+        }
+      },
+      "effect_ids": [
+        "signal_illumination_arterial"
+      ],
+      "sources": [
+        "signal_weight/slider_analysis.md §6.3"
+      ],
+      "mode_dominant": {
+        "fast": "signal_weight",
+        "safe": "light_weight",
+        "leisure": "light_weight"
+      },
+      "tie_break_reason": "Night corridors need lit routing; arterial bypass from signal avoidance drops illumination (Putney 90%→60% @0.6)."
+    },
+    {
+      "id": "speed_risk_twickenham",
+      "type": "antagonistic",
+      "weights": [
+        "speed_weight",
+        "risk_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "arterial_bypass",
+      "trigger": {
+        "speed_weight": {
+          "gte": 0.6
+        },
+        "risk_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "accidents": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "counterweight"
+        ],
+        "ui_warning": "Avoiding fast traffic may use less safe corridors.",
+        "counterweight": {
+          "risk_weight": 0.15,
+          "apply_when_deviation_from_preset": true
+        }
+      },
+      "effect_ids": [
+        "speed_accidents_twickenham"
+      ],
+      "sources": [
+        "speed_weight/slider_analysis.md §6.4"
+      ],
+      "mode_dominant": {
+        "fast": "risk_weight",
+        "safe": "risk_weight",
+        "leisure": "speed_weight"
+      },
+      "tie_break_reason": "Twickenham accidents +171% @speed 1.0 — low stress does not imply safe alignment."
+    },
+    {
+      "id": "speed_calming_rat_run",
+      "type": "antagonistic",
+      "weights": [
+        "speed_weight",
+        "calming_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "rat_run",
+      "trigger": {
+        "speed_weight": {
+          "gte": 0.6
+        },
+        "calming_weight": {
+          "gte": 0.4
+        }
+      },
+      "stat_signature": {
+        "calming_count": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "counterweight"
+        ],
+        "ui_warning": "Quiet back-street detours may have many speed bumps.",
+        "counterweight": {
+          "calming_weight": 0.1,
+          "apply_when_deviation_from_preset": true
+        }
+      },
+      "effect_ids": [
+        "speed_calming_rat_run"
+      ],
+      "sources": [
+        "speed_weight/slider_analysis.md §6.2"
+      ],
+      "mode_dominant": {
+        "fast": "calming_weight",
+        "safe": "speed_weight",
+        "leisure": "speed_weight"
+      },
+      "tie_break_reason": "Wembley/Bromley/Hill calming storms (+700% Wembley @3.0) on stress-avoidance rat runs."
+    },
+    {
+      "id": "junction_risk_arterial",
+      "type": "antagonistic",
+      "weights": [
+        "junction_weight",
+        "risk_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "arterial_bypass",
+      "trigger": {
+        "junction_weight": {
+          "gte": 1.0
+        },
+        "risk_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "accidents": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle",
+          "counterweight"
+        ],
+        "ui_warning": "Maximizing flow may use busier roads — increase Safety.",
+        "preset_bundle": {
+          "risk_weight_min": 0.5
+        },
+        "counterweight": {
+          "risk_weight": 0.15,
+          "apply_when_deviation_from_preset": true
+        }
+      },
+      "effect_ids": [
+        "junction_accidents_arterial"
+      ],
+      "sources": [
+        "junction_weight/slider_analysis.md §6.2",
+        "junction_weight/slider_analysis.md §8"
+      ],
+      "mode_dominant": {
+        "fast": "junction_weight",
+        "safe": "risk_weight",
+        "leisure": "junction_weight"
+      },
+      "tie_break_reason": "Kings Cross accidents +133% @junction 2.0 — arterial road warning; mitigate via risk, not lower junction cap."
+    },
+    {
+      "id": "hill_green_preset",
+      "type": "antagonistic",
+      "weights": [
+        "hill_weight",
+        "green_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "valley_trap",
+      "trigger": {
+        "hill_weight": {
+          "gte": 0.6
+        },
+        "green_weight": {
+          "gte": 0.2
+        }
+      },
+      "stat_signature": {
+        "elevation_gain": "decrease",
+        "green_pct": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning"
+        ],
+        "ui_warning": "Flat routes and scenic routes may pull in opposite directions."
+      },
+      "effect_ids": [
+        "hill_green_down",
+        "green_elevation_up"
+      ],
+      "sources": [
+        "hill_weight/slider_analysis.md §6.2",
+        "green_weight/slider_analysis.md §6.2"
+      ],
+      "mode_dominant": {
+        "fast": "hill_weight",
+        "safe": "green_weight",
+        "leisure": "green_weight"
+      },
+      "tie_break_reason": "Thames flat path vs heath scenic pull — fast favours flat direct routing, safe/leisure favour green corridors."
+    },
+    {
+      "id": "hill_risk_valley",
+      "type": "antagonistic",
+      "weights": [
+        "hill_weight",
+        "risk_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "valley_trap",
+      "trigger": {
+        "hill_weight": {
+          "gte": 1.0
+        },
+        "risk_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "accidents": "increase",
+        "elevation_gain": "decrease"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle"
+        ],
+        "ui_warning": "Very flat routes may use busier valley roads.",
+        "preset_bundle": {
+          "risk_weight_min": 0.5
+        }
+      },
+      "effect_ids": [
+        "hill_accidents_valley"
+      ],
+      "sources": [
+        "hill_weight/slider_analysis.md §6.2",
+        "hill_weight/slider_analysis.md §8"
+      ],
+      "mode_dominant": {
+        "fast": "hill_weight",
+        "safe": "risk_weight",
+        "leisure": "hill_weight"
+      },
+      "tie_break_reason": "Valley-trap routing @hill 3.0 spikes accidents on Greenwich (+155%), Bromley (+72%), Wembley (+76%)."
+    },
+    {
+      "id": "hill_calming_tottenham",
+      "type": "antagonistic",
+      "weights": [
+        "hill_weight",
+        "calming_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "rat_run",
+      "trigger": {
+        "hill_weight": {
+          "gte": 0.2
+        },
+        "calming_weight": {
+          "gte": 0.4
+        }
+      },
+      "stat_signature": {
+        "calming_count": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning"
+        ],
+        "ui_warning": "Flat bypasses may thread through speed-calmed streets."
+      },
+      "effect_ids": [
+        "hill_calming_tottenham"
+      ],
+      "sources": [
+        "hill_weight/slider_analysis.md §6.3"
+      ],
+      "mode_dominant": {
+        "fast": "hill_weight",
+        "safe": "hill_weight",
+        "leisure": "hill_weight"
+      },
+      "tie_break_reason": "Tottenham calming 17→67 @hill 0.2 on flat bypass — bumpier than hill climb."
+    },
+    {
+      "id": "barrier_risk_greenwich",
+      "type": "antagonistic",
+      "weights": [
+        "barrier_weight",
+        "risk_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "barrier_avoidance_detour",
+      "trigger": {
+        "barrier_weight": {
+          "gte": 0.6
+        },
+        "risk_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "accidents": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle"
+        ],
+        "ui_warning": "Avoiding barriers may use less safe detours.",
+        "preset_bundle": {
+          "risk_weight_min": 0.5
+        }
+      },
+      "effect_ids": [
+        "barrier_accidents_greenwich"
+      ],
+      "sources": [
+        "barrier_weight/slider_analysis.md §6",
+        "barrier_weight/slider_analysis.md §8"
+      ],
+      "mode_dominant": {
+        "fast": "barrier_weight",
+        "safe": "risk_weight",
+        "leisure": "barrier_weight"
+      },
+      "tie_break_reason": "Greenwich accidents +53% @barrier 0.6 when dodging gates."
+    },
+    {
+      "id": "calming_risk_arterial",
+      "type": "antagonistic",
+      "weights": [
+        "calming_weight",
+        "risk_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "arterial_bypass",
+      "trigger": {
+        "calming_weight": {
+          "gte": 0.6
+        },
+        "risk_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "accidents": "increase",
+        "signal_count": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle"
+        ],
+        "ui_warning": "Avoiding speed bumps may use busier roads with more signals.",
+        "preset_bundle": {
+          "risk_weight_min": 0.5
+        }
+      },
+      "effect_ids": [
+        "calming_accidents_up",
+        "calming_signals_hill"
+      ],
+      "sources": [
+        "calming_weight/slider_analysis.md §6",
+        "calming_weight/slider_analysis.md §8"
+      ],
+      "mode_dominant": {
+        "fast": "calming_weight",
+        "safe": "risk_weight",
+        "leisure": "calming_weight"
+      },
+      "tie_break_reason": "Tottenham/Bromley accident rises @calming 1.5 when avoiding bumps via arterials."
+    },
+    {
+      "id": "green_barrier_twickenham",
+      "type": "antagonistic",
+      "weights": [
+        "green_weight",
+        "barrier_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "scenic_park_detour",
+      "trigger": {
+        "green_weight": {
+          "gte": 0.2
+        },
+        "barrier_weight": {
+          "gte": 0.6
+        }
+      },
+      "stat_signature": {
+        "barrier_count": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning"
+        ],
+        "ui_warning": "Scenic routes may pass through more gates and barriers."
+      },
+      "effect_ids": [
+        "green_barriers_twickenham"
+      ],
+      "sources": [
+        "green_weight/slider_analysis.md §6.2",
+        "green_weight/slider_analysis.md §8"
+      ],
+      "mode_dominant": {
+        "fast": "barrier_weight",
+        "safe": "green_weight",
+        "leisure": "green_weight"
+      },
+      "tie_break_reason": "Twickenham scenic detour adds 8 barriers @green 0.2 — physical gates block cargo/wide bikes."
+    },
+    {
+      "id": "surface_green_parks",
+      "type": "antagonistic",
+      "weights": [
+        "surface_weight",
+        "green_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "paved_only_tension",
+      "trigger": {
+        "surface_weight": {
+          "gte": 0.2
+        },
+        "green_weight": {
+          "gte": 0.2
+        }
+      },
+      "stat_signature": {
+        "rough_pct": "decrease",
+        "green_pct": "decrease"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle"
+        ],
+        "ui_warning": "Smooth surfaces may skip unpaved park paths.",
+        "preset_bundle": {
+          "surface_weight_floor_road_bike": 0.2
+        }
+      },
+      "effect_ids": [
+        "surface_green_down"
+      ],
+      "sources": [
+        "surface_weight/slider_analysis.md §6.1",
+        "green_weight/slider_analysis.md §6.2"
+      ],
+      "mode_dominant": {
+        "fast": "surface_weight",
+        "safe": "green_weight",
+        "leisure": "green_weight"
+      },
+      "tie_break_reason": "Paved-only preference beats park gravel — road bike hardware override in Phase 3."
+    },
+    {
+      "id": "surface_speed_tottenham",
+      "type": "antagonistic",
+      "weights": [
+        "surface_weight",
+        "speed_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "paved_only_tension",
+      "trigger": {
+        "surface_weight": {
+          "gte": 0.2
+        },
+        "speed_weight": {
+          "gte": 0.6
+        }
+      },
+      "stat_signature": {
+        "speed_stress_pct": "increase",
+        "rough_pct": "decrease"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning"
+        ],
+        "ui_warning": "Paved-only routing may use busier motor corridors."
+      },
+      "effect_ids": [
+        "surface_speed_stress_up"
+      ],
+      "sources": [
+        "surface_weight/slider_analysis.md §6.1"
+      ],
+      "mode_dominant": {
+        "fast": "surface_weight",
+        "safe": "speed_weight",
+        "leisure": "speed_weight"
+      },
+      "tie_break_reason": "Tottenham paved detour accepts +36% speed_stress to stay on smooth surfaces."
+    },
+    {
+      "id": "surface_risk_tottenham",
+      "type": "antagonistic",
+      "weights": [
+        "surface_weight",
+        "risk_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "paved_only_tension",
+      "trigger": {
+        "surface_weight": {
+          "gte": 0.2
+        },
+        "risk_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "accidents": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning"
+        ],
+        "ui_warning": "Smooth-surface detours may be less safe."
+      },
+      "effect_ids": [
+        "surface_accidents_tottenham"
+      ],
+      "sources": [
+        "surface_weight/slider_analysis.md §6.1"
+      ],
+      "mode_dominant": {
+        "fast": "surface_weight",
+        "safe": "risk_weight",
+        "leisure": "risk_weight"
+      },
+      "tie_break_reason": "Tottenham accidents +28% on paved detour @surface 0.2."
+    },
+    {
+      "id": "tfl_cycleway_calming_bromley",
+      "type": "antagonistic",
+      "weights": [
+        "tfl_cycleway_weight",
+        "calming_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "rat_run",
+      "trigger": {
+        "tfl_cycleway_weight": {
+          "gte": 0.2
+        },
+        "calming_weight": {
+          "gte": 0.6
+        }
+      },
+      "stat_signature": {
+        "calming_count": "increase",
+        "tfl_cycleway_pct": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning"
+        ],
+        "ui_warning": "Cycle network detours may include speed-calmed links."
+      },
+      "effect_ids": [
+        "tfl_cycleway_calming_bromley"
+      ],
+      "sources": [
+        "tfl_cycleway_weight/slider_analysis.md §6.2"
+      ],
+      "mode_dominant": {
+        "fast": "tfl_cycleway_weight",
+        "safe": "tfl_cycleway_weight",
+        "leisure": "tfl_cycleway_weight"
+      },
+      "tie_break_reason": "Infrastructure reward beats Bromley calming side-effect (+84% @0.2) — CS network priority for Commuter."
+    },
+    {
+      "id": "tfl_live_risk_kings_cross",
+      "type": "antagonistic",
+      "weights": [
+        "tfl_live_weight",
+        "risk_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "live_closure_reroute",
+      "trigger": {
+        "tfl_live_weight": {
+          "gte": 0.2
+        },
+        "risk_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "accidents": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle"
+        ],
+        "ui_warning": "Closure detours may use less safe roads.",
+        "preset_bundle": {
+          "risk_weight_min": 0.5
+        }
+      },
+      "effect_ids": [
+        "tfl_live_accidents_kings_cross"
+      ],
+      "sources": [
+        "tfl_live_weight/slider_analysis.md §6.2"
+      ],
+      "mode_dominant": {
+        "fast": "tfl_live_weight",
+        "safe": "risk_weight",
+        "leisure": "tfl_live_weight"
+      },
+      "tie_break_reason": "Kings Cross accidents +68% @tfl_live 0.2 on closure bypass."
+    },
+    {
+      "id": "tfl_live_surface_earls",
+      "type": "antagonistic",
+      "weights": [
+        "tfl_live_weight",
+        "surface_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "live_closure_reroute",
+      "trigger": {
+        "tfl_live_weight": {
+          "gte": 0.2
+        },
+        "surface_weight": {
+          "gte": 0.2
+        }
+      },
+      "stat_signature": {
+        "rough_pct": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning"
+        ],
+        "ui_warning": "Closure detours may include rough surfaces."
+      },
+      "effect_ids": [
+        "tfl_live_rough_earls"
+      ],
+      "sources": [
+        "tfl_live_weight/slider_analysis.md §6.2"
+      ],
+      "mode_dominant": {
+        "fast": "tfl_live_weight",
+        "safe": "tfl_live_weight",
+        "leisure": "tfl_live_weight"
+      },
+      "tie_break_reason": "Earls Court rough 15% @tfl_live 0.2 on unpaved bypass."
+    },
+    {
+      "id": "tfl_live_calming_wembley",
+      "type": "antagonistic",
+      "weights": [
+        "tfl_live_weight",
+        "calming_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "live_closure_reroute",
+      "trigger": {
+        "tfl_live_weight": {
+          "gte": 0.2
+        },
+        "calming_weight": {
+          "gte": 0.4
+        }
+      },
+      "stat_signature": {
+        "calming_count": "increase",
+        "dist_km": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning"
+        ],
+        "ui_warning": "Avoiding closures may route through many speed bumps."
+      },
+      "effect_ids": [
+        "tfl_live_calming_wembley",
+        "tfl_live_wembley_explosion"
+      ],
+      "sources": [
+        "tfl_live_weight/slider_analysis.md §6.2"
+      ],
+      "mode_dominant": {
+        "fast": "tfl_live_weight",
+        "safe": "tfl_live_weight",
+        "leisure": "tfl_live_weight"
+      },
+      "tie_break_reason": "Wembley +411% calming @tfl_live 0.2 — residential closure dodge."
+    },
+    {
+      "id": "tfl_quietway_risk_bromley",
+      "type": "antagonistic",
+      "weights": [
+        "tfl_quietway_weight",
+        "risk_weight"
+      ],
+      "severity": "low",
+      "mechanism_id": "quietway_only_detour",
+      "trigger": {
+        "tfl_quietway_weight": {
+          "gte": 0.2
+        },
+        "risk_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "accidents": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning"
+        ],
+        "ui_warning": "Quietway detours may be less safe on some corridors."
+      },
+      "effect_ids": [
+        "tfl_quietway_accidents_bromley"
+      ],
+      "sources": [
+        "tfl_quietway_weight/slider_analysis.md §6.2"
+      ],
+      "mode_dominant": {
+        "fast": "tfl_quietway_weight",
+        "safe": "risk_weight",
+        "leisure": "tfl_quietway_weight"
+      },
+      "tie_break_reason": "Bromley accident +5% on quietway-only detour."
+    },
+    {
+      "id": "vehicular_free_risk_accidents",
+      "type": "antagonistic",
+      "weights": [
+        "vehicular_free_weight",
+        "risk_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "segregated_infrastructure_pull",
+      "trigger": {
+        "vehicular_free_weight": {
+          "gte": 1.5
+        },
+        "risk_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "accidents": "increase",
+        "vehicular_free_pct": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle"
+        ],
+        "ui_warning": "Car-free detours may pass through less safe segments.",
+        "preset_bundle": {
+          "risk_weight_min": 0.5
+        }
+      },
+      "effect_ids": [
+        "vehicular_free_accidents_up"
+      ],
+      "sources": [
+        "vehicular_free_weight/slider_analysis.md §6.2",
+        "vehicular_free_weight/slider_analysis.md §1"
+      ],
+      "mode_dominant": {
+        "fast": "vehicular_free_weight",
+        "safe": "vehicular_free_weight",
+        "leisure": "vehicular_free_weight"
+      },
+      "tie_break_reason": "Tottenham +45% and Bromley +20% accidents on segregated pulls."
+    },
+    {
+      "id": "risk_light_floor",
+      "type": "floor",
+      "weights": [
+        "risk_weight",
+        "light_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "lit_arterial_corridor",
+      "trigger": {
+        "light_weight": {
+          "gte": 0.4
+        },
+        "risk_weight": {
+          "lt": 0.4
+        }
+      },
+      "stat_signature": {
+        "accidents": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle"
+        ],
+        "ui_warning": "Well-lit routes work best with Safety enabled — especially at night.",
+        "preset_bundle": {
+          "risk_weight_min": 0.4,
+          "label": "Night Ride Mode"
+        }
+      },
+      "effect_ids": [
+        "light_accidents_up",
+        "risk_illumination_down"
+      ],
+      "sources": [
+        "light_weight/slider_analysis.md §1",
+        "risk_weight/slider_analysis.md §8"
+      ],
+      "mode_dominant": {
+        "fast": "risk_weight",
+        "safe": "risk_weight",
+        "leisure": "risk_weight"
+      },
+      "tie_break_reason": "Risk floor bundles with light for night — when light high and risk low, light wins for Night Ride persona."
+    },
+    {
+      "id": "risk_surface_floor",
+      "type": "floor",
+      "weights": [
+        "risk_weight",
+        "surface_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "scenic_park_detour",
+      "trigger": {
+        "risk_weight": {
+          "gte": 0.6
+        },
+        "surface_weight": {
+          "lt": 0.2
+        }
+      },
+      "stat_signature": {
+        "rough_pct": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning",
+          "preset_bundle"
+        ],
+        "ui_warning": "Safer routes may use rough paths — enable Smooth Surfaces for paved only.",
+        "preset_bundle": {
+          "surface_weight_min": 0.2
+        }
+      },
+      "effect_ids": [
+        "risk_rough_spike"
+      ],
+      "sources": [
+        "risk_weight/slider_analysis.md §6.2",
+        "risk_weight/slider_analysis.md §8"
+      ],
+      "mode_dominant": {
+        "fast": "surface_weight",
+        "safe": "risk_weight",
+        "leisure": "risk_weight"
+      },
+      "tie_break_reason": "Paved floor when risk pushes rough park/path shortcuts (Putney rough 27% @risk 0.8)."
+    },
+    {
+      "id": "signal_junction_paradox",
+      "type": "antagonistic",
+      "weights": [
+        "signal_weight",
+        "junction_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "arterial_bypass",
+      "trigger": {
+        "signal_weight": {
+          "gte": 0.6
+        },
+        "junction_weight": {
+          "gte": 1.0
+        }
+      },
+      "stat_signature": {
+        "dist_km": "increase",
+        "accidents": "increase"
+      },
+      "guardrail": {
+        "priority": [
+          "ui_warning"
+        ],
+        "ui_warning": "Combining flow and light-avoidance may produce long zig-zag routes."
+      },
+      "effect_ids": [
+        "signal_dist_aggressive",
+        "junction_accidents_arterial"
+      ],
+      "sources": [
+        "signal_weight/slider_analysis.md §9",
+        "junction_weight/slider_analysis.md §8"
+      ],
+      "mode_dominant": {
+        "fast": "signal_weight",
+        "safe": "junction_weight",
+        "leisure": "junction_weight"
+      },
+      "tie_break_reason": "Same paradox family — junction flow vs signal avoidance; junction cap 3.0 already pairs with risk."
+    },
+    {
+      "id": "light_risk_night_bundle",
+      "type": "synergistic",
+      "weights": [
+        "light_weight",
+        "risk_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "lit_arterial_corridor",
+      "trigger": {
+        "light_weight": {
+          "gte": 0.4
+        },
+        "risk_weight": {
+          "gte": 0.4
+        }
+      },
+      "guardrail": {
+        "priority": [
+          "preset_bundle"
+        ],
+        "preset_bundle": {
+          "label": "Night Ride Mode",
+          "both_min": 0.4
+        }
+      },
+      "effect_ids": [
+        "light_accidents_up"
+      ],
+      "sources": [
+        "light_weight/slider_analysis.md §1",
+        "light_weight/slider_analysis.md §8"
+      ]
+    },
+    {
+      "id": "vehicular_free_tfl_cycleway_bundle",
+      "type": "synergistic",
+      "weights": [
+        "vehicular_free_weight",
+        "tfl_cycleway_weight"
+      ],
+      "severity": "medium",
+      "mechanism_id": "segregated_infrastructure_pull",
+      "trigger": {
+        "vehicular_free_weight": {
+          "gte": 1.5
+        },
+        "tfl_cycleway_weight": {
+          "gte": 0.2
+        }
+      },
+      "guardrail": {
+        "priority": [
+          "preset_bundle"
+        ],
+        "preset_bundle": {
+          "label": "Infrastructure First",
+          "note": "Natural pair for Commuter preset"
+        }
+      },
+      "effect_ids": [
+        "vehicular_free_tfl_cycleway_win",
+        "tfl_cycleway_accidents_win"
+      ],
+      "sources": [
+        "vehicular_free_weight/slider_analysis.md §8",
+        "tfl_cycleway_weight/slider_analysis.md §8"
+      ]
+    },
+    {
+      "id": "signal_daytime_flow_bundle",
+      "type": "synergistic",
+      "weights": [
+        "signal_weight",
+        "risk_weight"
+      ],
+      "severity": "high",
+      "mechanism_id": "arterial_bypass",
+      "trigger": {
+        "signal_weight": {
+          "gte": 0.4
+        },
+        "risk_weight": {
+          "gte": 0.5
+        }
+      },
+      "guardrail": {
+        "priority": [
+          "preset_bundle"
+        ],
+        "preset_bundle": {
+          "label": "Daytime Flow",
+          "signal_weight_min": 0.4,
+          "risk_weight_min": 0.5
+        }
+      },
+      "effect_ids": [
+        "signal_accidents_arterial"
+      ],
+      "sources": [
+        "signal_weight/slider_analysis.md §6.3"
+      ]
+    },
+    {
+      "id": "tfl_quietway_merged_into_cycleway",
+      "type": "ui_merge",
+      "weights": [
+        "tfl_cycleway_weight",
+        "tfl_quietway_weight"
+      ],
+      "severity": "high",
+      "guardrail": {
+        "priority": [
+          "preset_bundle"
+        ],
+        "preset_bundle": {
+          "co_set": {
+            "tfl_cycleway_weight": 0.2,
+            "tfl_quietway_weight": 0.2
+          },
+          "ui_label": "Prioritize TfL Cycle Network"
+        }
+      },
+      "sources": [
+        "tfl_quietway_weight/slider_analysis.md §8",
+        "tfl_cycleway_weight/slider_analysis.md §8"
+      ]
+    }
+  ],
+  "modes": [
+    "fast",
+    "safe",
+    "leisure"
+  ],
+  "mode_labels": {
+    "fast": "Fast",
+    "safe": "Safe",
+    "leisure": "Leisure"
+  },
+  "tie_break_note": "mode_dominant applies to antagonistic/floor couplings between non-binary sliders only. Binary toggles (e.g. light_weight) are resolved outside this matrix in the Phase 5 translation layer."
+}
