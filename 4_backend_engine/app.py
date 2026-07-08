@@ -19,8 +19,10 @@ from graph_io import load_graph, fast_path
 import tfl_live
 import tomtom_live
 import live_disruptions
+from route_time_estimate import cruise_duration_min, duration_speed_multiplier_for_preset
 from routing_heuristic import (
     compute_optimized_cost_per_metre_lower_bound,
+    get_route_heuristic_epsilon,
     green_reward,
     make_heuristic,
     set_penalty_floors,
@@ -34,7 +36,6 @@ from barrier_clusters import (
     barrier_cluster_meta,
 )
 from cost_masks import (
-    is_segregated_cycling,
     is_service_access_denied,
     is_service_alley,
     is_vehicular_free,
@@ -42,6 +43,7 @@ from cost_masks import (
     routing_width_m,
     vf_allowed_masks,
     vf_flags,
+    VF_MASK_ALL,
 )
 import night_time
 import translation_layer
@@ -96,7 +98,11 @@ def bootstrap_routing_engine():
 
     t0 = time.perf_counter()
     live_disruptions.init(G)
-    print(f"--> Live disruption index: {time.perf_counter() - t0:.1f}s")
+    if os.environ.get("SKIP_DISRUPTION_FETCH", "").lower() in ("1", "true", "yes"):
+        print(f"--> Live disruption index: init only ({time.perf_counter() - t0:.1f}s)")
+    else:
+        live_disruptions.start_background_refresh()
+        print(f"--> Live disruption index: {time.perf_counter() - t0:.1f}s")
 
     # Precompute vehicular-free class flags per edge (configurable VF set is then
     # a single int AND per edge on the routing hot path - no tag parsing).
@@ -593,6 +599,7 @@ def make_weight_optimized(w, hours_map, fallback_open):
     vf_mask_allowed, vf_reward_allowed = vf_allowed_masks(
         shared_path=bool(w.get('vf_shared_path', True)),
         bus_lane=bool(w.get('vf_bus_lane', True)),
+        painted_lane=bool(w.get('vf_painted_lane', False)),
     )
     hard_cost = BARRIER_HARD_COST
     junction_suppressed = JUNCTION_CLUSTER_SUPPRESSED
@@ -757,7 +764,13 @@ def _snap_meta(snap):
     }
 
 # --- STATS ---
-def calculate_path_stats(path_nodes, calming_source='way', speed_kmh=None):
+def calculate_path_stats(
+    path_nodes,
+    calming_source='way',
+    speed_kmh=None,
+    vf_mask_allowed=None,
+    duration_speed_multiplier: float = 1.0,
+):
     total_length = 0.0
     total_accidents = 0.0
     lit_length = 0.0
@@ -767,10 +780,9 @@ def calculate_path_stats(path_nodes, calming_source='way', speed_kmh=None):
     tfl_cycleway_length = 0.0
     tfl_quietway_length = 0.0
     speed_stress_length = 0.0
-    narrow_length = 0.0
     green_length = 0.0
     scenic_green_length = 0.0
-    segregated_cycling_length = 0.0
+    vf_selected_length = 0.0
     barrier_count = 0
     barrier_penalty_count = 0
     give_way_count = 0
@@ -779,13 +791,15 @@ def calculate_path_stats(path_nodes, calming_source='way', speed_kmh=None):
     signal_count = 0
     junction_count = 0
     disruption_count = 0
+    vf_mask = vf_mask_allowed if vf_mask_allowed is not None else VF_MASK_ALL
     for i in range(len(path_nodes) - 1):
         u = path_nodes[i]
         v = path_nodes[i+1]
         edge_data = G.get_edge_data(u, v) or {}
         l = float(edge_data.get('length', 0))
         total_length += l
-        vehicular_free = is_vehicular_free(edge_data)
+        edge_vf = int(edge_data.get('_vf', 0)) or vf_flags(edge_data)
+        vehicular_free = bool(edge_vf & vf_mask) if vf_mask_allowed is not None else is_vehicular_free(edge_data)
         on_steps = masks_surface_and_hill(edge_data)
         if not vehicular_free:
             total_accidents += float(edge_data.get('risk', 0))
@@ -794,8 +808,8 @@ def calculate_path_stats(path_nodes, calming_source='way', speed_kmh=None):
         smoothness = str(edge_data.get('smoothness', '')).lower()
         if not on_steps and (s in BAD_SURFACES or smoothness in BAD_SMOOTHNESS):
             rough_length += l
-        if is_segregated_cycling(edge_data):
-            segregated_cycling_length += l
+        if vehicular_free:
+            vf_selected_length += l
         grade = float(edge_data.get('grade', 0.0))
         if not on_steps:
             if grade > 0:
@@ -807,9 +821,6 @@ def calculate_path_stats(path_nodes, calming_source='way', speed_kmh=None):
         if _is_tfl_quietway(edge_data): tfl_quietway_length += l
         if not vehicular_free and _speed_stress_multiplier(edge_data) > 0:
             speed_stress_length += l
-        width_m = _get_width_m(edge_data)
-        if width_m is not None and width_m < WIDTH_STD_M:
-            narrow_length += l
         if _has_attraction_edge(edge_data): green_length += l
         if _is_green_edge(edge_data): scenic_green_length += l
         if (
@@ -834,26 +845,30 @@ def calculate_path_stats(path_nodes, calming_source='way', speed_kmh=None):
             junction_count += 1
         if live_disruptions.get_edge_disruption(u, v): disruption_count += 1
 
-    speed_mps = (float(speed_kmh) if speed_kmh else DEFAULT_STATS_SPEED_KMH) / 3.6
-    duration_min = total_length / (speed_mps * 60.0)
+    duration_min = cruise_duration_min(
+        total_length,
+        float(speed_kmh) if speed_kmh else DEFAULT_STATS_SPEED_KMH,
+        duration_speed_multiplier,
+    )
     pct_lit = (lit_length / total_length * 100) if total_length > 0 else 0
     pct_rough = (rough_length / total_length * 100) if total_length > 0 else 0
-    narrow_km = narrow_length / 1000.0
     speed_stress_km = speed_stress_length / 1000.0
     speed_stress_pct = (speed_stress_length / total_length * 100) if total_length > 0 else 0
     green_km = green_length / 1000.0
     pct_green = (scenic_green_length / total_length * 100) if total_length > 0 else 0
-    pct_vf = (segregated_cycling_length / total_length * 100) if total_length > 0 else 0
+    pct_vf = (vf_selected_length / total_length * 100) if total_length > 0 else 0
     tfl_cycleway_pct = (tfl_cycleway_length / total_length * 100) if total_length > 0 else 0
     tfl_quietway_pct = (tfl_quietway_length / total_length * 100) if total_length > 0 else 0
+    tfl_network_pct = tfl_cycleway_pct + tfl_quietway_pct
     return {
         "length_m": round(total_length, 0), "accidents": int(total_accidents),
         "duration_min": round(duration_min, 1), "illumination_pct": round(pct_lit, 0),
         "rough_pct": round(pct_rough, 0), "elevation_gain": round(total_climb, 0),
         "steep_count": steep_count,
         "tfl_cycleway_pct": round(tfl_cycleway_pct, 1), "tfl_quietway_pct": round(tfl_quietway_pct, 1),
+        "tfl_network_pct": round(tfl_network_pct, 1),
         "speed_stress_km": round(speed_stress_km, 2), "speed_stress_pct": round(speed_stress_pct, 1),
-        "narrow_km": round(narrow_km, 2), "green_km": round(green_km, 2),
+        "green_km": round(green_km, 2),
         "green_pct": round(pct_green, 1), "vehicular_free_pct": round(pct_vf, 1),
         "barrier_count": barrier_count, "barrier_penalty_count": barrier_penalty_count,
         "give_way_count": give_way_count, "stop_sign_count": stop_sign_count,
@@ -1326,6 +1341,7 @@ def get_route():
             vf_sel = toggles.get("vf_infrastructure", {})
             w["vf_shared_path"] = bool(vf_sel.get("shared_path", True))
             w["vf_bus_lane"] = bool(vf_sel.get("bus_lane", True))
+            w["vf_painted_lane"] = bool(vf_sel.get("painted_lane", False))
         else:
             w = user_profiles.build_weight_dict_from_request(request.args)
             bt_arg = (request.args.get('bike_type') or '').strip().lower()
@@ -1334,6 +1350,11 @@ def get_route():
 
         w["bike_type"] = bike_type
         speed_kmh = user_profiles.BIKE_SPEEDS_KMH.get(bike_type, 15.0)
+        vf_mask_allowed, _ = vf_allowed_masks(
+            shared_path=bool(w.get("vf_shared_path", True)),
+            bus_lane=bool(w.get("vf_bus_lane", True)),
+            painted_lane=bool(w.get("vf_painted_lane", False)),
+        )
 
         t_route = time.perf_counter()
         start_snap = tfl_live.snap_to_edge(start_lat, start_lon)
@@ -1358,13 +1379,16 @@ def get_route():
         coords_fastest = apply_endpoint_stubs(
             reconstruct_path_geometry(path_fastest), start_snap, end_snap
         )
-        stats_fastest = calculate_path_stats(path_fastest, speed_kmh=speed_kmh)
+        stats_fastest = calculate_path_stats(
+            path_fastest, speed_kmh=speed_kmh, vf_mask_allowed=vf_mask_allowed
+        )
 
-        # Optional bounded-suboptimal A* (weighted heuristic): cost <= (1+eps) x optimal.
-        # Default 0.0 = strictly admissible. Deep preset weight vectors can make the
-        # admissible search very slow (documented in get_presets_notes.md).
-        eps = float(os.environ.get("ROUTE_HEURISTIC_EPSILON", "0") or 0)
-        scale = compute_optimized_cost_per_metre_lower_bound(w) * (1.0 + max(0.0, eps))
+        # Bounded-suboptimal A* on optimized path: cost <= (1+eps) x optimal.
+        # Default eps=0.5 (routing_heuristic.DEFAULT_ROUTE_HEURISTIC_EPSILON).
+        # Fastest path above stays exact (distance-only heuristic). Set
+        # ROUTE_HEURISTIC_EPSILON=0 for strictly admissible optimized search.
+        eps = get_route_heuristic_epsilon()
+        scale = compute_optimized_cost_per_metre_lower_bound(w) * (1.0 + eps)
         h_opt = make_heuristic(end_node, G, cost_per_m=scale)
         weight_optimized = make_weight_optimized(w, hours_map, fallback_open)
         t0 = time.perf_counter()
@@ -1381,7 +1405,11 @@ def get_route():
             reconstruct_path_geometry(path_optimized), start_snap, end_snap
         )
         stats_optimized = calculate_path_stats(
-            path_optimized, calming_source=user_profiles.CALMING_SOURCE, speed_kmh=speed_kmh
+            path_optimized,
+            calming_source=user_profiles.CALMING_SOURCE,
+            speed_kmh=speed_kmh,
+            vf_mask_allowed=vf_mask_allowed,
+            duration_speed_multiplier=duration_speed_multiplier_for_preset(preset),
         )
 
         # Route-only overlay chunks (only segments on path_optimized that match each criterion)
@@ -1398,6 +1426,7 @@ def get_route():
             "status": "success",
             "meta": {
                 "cost_per_m_lower_bound": round(scale, 4),
+                "heuristic_epsilon": eps,
                 "active_profile_id": active_profile_id,
                 "weights": {k: w[k] for k in user_profiles.ROUTING_WEIGHT_KEYS},
                 "calming_source": user_profiles.CALMING_SOURCE,

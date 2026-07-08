@@ -1,7 +1,7 @@
 /** Route overlay layer ids — mirrored by GET /overlay_catalog on app.py */
 
 export const ROUTE_OVERLAY_EDGE = [
-  { id: 'lit', label: 'Lit segments', themeColor: 'litColor' },
+  { id: 'lit', label: 'Lit segments', themeColor: 'litColor', requiresLighting: true },
   { id: 'steep', label: 'Steep / uphill', themeColor: 'steepColor' },
   { id: 'tflCycleway', label: 'TfL cycleways', themeColor: 'tflCyclewayColor' },
   { id: 'tflQuietway', label: 'TfL quietways', themeColor: 'tflQuietwayColor' },

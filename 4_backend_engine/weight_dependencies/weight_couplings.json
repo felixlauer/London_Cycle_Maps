@@ -76,7 +76,7 @@
           "gte": 0.4
         },
         "calming_weight": {
-          "gte": 0.4
+          "gte": 0.75
         }
       },
       "stat_signature": {
@@ -91,7 +91,7 @@
         ],
         "ui_warning": "Shortcut streets may have more speed bumps.",
         "preset_bundle": {
-          "signal_weight_max_when_calming_on": 0.4
+          "signal_weight_max_when_calming_on": 0.75
         },
         "counterweight": {
           "calming_weight": 0.1,

@@ -261,6 +261,17 @@
   transform: rotate(180deg);
 }
 
+.wiz-budget-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--wiz-bg);
+  padding-top: 2px;
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--wiz-border);
+}
+
 /* Budget bar */
 .wiz-budget {
   margin-bottom: 14px;

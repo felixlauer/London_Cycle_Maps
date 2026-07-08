@@ -2,8 +2,12 @@
 Unified live disruptions: TfL + TomTom. Safe-update pattern: source-specific state
 then merged MASTER_LIVE_LOOKUP for O(1) routing. app.py and app_debug.py use this module.
 Call init(G) once; then update_disruptions(fetch_tfl=..., fetch_tomtom=...) and query get_edge_disruption(u, v).
+On startup call start_background_refresh() to fetch both sources immediately and every 10 minutes.
 """
 import logging
+import os
+import threading
+import time
 
 log = logging.getLogger("live_disruptions")
 logging.basicConfig(level=logging.INFO)
@@ -193,3 +197,44 @@ def get_status():
         "tomtom": tomtom_status,
         "master_edge_count": len(MASTER_LIVE_LOOKUP),
     }
+
+
+DEFAULT_POLL_INTERVAL_S = 600
+
+
+def _poll_loop(interval_s: int) -> None:
+    while True:
+        time.sleep(interval_s)
+        try:
+            ok, msg, _count = update_disruptions(fetch_tfl=True, fetch_tomtom=True)
+            log.info(
+                "live_disruptions: poll ok=%s master_edges=%d (%s)",
+                ok,
+                len(MASTER_LIVE_LOOKUP),
+                msg,
+            )
+        except Exception:
+            log.exception("live_disruptions: poll failed")
+
+
+def start_background_refresh(interval_s: int | None = None) -> None:
+    """Fetch TfL + TomTom disruptions now, then refresh every interval_s (default 10 min)."""
+    interval_s = int(
+        interval_s
+        if interval_s is not None
+        else os.environ.get("DISRUPTION_POLL_INTERVAL_S", DEFAULT_POLL_INTERVAL_S)
+    )
+    ok, msg, count = update_disruptions(fetch_tfl=True, fetch_tomtom=True)
+    log.info(
+        "live_disruptions: initial fetch ok=%s master_edges=%d (%s)",
+        ok,
+        len(MASTER_LIVE_LOOKUP),
+        msg,
+    )
+    t = threading.Thread(
+        target=_poll_loop,
+        args=(interval_s,),
+        name="disruption-poll",
+        daemon=True,
+    )
+    t.start()

@@ -37,12 +37,6 @@ export default function AdvancedStep({
         Happy with the preset? You can skip this step. Otherwise, set a detour
         budget and tune each preference.
       </p>
-      <div className="wiz-disclaimer">
-        {exemplary.disclaimer}
-        {baseMin !== undefined && (
-          <> On your bike that is about <strong>{Math.round(baseMin)} min</strong> at baseline.</>
-        )}
-      </div>
 
       <button type="button" className="wiz-collapse-toggle" onClick={() => setOpen((v) => !v)}>
         <span>Advanced modifications</span>
@@ -51,24 +45,33 @@ export default function AdvancedStep({
 
       {open && (
         <>
-          <div className="wiz-panel">
-            <div className="wiz-panel-title">Detour budget</div>
-            <div className="wiz-slider" style={{ marginBottom: 8 }}>
-              <div className="wiz-slider-head">
-                <span className="wiz-slider-label">How many extra minutes are OK overall?</span>
-                <span className="wiz-slider-cost">{budget} min</span>
+          <div className="wiz-disclaimer">
+            {exemplary.disclaimer}
+            {baseMin !== undefined && (
+              <> On your bike that is about <strong>{Math.round(baseMin)} min</strong> at baseline.</>
+            )}
+          </div>
+
+          <div className="wiz-budget-sticky">
+            <div className="wiz-panel" style={{ marginBottom: 0 }}>
+              <div className="wiz-panel-title">Detour budget</div>
+              <div className="wiz-slider" style={{ marginBottom: 8 }}>
+                <div className="wiz-slider-head">
+                  <span className="wiz-slider-label">How many extra minutes are OK overall?</span>
+                  <span className="wiz-slider-cost">{budget} min</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="30"
+                  step="1"
+                  value={budget}
+                  onChange={(e) => onBudgetChange(parseInt(e.target.value, 10))}
+                  aria-label="Detour budget"
+                />
               </div>
-              <input
-                type="range"
-                min="0"
-                max="30"
-                step="1"
-                value={budget}
-                onChange={(e) => onBudgetChange(parseInt(e.target.value, 10))}
-                aria-label="Detour budget"
-              />
+              <BudgetBar used={used} budget={budget} />
             </div>
-            <BudgetBar used={used} budget={budget} />
           </div>
 
           <div className="wiz-panel">

@@ -55,6 +55,7 @@ export default function RouteOverlayPicker({
   visibility,
   setVisibility,
   routeRevealed,
+  lightingActive = false,
   onRefreshDisruptions,
   disruptionStatus,
   apiBase = 'http://127.0.0.1:5000',
@@ -83,17 +84,20 @@ export default function RouteOverlayPicker({
   const renderGroup = (title, items) => (
     <>
       <div style={{ ...sectionStyle, color: theme.textSub }}>{title}</div>
-      {items.map(({ id, label, themeColor }) => (
+      {items.map(({ id, label, themeColor, requiresLighting }) => {
+        const unavailable = requiresLighting && !lightingActive;
+        return (
         <OverlayRow
           key={id}
-          label={label}
+          label={unavailable ? `${label} (night routing off)` : label}
           isOn={!!visibility[id]}
           onToggle={(v) => setOne(id, v)}
           swatchColor={theme[themeColor] || theme.textMain}
           theme={theme}
-          disabled={disabled}
+          disabled={disabled || unavailable}
         />
-      ))}
+        );
+      })}
     </>
   );
 

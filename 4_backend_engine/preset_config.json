@@ -8,8 +8,8 @@
   "epsilon": 0.0001,
   "speeds_kmh": {
     "standard": 15.0,
-    "road": 20.0,
-    "ebike": 17.0,
+    "road": 21.0,
+    "ebike": 18.0,
     "cargo": 15.0
   },
   "weight_caps": {
@@ -47,7 +47,7 @@
     },
     "road": {
       "label": "Road bike",
-      "speed_kmh": 20.0,
+      "speed_kmh": 21.0,
       "rules": {
         "surface_auto_value": 0.6,
         "hide_surface_question": true
@@ -56,7 +56,7 @@
     },
     "ebike": {
       "label": "E-bike",
-      "speed_kmh": 17.0,
+      "speed_kmh": 18.0,
       "rules": {
         "hill_weight_epsilon": true
       },
@@ -561,7 +561,7 @@
     },
     "vf_infrastructure": {
       "question": "Which cycling infrastructure do you feel safe on?",
-      "help": "Controls what counts as 'car-free' for the car-free corridors preference. Segregated tracks always count; shared paths with pedestrians and shared bus lanes are your call.",
+      "help": "Controls what counts as 'car-free' for the car-free corridors preference. Segregated tracks always count; shared paths, painted on-road lanes, and shared bus lanes are your call.",
       "options": {
         "shared_path": {
           "label": "Shared paths (with pedestrians)",
@@ -570,6 +570,11 @@
         "bus_lane": {
           "label": "Shared bus lanes",
           "default": true
+        },
+        "painted_lane": {
+          "label": "Exclusive painted cycle lanes (on road)",
+          "default": false,
+          "help_note": "Only cycleway=lane with :lane=exclusive (~41 km in London; opt-in; masks traffic stress but no segregated reward)"
         }
       }
     }
@@ -584,10 +589,10 @@
         "speed_weight": 0.3,
         "risk_weight": 0.3,
         "hill_weight": 1.8,
-        "calming_weight": 0.6,
-        "barrier_weight": 0.6,
+        "calming_weight": 1.2,
+        "barrier_weight": 1.2,
         "green_weight": 0.0001,
-        "vehicular_free_weight": 1.5,
+        "vehicular_free_weight": 1.0,
         "tfl_cycleway_weight": 0.3
       },
       "toggles": {
@@ -614,7 +619,7 @@
         "calming_weight": 0.0001,
         "barrier_weight": 0.3,
         "green_weight": 0.15,
-        "vehicular_free_weight": 2.5,
+        "vehicular_free_weight": 3.0,
         "tfl_cycleway_weight": 0.5
       },
       "toggles": {
@@ -637,10 +642,10 @@
         "junction_weight": 1.0,
         "speed_weight": 1.0,
         "risk_weight": 0.5,
-        "hill_weight": 1.8,
+        "hill_weight": 2.5,
         "calming_weight": 0.3,
         "barrier_weight": 0.3,
-        "green_weight": 0.6,
+        "green_weight": 1.0,
         "vehicular_free_weight": 2.5,
         "tfl_cycleway_weight": 0.5
       },

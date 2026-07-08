@@ -55,16 +55,6 @@ CLUSTER_PENALTY = {
 # Unknown tags in London extract → moderate stop/push (group 3).
 DEFAULT_CLUSTER = CLUSTER_STOP_PUSH
 
-# Impassable for cargo bikes only (length/width): chicane-style cycle barriers,
-# motorcycle barriers, width restrictors, pinch points, narrow wicket gates.
-CARGO_IMPASSABLE_TAGS = frozenset({
-    "cycle_barrier",
-    "motorcycle_barrier",
-    "width_restrictor",
-    "pinch point",
-    "wicket_gate",
-})
-
 _GROUP1 = frozenset({
     "height_restrictor", "lift_gate", "width_restrictor", "automatic lifting gate",
     "toll_booth", "sump_buster", "gap",
@@ -93,6 +83,15 @@ _GROUP5 = frozenset({
     "stile", "turnstile", "full-height_turnstile", "full_height_turnstile", "kissing_gate",
     "fence", "wall", "jersey_barrier", "barricade", "embankment", "hoarding", "log;kissing_gate",
 })
+
+# Cargo-only hard blocks (bike_type == "cargo"): chicane/motorcycle barriers, narrow
+# wicket gates, and every group-4 hostile tag (lift/squeeze/dismount assumed).
+# TODO: consider exposing per-barrier tolerance in the wizard (hop-off vs avoid).
+CARGO_IMPASSABLE_TAGS = frozenset({
+    "cycle_barrier",
+    "motorcycle_barrier",
+    "wicket_gate",
+}) | _GROUP4
 
 BARRIER_TO_CLUSTER: dict[str, int] = {}
 for _tag in _GROUP1:

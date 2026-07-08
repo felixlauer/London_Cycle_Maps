@@ -117,6 +117,12 @@ def main():
         tags->'smoothness'          as smoothness,
         tags->'cycleway:smoothness' as cycleway_smoothness,
 
+        -- 2D. Painted lane quality (cycleway=lane + :lane=exclusive|advisory)
+        tags->'cycleway:lane'            as cycleway_lane,
+        tags->'cycleway:left:lane'       as cycleway_left_lane,
+        tags->'cycleway:right:lane'      as cycleway_right_lane,
+        tags->'cycleway:both:lane'       as cycleway_both_lane,
+
         -- 3. Traffic & Road Stress
         tags->'hgv'                 as hgv,
         tags->'traffic_calming'     as traffic_calming,
@@ -149,6 +155,7 @@ def main():
         'segregated', 'cycleway_separation', 'cycleway_left_separation',
         'cycleway_right_separation', 'cycleway_buffer',
         'cycleway_width', 'cycleway_surface', 'smoothness', 'cycleway_smoothness',
+        'cycleway_lane', 'cycleway_left_lane', 'cycleway_right_lane', 'cycleway_both_lane',
         # New: traffic
         'hgv', 'traffic_calming',
         # Access & OSM service=* (e.g. alley, parking_aisle); bicycle already above
@@ -215,6 +222,10 @@ def main():
             'cycleway_width':       str(row['cycleway_width']),
             'cycleway_surface':     str(row['cycleway_surface']),
             'cycleway_smoothness':  str(row['cycleway_smoothness']),
+            'cycleway_lane':            str(row['cycleway_lane']),
+            'cycleway_left_lane':       str(row['cycleway_left_lane']),
+            'cycleway_right_lane':      str(row['cycleway_right_lane']),
+            'cycleway_both_lane':       str(row['cycleway_both_lane']),
             # Strategic networks
             'lcn_ref':          str(row['lcn_ref']),
             'rcn_ref':          str(row['rcn_ref']),
@@ -813,6 +824,7 @@ def generate_report(G, df_lines, df_points, snap_count, snap_miss,
         'segregated', 'cycleway_separation', 'cycleway_left_separation',
         'cycleway_right_separation', 'cycleway_buffer',
         'cycleway_width', 'cycleway_surface', 'cycleway_smoothness',
+        'cycleway_lane', 'cycleway_left_lane', 'cycleway_right_lane', 'cycleway_both_lane',
         'lcn_ref', 'rcn_ref', 'ncn_ref', 'cycle_network',
         'hgv', 'traffic_calming',
         'access', 'service', 'bicycle',

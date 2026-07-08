@@ -42,11 +42,10 @@ const METRIC_ROWS = [
   { label: 'Rough Surf.', key: 'rough_pct', unit: '%', invertDiff: false },
   { label: 'Elevation', key: 'elevation_gain', unit: 'm', invertDiff: false, integer: true },
   { label: 'Steep Seg.', key: 'steep_count', unit: '', invertDiff: false, integer: true },
-  { label: 'TfL Cycleway', key: 'tfl_cycleway_pct', unit: '%', invertDiff: true },
-  { label: 'TfL Quietway', key: 'tfl_quietway_pct', unit: '%', invertDiff: true },
+  { label: 'TfL network', key: 'tfl_network_pct', unit: '%', invertDiff: true },
+  { label: 'Segregated', key: 'vehicular_free_pct', unit: '%', invertDiff: true },
   { label: 'Speed stress', key: 'speed_stress_pct', unit: '%', invertDiff: false },
-  { label: 'Narrow', key: 'narrow_km', unit: 'km', invertDiff: false },
-  { label: 'Green', key: 'green_km', unit: 'km', invertDiff: true },
+  { label: 'Green', key: 'green_pct', unit: '%', invertDiff: true },
   { label: 'Barriers', key: 'barrier_count', unit: '', invertDiff: false, integer: true },
   { label: 'Calming', key: 'calming_count', unit: '', invertDiff: false, integer: true },
   { label: 'Signals', key: 'signal_count', unit: '', invertDiff: false, integer: true },
@@ -139,7 +138,7 @@ const HeaderBarToggle = ({ label, isOn, setIsOn }) => (
     </div>
 );
 
-const HeroStat = ({ label, fastest, optimized, unit, theme, optimizedColor }) => {
+const RouteHeroCard = ({ label, fastest, optimized, unit, theme }) => {
   const f = parseFloat(fastest);
   const o = parseFloat(optimized);
   const diff = o - f;
@@ -147,37 +146,61 @@ const HeroStat = ({ label, fastest, optimized, unit, theme, optimizedColor }) =>
   const displayDiff = (diff > 0 ? '+' : '') + fmt(diff);
   const diffColor = diff > 0 ? '#f44336' : diff < 0 ? '#4CAF50' : theme.textSub;
   return (
-    <div style={{ marginBottom: '8px', fontSize: '12px' }}>
-      <div style={{ fontWeight: 'bold', color: theme.textSub, fontSize: '10px', textTransform: 'uppercase', marginBottom: '2px' }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
-        <span style={{ color: theme.textSub }}>{fmt(f)} {unit}</span>
-        <span style={{ color: theme.textSub }}>→</span>
-        <span style={{ color: optimizedColor, fontWeight: 'bold' }}>{fmt(o)} {unit}</span>
-        <span style={{ color: diffColor, marginLeft: 'auto' }}>{displayDiff} {unit}</span>
+    <div className="ui-hero-card">
+      <div className="ui-hero-card__label">{label}</div>
+      <div className="ui-hero-card__main">
+        <span className="ui-hero-card__value">{fmt(o)}</span>
+        <span className="ui-hero-card__unit">{unit}</span>
+      </div>
+      <div className="ui-hero-card__foot">
+        <span className="ui-hero-card__baseline">vs fastest: {fmt(f)} {unit}</span>
+        <span className="ui-hero-card__delta" style={{ color: diffColor }}>
+          {displayDiff} {unit}
+        </span>
       </div>
     </div>
   );
 };
 
-const CondensedStatRow = ({ label, fastest, optimized, unit, invertDiff, integer, theme }) => {
-  const f = parseFloat(fastest);
-  const o = parseFloat(optimized);
+const resolveMetricValue = (stats, key) => {
+  if (!stats) return NaN;
+  if (key === 'tfl_network_pct') {
+    const direct = parseFloat(stats.tfl_network_pct);
+    if (Number.isFinite(direct)) return direct;
+    const cw = parseFloat(stats.tfl_cycleway_pct);
+    const qw = parseFloat(stats.tfl_quietway_pct);
+    if (Number.isFinite(cw) || Number.isFinite(qw)) {
+      return (Number.isFinite(cw) ? cw : 0) + (Number.isFinite(qw) ? qw : 0);
+    }
+    return NaN;
+  }
+  return parseFloat(stats[key]);
+};
+
+const CondensedStatRow = ({ label, statKey, statsFastest, statsOptimized, unit, invertDiff, integer, theme }) => {
+  const f = resolveMetricValue(statsFastest, statKey);
+  const o = resolveMetricValue(statsOptimized, statKey);
   const diff = o - f;
   const fmt = integer ? (n) => Math.round(n) : (n) => n.toFixed(1);
-  const displayDiff = (diff > 0 ? '+' : '') + fmt(diff);
+  const fmtVal = (n) => (Number.isFinite(n) ? fmt(n) : '—');
+  const displayDiff = Number.isFinite(diff)
+    ? `${diff > 0 ? '+' : ''}${fmt(diff)}`
+    : '—';
   let diffColor = theme.textSub;
-  if (!invertDiff) {
-    if (diff < 0) diffColor = '#4CAF50';
-    if (diff > 0) diffColor = '#f44336';
-  } else {
-    if (diff > 0) diffColor = '#4CAF50';
-    if (diff < 0) diffColor = '#f44336';
+  if (Number.isFinite(diff)) {
+    if (!invertDiff) {
+      if (diff < 0) diffColor = '#4CAF50';
+      if (diff > 0) diffColor = '#f44336';
+    } else {
+      if (diff > 0) diffColor = '#4CAF50';
+      if (diff < 0) diffColor = '#f44336';
+    }
   }
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '3px 0', borderBottom: `1px solid ${theme.border}` }}>
-      <span style={{ color: theme.textMain, fontWeight: '600', width: '38%' }}>{label}</span>
-      <span style={{ color: theme.textMain, width: '32%', textAlign: 'right' }}>{fmt(o)}{unit ? ` ${unit}` : ''}</span>
-      <span style={{ color: diffColor, width: '30%', textAlign: 'right' }}>{displayDiff}{unit ? ` ${unit}` : ''}</span>
+    <div className="ui-stats-row">
+      <span>{label}</span>
+      <span>{fmtVal(o)}{unit ? ` ${unit}` : ''}</span>
+      <span style={{ color: diffColor }}>{displayDiff}{unit && Number.isFinite(diff) ? ` ${unit}` : ''}</span>
     </div>
   );
 };
@@ -589,6 +612,7 @@ function App() {
           bikeType: meta.bike_type, preset: meta.preset,
           clamps: meta.translation_clamps || [],
           lightGatedOff: !!meta.light_gated_off,
+          lightingActive: (meta.weights?.light_weight ?? 0) > 0,
         };
         setLastRouteMeta(metaBundle);
         setStatus(routeRevealedRef.current
@@ -666,6 +690,12 @@ function App() {
       .then(d => setTomtomDisruptionStatus(d.ok ? `${d.count} incidents matched` : (d.message || "Error")))
       .catch(() => setTomtomDisruptionStatus("Connection error"));
   };
+
+  useEffect(() => {
+    if (!lastRouteMeta?.lightingActive) {
+      setOverlayVisibility((prev) => (prev.lit ? { ...prev, lit: false } : prev));
+    }
+  }, [lastRouteMeta?.lightingActive]);
 
   useEffect(() => {
     if (overlayVisibility.disruptions && routeRevealed && !tflDisruptionStatus) {
@@ -859,7 +889,7 @@ function App() {
         {inspectorGeo && <Polyline positions={inspectorGeo} color="red" weight={6} opacity={0.8} />}
         {routeRevealed && fastestData && <Polyline positions={fastestData.path} color={theme.routeGrey} weight={6} opacity={0.4} />}
         {routeRevealed && safestData && <Polyline positions={safestData.path} color={theme.routeOptimized} weight={5} opacity={1.0} />}
-        {routeRevealed && overlayVisibility.lit && litSegments.map((s, i) => <Polyline key={`lit-${i}`} positions={s} color={theme.litColor} weight={4} opacity={1.0} />)}
+        {routeRevealed && overlayVisibility.lit && lastRouteMeta?.lightingActive && litSegments.map((s, i) => <Polyline key={`lit-${i}`} positions={s} color={theme.litColor} weight={4} opacity={1.0} />)}
         {routeRevealed && overlayVisibility.steep && !overlayVisibility.lit && steepSegments.map((s, i) => <Polyline key={`steep-${i}`} positions={s} color={theme.steepColor} weight={5} opacity={1.0} />)}
         {routeRevealed && overlayVisibility.tflCycleway && tflCyclewayChunks.map((s, i) => <Polyline key={`tfl-c-${i}`} positions={s} color={theme.tflCyclewayColor} weight={4} opacity={0.9} />)}
         {routeRevealed && overlayVisibility.tflQuietway && tflQuietwayChunks.map((s, i) => <Polyline key={`tfl-q-${i}`} positions={s} color={theme.tflQuietwayColor} weight={4} opacity={0.9} />)}
@@ -920,6 +950,7 @@ function App() {
         visibility={overlayVisibility}
         setVisibility={setOverlayVisibility}
         routeRevealed={routeRevealed}
+        lightingActive={!!lastRouteMeta?.lightingActive}
         onRefreshDisruptions={handleRefreshDisruptions}
         disruptionStatus={disruptionStatusLabel}
         apiBase={API_BASE}
@@ -927,40 +958,47 @@ function App() {
 
       {/* STATS PANEL */}
       {routeRevealed && fastestData && safestData && (
-      <div className="ui-panel" style={{ position: "absolute", bottom: "30px", left: "20px", width: "260px", maxHeight: "70vh", overflowY: "auto", padding: "15px", zIndex: 1000 }}>
-          <h4 style={{ margin: "0 0 10px 0", borderBottom: `1px solid ${theme.border}`, paddingBottom: "5px", color: theme.textMain }}>Route Analysis</h4>
+      <div className="ui-panel ui-stats-panel" style={{ position: "absolute", bottom: "30px", left: "20px", zIndex: 1000 }}>
+          <h4 className="ui-stats-title">Route Analysis</h4>
           {lastRouteMeta?.bikeType && (
-            <div style={{ fontSize: "10px", color: theme.textSub, marginBottom: "8px" }}>
+            <div className="ui-stats-meta">
               {lastRouteMeta.bikeType}{lastRouteMeta.preset ? ` · ${lastRouteMeta.preset} preset` : ''}
               {lastRouteMeta.lightGatedOff ? ' · lighting off (daylight)' : ''}
               {lastRouteMeta.clamps?.length > 0 && (
-                <div style={{ marginTop: "2px" }}>
-                  ⚖ {lastRouteMeta.clamps.length} conflict clamp{lastRouteMeta.clamps.length > 1 ? 's' : ''} applied
+                <div className="ui-stats-meta-clamps">
+                  {lastRouteMeta.clamps.length} conflict clamp{lastRouteMeta.clamps.length > 1 ? 's' : ''} applied
                   ({lastRouteMeta.clamps.map((c) => c.clamped_weight.replace('_weight', '')).join(', ')})
                 </div>
               )}
             </div>
           )}
-          <HeroStat label="Time" fastest={fastestData.stats.duration_min} optimized={safestData.stats.duration_min} unit="min" theme={theme} optimizedColor={theme.textMain} />
-          <HeroStat label="Distance" fastest={(fastestData.stats.length_m / 1000).toFixed(1)} optimized={(safestData.stats.length_m / 1000).toFixed(1)} unit="km" theme={theme} optimizedColor={theme.textMain} />
-          <div style={{ borderTop: `1px solid ${theme.border}`, marginTop: "8px", paddingTop: "6px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", fontWeight: "bold", color: theme.textSub, marginBottom: "4px" }}>
-              <span style={{ width: "38%" }}>METRIC</span>
-              <span style={{ width: "32%", textAlign: "right" }}>VALUE</span>
-              <span style={{ width: "30%", textAlign: "right" }}>DELTA</span>
+          <div className="ui-stats-layout">
+            <div className="ui-stats-hero">
+              <RouteHeroCard label="Time" fastest={fastestData.stats.duration_min} optimized={safestData.stats.duration_min} unit="min" theme={theme} />
+              <RouteHeroCard label="Distance" fastest={(fastestData.stats.length_m / 1000).toFixed(1)} optimized={(safestData.stats.length_m / 1000).toFixed(1)} unit="km" theme={theme} />
             </div>
-            {METRIC_ROWS.map((row) => (
-              <CondensedStatRow
-                key={row.key}
-                label={row.label}
-                fastest={fastestData.stats[row.key]}
-                optimized={safestData.stats[row.key]}
-                unit={row.unit}
-                invertDiff={row.invertDiff}
-                integer={row.integer}
-                theme={theme}
-              />
-            ))}
+            <div className="ui-stats-detail">
+              <div className="ui-stats-detail-head">
+                <span>METRIC</span>
+                <span>VALUE</span>
+                <span>DELTA</span>
+              </div>
+              {METRIC_ROWS.filter((row) => (
+                row.key !== 'illumination_pct' || lastRouteMeta?.lightingActive
+              )).map((row) => (
+                <CondensedStatRow
+                  key={row.key}
+                  label={row.label}
+                  statKey={row.key}
+                  statsFastest={fastestData.stats}
+                  statsOptimized={safestData.stats}
+                  unit={row.unit}
+                  invertDiff={row.invertDiff}
+                  integer={row.integer}
+                  theme={theme}
+                />
+              ))}
+            </div>
           </div>
       </div>
       )}

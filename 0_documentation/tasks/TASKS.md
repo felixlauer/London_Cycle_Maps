@@ -15,16 +15,59 @@ Prioritised list of work items. **Keep this file up to date:** when you complete
 
 ## In progress
 
-*(Nothing currently in progress.)*
+- [ ] **Re-sweep after 7 Jul config build (operator)** — Run manually, then sign off P0 checklist:
+  ```powershell
+  python 6_verification/preset_sweep.py --all --epsilon 0.5
+  python 6_verification/preset_sweep_summary.py --date <today>
+  ```
+  Plan: [`preset_tuning_plan_2026-07-07.md`](preset_tuning_plan_2026-07-07.md) · Analysis: [`analysis_notes.md`](../verification/parameter_sweeps/2026-07-06/presets/_summary/analysis_notes.md)
 
 ---
 
 ## To do
 
-*(No active high-priority items.)*
+### After re-sweep — verify P0 sign-off
+
+- [ ] **P0 sign-off** — `delta_calming`/`delta_barriers` ≤ 0 on most Fast routes; Leisure green wins more routes; Safe accidents still lowest. Checklist in tuning plan §P0-6.
+- [ ] **P0-5 r8 Tottenham** — Map review: 0% green (data vs routing).
+- [ ] **P0-3 fallback** — If Fast rat runs persist, try `signal_weight` 1.0.
+- [ ] **P0-4 fallback** — If Paddington/Ken artefacts persist, try `risk_weight` 1.0.
+
+### Metrics — P2 (duration)
+
+- [ ] **P2-12b Cost-function ride time** — Implement Phase B per [`route_time_phase_b.md`](route_time_phase_b.md). Sketch in `route_time_estimate.py`; env `ROUTE_TIME_MODEL=penalties` when ready.
+- [ ] **P2-14** — `verify_epsilon_routes.py`: do not fail exit code on baseline-only mismatch.
+
+### Weight effectiveness — P1 (after re-sweep)
+
+- [ ] **P1-6 Safe speed_weight dead at cap 2.0** — Audit speed_stress edges on Twickenham/Wembley/Bromley; scale cost-function penalty if needed.
+- [ ] **P1-7 Leisure hill_weight** — Confirm 2.5 unblocks sensitivity; Bromley `climb_m` vs Fast.
+- [ ] **P1-9 Safe suburban hills** — If Bromley Safe climb still &gt;150 m, try `hill_weight` 0.3→0.6.
+- [ ] **P1-10 / P1-11 Leisure wizard warnings** — Junction/speed above nominal (r2); copy only.
+
+### Graph / routing artefacts — P3
+
+See [`preset_tuning_plan_2026-07-07.md`](preset_tuning_plan_2026-07-07.md) §P3.
+
+- [ ] **P3-15** Putney bridge detour (r7)
+- [ ] **P3-16** Paddington artefact (r10)
+- [ ] **P3-17** Hyde Park gate / Buckingham Palace
+- [ ] **P3-18** Kia Oval cycleway (r5 Wembley)
+- [ ] **P3-19** Cycleway hopping (r3, r4)
+- [ ] **P3-20** Graph rebuild (exclusive painted lanes)
+- [ ] **P3-21** OSM cycleway oneway audit
+
+### Product / defer — P4
+
+See tuning plan §P4.
+
+- [ ] **P4-22** Route consistency reward (deferred)
+- [ ] **P4-23** Fast beginner warning (unsignalized merges)
+- [ ] **P4-25** Safe r10 shortcut as nominal (after P0-4 map check)
 
 ### To do — Low priority
 
+- [ ] **Barrier tolerance in wizard** — Cargo hard-blocks are fixed in `barrier_clusters.CARGO_IMPASSABLE_TAGS` (group 4 + chicane tags). Consider letting users choose which barrier types they will hop off for / squeeze through, either as checkboxes or woven into the barrier slider question copy.
 - [ ] **TfL export: persist negative removals in ground-truth state** — `tfl_edges_from_graph.json` only stores tagged edges (positive state). Debug-app **removals** live in `tfl_manual_edits.json` only; after a rebuild they depend on a separate manual-apply pass. Consider a unified TfL state file (or export format) that records explicit untagged osm_ids / ways so export-alone restore matches full curated state without relying on manual JSON. See GRAPH.md §3.7 tradeoffs.
 - [ ] **TfL disruptions: motorway vs pedestrian/cycle logic** — TfL geometry does not say which carriageway or cycle track is closed. Reliable automatic mapping likely needs richer data or ML/heuristics beyond highway type alone (motorways are already excluded from the cycling graph). See Development_Protocol_2026-03-01 §8.2.
 - [ ] **TfL cycleway cancel-out in main app** — When a segment has a live disruption, reduce or cancel the TfL cycleway/quietway bonus so preference does not dominate. See Development_Protocol_2026-03-01 §8.3.
@@ -39,6 +82,8 @@ Prioritised list of work items. **Keep this file up to date:** when you complete
 ---
 
 ## Completed
+
+- **7 Jul 2026 — Preset weight build + duration Phase A** — `preset_config.json` weights updated (Fast calming/barrier 1.2, VF 1.0; Safe VF 3.0; Leisure green 1.0, hill 2.5). `signal_calming_rat_run` calming clamp floor **0.4→0.75** (mode_dominant unchanged). Phase A: Fast **1.35×** `duration_min` in `route_time_estimate.py`, `app.py`, `sweep_common.py` (nominal/+/- only, not baseline). Phase B planned in [`route_time_phase_b.md`](route_time_phase_b.md). Tests: 35 passing.
 
 - **TfL apply: zero all TfL tags first, then apply only export** — Done: `apply_tfl_export.py` now clears `tfl_cycle_programme` and `tfl_cycle_route` on every edge, then applies only the export. See Development_Protocol_2026-02-19 §7.4.
 - **Barrier confidence and point-based traffic calming** — Done: Kerb only on pedestrian ways; other barriers get `barrier_confidence` (0–1) from orthogonal distance; traffic_calming from planet_osm_point snapped to edges in separate columns (prefer car-allowed); calming_source (way/point/both) in backend and debug overlay. See Development_Protocol_2026-02-23.

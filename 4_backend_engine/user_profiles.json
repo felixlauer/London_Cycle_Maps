@@ -11,7 +11,8 @@
         "jam_comfort": true,
         "vf_infrastructure": {
           "shared_path": true,
-          "bus_lane": true
+          "bus_lane": true,
+          "painted_lane": false
         }
       },
       "weights": {
@@ -40,7 +41,8 @@
         "jam_comfort": false,
         "vf_infrastructure": {
           "shared_path": true,
-          "bus_lane": true
+          "bus_lane": true,
+          "painted_lane": false
         }
       },
       "weights": {
@@ -69,7 +71,8 @@
         "jam_comfort": false,
         "vf_infrastructure": {
           "shared_path": true,
-          "bus_lane": true
+          "bus_lane": true,
+          "painted_lane": false
         }
       },
       "weights": {
@@ -98,7 +101,8 @@
         "jam_comfort": false,
         "vf_infrastructure": {
           "shared_path": true,
-          "bus_lane": true
+          "bus_lane": true,
+          "painted_lane": false
         }
       },
       "weights": {
@@ -127,7 +131,8 @@
         "jam_comfort": true,
         "vf_infrastructure": {
           "shared_path": true,
-          "bus_lane": true
+          "bus_lane": true,
+          "painted_lane": false
         }
       },
       "weights": {
@@ -156,7 +161,8 @@
         "jam_comfort": true,
         "vf_infrastructure": {
           "shared_path": true,
-          "bus_lane": true
+          "bus_lane": true,
+          "painted_lane": false
         }
       },
       "weights": {
@@ -173,6 +179,36 @@
         "junction_weight": 2.0,
         "signal_weight": 0.0001,
         "tfl_live_weight": 0.1
+      }
+    },
+    "test_profile_2": {
+      "name": "test profile 2",
+      "preset": "safe",
+      "bike_type": "standard",
+      "toggles": {
+        "light_night": true,
+        "surface": true,
+        "jam_comfort": false,
+        "vf_infrastructure": {
+          "shared_path": true,
+          "bus_lane": true,
+          "painted_lane": false
+        }
+      },
+      "weights": {
+        "risk_weight": 1.2,
+        "light_weight": 0.6,
+        "surface_weight": 0.3,
+        "hill_weight": 0.3,
+        "tfl_cycleway_weight": 0.5,
+        "vehicular_free_weight": 2.5,
+        "speed_weight": 2.0,
+        "green_weight": 0.3,
+        "barrier_weight": 0.3,
+        "calming_weight": 0.2,
+        "junction_weight": 2.0,
+        "signal_weight": 0.3,
+        "tfl_live_weight": 0.4
       }
     }
   }

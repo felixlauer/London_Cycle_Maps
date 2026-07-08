@@ -26,7 +26,7 @@ export default function PresetWizard({ apiBase, themeMode, onClose, onCreated })
     light_night: false,
     surface: false,
     jam_comfort: true,
-    vf_infrastructure: { shared_path: true, bus_lane: true },
+    vf_infrastructure: { shared_path: true, bus_lane: true, painted_lane: false },
   });
   const [name, setName] = useState('');
   const [saveError, setSaveError] = useState('');
@@ -120,7 +120,7 @@ export default function PresetWizard({ apiBase, themeMode, onClose, onCreated })
     if (loadError) return <p className="wiz-intro">{loadError}</p>;
     if (!config) return <p className="wiz-intro">Loading preset configuration…</p>;
     if (step === 0) return <BikeTypeStep config={config} bikeType={bikeType} onSelect={setBikeType} />;
-    if (step === 1) return <PresetStep config={config} bikeType={bikeType} preset={preset} onSelect={selectPreset} />;
+    if (step === 1) return <PresetStep config={config} preset={preset} onSelect={selectPreset} />;
     if (step === 2) {
       return (
         <AdvancedStep

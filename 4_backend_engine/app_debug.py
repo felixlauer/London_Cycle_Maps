@@ -77,7 +77,11 @@ def bootstrap_debug_engine():
 
     t0 = time.perf_counter()
     live_disruptions.init(G)
-    print(f"--> Live disruption index: {time.perf_counter() - t0:.1f}s")
+    if os.environ.get("SKIP_DISRUPTION_FETCH", "").lower() in ("1", "true", "yes"):
+        print(f"--> Live disruption index: init only ({time.perf_counter() - t0:.1f}s)")
+    else:
+        live_disruptions.start_background_refresh()
+        print(f"--> Live disruption index: {time.perf_counter() - t0:.1f}s")
 
     t0 = time.perf_counter()
     build_all_debug_caches()

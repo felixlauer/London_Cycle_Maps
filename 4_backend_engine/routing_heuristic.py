@@ -22,6 +22,23 @@ VEHICULAR_FREE_WEIGHT_CAP = 3.0
 R_MIN = 0.1
 M_MIN = 0.1
 
+# Production default: bounded-suboptimal A* (cost <= (1+eps) x optimal). Verified on
+# all 11 leisure test routes 2026-07-06. Override with ROUTE_HEURISTIC_EPSILON env.
+DEFAULT_ROUTE_HEURISTIC_EPSILON = 0.5
+
+
+def get_route_heuristic_epsilon() -> float:
+    """ROUTE_HEURISTIC_EPSILON env overrides; else DEFAULT_ROUTE_HEURISTIC_EPSILON."""
+    import os
+
+    raw = os.environ.get("ROUTE_HEURISTIC_EPSILON")
+    if raw is None or not str(raw).strip():
+        return DEFAULT_ROUTE_HEURISTIC_EPSILON
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return DEFAULT_ROUTE_HEURISTIC_EPSILON
+
 PENALTY_FLOOR_KEYS = (
     "risk_weight",
     "light_weight",

@@ -52,14 +52,14 @@ WEIGHT_MIN = 0.0
 EPSILON = 0.0001
 
 BIKE_TYPES = ("standard", "road", "ebike", "cargo")
-BIKE_SPEEDS_KMH = {"standard": 15.0, "road": 20.0, "ebike": 17.0, "cargo": 15.0}
+BIKE_SPEEDS_KMH = {"standard": 15.0, "road": 21.0, "ebike": 18.0, "cargo": 15.0}
 DEFAULT_BIKE_TYPE = "standard"
 
 DEFAULT_TOGGLES = {
     "light_night": False,
     "surface": False,
     "jam_comfort": True,
-    "vf_infrastructure": {"shared_path": True, "bus_lane": True},
+    "vf_infrastructure": {"shared_path": True, "bus_lane": True, "painted_lane": False},
 }
 
 _BASE_DIR = os.path.dirname(__file__)
@@ -128,6 +128,7 @@ def _normalize_toggles(toggles: Any) -> dict:
     out["vf_infrastructure"] = {
         "shared_path": bool(vf.get("shared_path", True)),
         "bus_lane": bool(vf.get("bus_lane", True)),
+        "painted_lane": bool(vf.get("painted_lane", False)),
     }
     return out
 

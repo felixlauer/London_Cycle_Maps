@@ -139,13 +139,34 @@ def masks_surface_and_hill(d: dict | None) -> bool:
 VF_MASK_CORE = 1        # physically separated (cycleway, track/separate/exclusive, kerb/bollard, superhighway)
 VF_MASK_SHARED_PATH = 2  # shared with pedestrians (footway/path/pedestrian/bridleway, no physical cycle tags)
 VF_MASK_BUS_LANE = 4    # share_busway only
+VF_MASK_PAINTED_LANE = 32  # exclusive painted cycle lanes (cycleway=lane + :lane=exclusive)
 VF_REWARD_CORE = 8      # reward-eligible core (excludes parks)
 VF_REWARD_BUS_LANE = 16  # reward-eligible bus lane (excludes parks)
 
-VF_MASK_ALL = VF_MASK_CORE | VF_MASK_SHARED_PATH | VF_MASK_BUS_LANE
+VF_MASK_ALL = VF_MASK_CORE | VF_MASK_SHARED_PATH | VF_MASK_BUS_LANE | VF_MASK_PAINTED_LANE
 VF_REWARD_ALL = VF_REWARD_CORE | VF_REWARD_BUS_LANE
 
 _PHYSICAL_NONBUS_TAG_VALUES = frozenset({"track", "separate", "exclusive"})
+
+# cycleway*=lane paired with matching :lane=exclusive subtag on the edge (from graph).
+_LANE_SUBTAG_BY_CYCLEWAY_KEY = (
+    ("cycleway", "cycleway_lane"),
+    ("cycleway_left", "cycleway_left_lane"),
+    ("cycleway_right", "cycleway_right_lane"),
+    ("cycleway_both", "cycleway_both_lane"),
+)
+
+
+def _has_exclusive_painted_lane(d: dict) -> bool:
+    """True when a carriageway has cycleway=lane with :lane=exclusive (not advisory)."""
+    for cw_key, lane_sub_key in _LANE_SUBTAG_BY_CYCLEWAY_KEY:
+        for tok in _tag_tokens(d.get(cw_key)):
+            if tok != "lane":
+                continue
+            sub = str(d.get(lane_sub_key, "") or "").strip().lower()
+            if sub == "exclusive":
+                return True
+    return False
 
 
 def _has_physical_nonbus_cycleway_tag(d: dict) -> bool:
@@ -186,6 +207,7 @@ def vf_flags(d: dict | None) -> int:
         and highway in ("path", "pedestrian", "footway", "bridleway")
     )
     bus_lane = not core and _has_share_busway_tag(d)
+    painted_lane = not core and not bus_lane and _has_exclusive_painted_lane(d)
 
     if core:
         flags |= VF_MASK_CORE
@@ -193,6 +215,8 @@ def vf_flags(d: dict | None) -> int:
         flags |= VF_MASK_SHARED_PATH
     if bus_lane:
         flags |= VF_MASK_BUS_LANE
+    if painted_lane:
+        flags |= VF_MASK_PAINTED_LANE
 
     if not _is_yes_attr(d.get("is_park")):
         if core:
@@ -202,7 +226,11 @@ def vf_flags(d: dict | None) -> int:
     return flags
 
 
-def vf_allowed_masks(shared_path: bool = True, bus_lane: bool = True) -> tuple[int, int]:
+def vf_allowed_masks(
+    shared_path: bool = True,
+    bus_lane: bool = True,
+    painted_lane: bool = False,
+) -> tuple[int, int]:
     """(mask_allowed, reward_allowed) bitmasks from the user's infrastructure toggles."""
     mask_allowed = VF_MASK_CORE
     reward_allowed = VF_REWARD_CORE
@@ -211,6 +239,8 @@ def vf_allowed_masks(shared_path: bool = True, bus_lane: bool = True) -> tuple[i
     if bus_lane:
         mask_allowed |= VF_MASK_BUS_LANE
         reward_allowed |= VF_REWARD_BUS_LANE
+    if painted_lane:
+        mask_allowed |= VF_MASK_PAINTED_LANE
     return mask_allowed, reward_allowed
 
 

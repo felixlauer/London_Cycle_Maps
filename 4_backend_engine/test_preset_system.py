@@ -17,6 +17,7 @@ from barrier_clusters import (
 from cost_masks import (
     VF_MASK_BUS_LANE,
     VF_MASK_CORE,
+    VF_MASK_PAINTED_LANE,
     VF_MASK_SHARED_PATH,
     VF_REWARD_BUS_LANE,
     VF_REWARD_CORE,
@@ -46,12 +47,17 @@ class HardBlockTest(unittest.TestCase):
         for bike in ("standard", "road", "ebike", "cargo"):
             self.assertTrue(barrier_is_hard_block(d, bike))
 
-    def test_cargo_impassable_only_blocks_cargo(self):
-        for tag in CARGO_IMPASSABLE_TAGS:
+    def test_cargo_group4_hostile_blocks(self):
+        for tag in ("step", "log", "rising_kerb", "debris"):
             d = {"barrier": tag}
             self.assertTrue(barrier_is_hard_block(d, "cargo"), tag)
             self.assertFalse(barrier_is_hard_block(d, "standard"), tag)
-            self.assertFalse(barrier_is_hard_block(d, "ebike"), tag)
+
+    def test_cargo_chicane_tags_block_only_cargo(self):
+        for tag in ("cycle_barrier", "motorcycle_barrier", "wicket_gate"):
+            d = {"barrier": tag}
+            self.assertTrue(barrier_is_hard_block(d, "cargo"), tag)
+            self.assertFalse(barrier_is_hard_block(d, "standard"), tag)
 
     def test_access_denied_blocks_regardless_of_bike(self):
         d = {"barrier": "gate", "barrier_access": "private"}
@@ -85,6 +91,38 @@ class VfFlagsTest(unittest.TestCase):
         flags = vf_flags({"type": "cycleway", "is_park": "yes"})
         self.assertTrue(flags & VF_MASK_CORE)
         self.assertFalse(flags & VF_REWARD_CORE)
+
+    def test_exclusive_painted_lane_on_carriageway(self):
+        flags = vf_flags({
+            "type": "primary",
+            "cycleway": "lane",
+            "cycleway_lane": "exclusive",
+        })
+        self.assertTrue(flags & VF_MASK_PAINTED_LANE)
+        self.assertFalse(flags & VF_MASK_CORE)
+        self.assertFalse(flags & VF_REWARD_CORE)
+
+    def test_advisory_lane_not_painted_vf(self):
+        flags = vf_flags({
+            "type": "primary",
+            "cycleway": "lane",
+            "cycleway_lane": "advisory",
+        })
+        self.assertFalse(flags & VF_MASK_PAINTED_LANE)
+
+    def test_lane_without_subtag_not_painted_vf(self):
+        self.assertFalse(vf_flags({"type": "primary", "cycleway": "lane"}) & VF_MASK_PAINTED_LANE)
+
+    def test_painted_lane_deselected(self):
+        edge = {
+            "type": "primary",
+            "cycleway": "lane",
+            "cycleway_lane": "exclusive",
+        }
+        mask_allowed, _ = vf_allowed_masks(shared_path=True, bus_lane=True, painted_lane=False)
+        self.assertFalse(vf_flags(edge) & mask_allowed)
+        mask_on, _ = vf_allowed_masks(painted_lane=True)
+        self.assertTrue(vf_flags(edge) & mask_on)
 
     def test_plain_road_has_no_flags(self):
         self.assertEqual(vf_flags({"type": "residential"}), 0)
@@ -186,6 +224,34 @@ class TranslationLayerTest(unittest.TestCase):
         for coupling in translation_layer._COUPLINGS:
             for key in coupling["weights"]:
                 self.assertNotIn(key, translation_layer.RETIRED_WEIGHT_KEYS)
+
+
+    def test_fast_signal_calming_clamp_floor(self):
+        # signal_calming_rat_run: fast keeps signal; calming clamped to just below 0.75.
+        w = self._zero_weights()
+        w["signal_weight"] = 1.2
+        w["calming_weight"] = 1.2
+        out, clamps = translation_layer.apply_preset_clamps(w, "fast")
+        ids = [c["coupling_id"] for c in clamps]
+        self.assertIn("signal_calming_rat_run", ids)
+        self.assertAlmostEqual(out["calming_weight"], 0.7499, places=4)
+        self.assertEqual(out["signal_weight"], 1.2)
+
+
+class RouteTimeEstimateTest(unittest.TestCase):
+    def test_fast_multiplier(self):
+        from route_time_estimate import (
+            FAST_PRESET_DURATION_SPEED_MULTIPLIER,
+            cruise_duration_min,
+            duration_speed_multiplier_for_preset,
+        )
+
+        self.assertEqual(duration_speed_multiplier_for_preset("fast"), 1.35)
+        self.assertEqual(duration_speed_multiplier_for_preset("safe"), 1.0)
+        base = cruise_duration_min(6000.0, 15.0, 1.0)
+        fast = cruise_duration_min(6000.0, 15.0, FAST_PRESET_DURATION_SPEED_MULTIPLIER)
+        self.assertLess(fast, base)
+        self.assertAlmostEqual(fast, base / 1.35, places=4)
 
 
 class RewardLerpTest(unittest.TestCase):
