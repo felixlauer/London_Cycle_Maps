@@ -7,7 +7,6 @@
 The primary goal of the London Cycle Maps project is to deliver a routing application specifically tuned for cyclists in London. The system processes raw geographic data into a custom directed graph, factoring in elevation, traffic speed stress, cyclist collision history, and cycleway infrastructure. It currently consists of a fully functional data processing pipeline, a multi-factor routing backend with live disruption awareness, a user-facing map app, and an extensive debug application for data validation. Preset ride modes (**Fast**, **Safe**, **Leisure**) are designed and dependency-mapped, but not yet wired into the UI.
 https://tuned-cycling.subscribepage.io/
 
-*Main routing app: route from South Kensington to Piccadilly Circus*
 <img width="959" height="452" alt="Screenshot 2026-06-18 190105" src="https://github.com/user-attachments/assets/3df32217-ee3b-4b17-af05-0c0d89bf2015" />
 ---
 
@@ -30,7 +29,7 @@ Current major achievements include:
 Modes are **not implemented in the app yet**. The intended flow:
 
 1. **Pick a preset** — **Fast**, **Safe**, or **Leisure** (see below).
-2. **Optionally fine-tune** preferences (sliders / toggles for safety, comfort, scenery, infrastructure). A translation layer will resolve tug-of-wars using the active mode’s tie-breakers so conflicting settings stay coherent.
+2. **Optionally fine-tune** preferences (sliders / toggles for safety, comfort, scenery, infrastructure). A translation layer will resolve tug-of-wars using the active mode’s tie-breakers so conflicting settings stay coherent. Users can fill out a delay budget to prioritise their choices. 
 3. **Set bike-type and preferences** by answering a few simple questions ("Do you prefer illuminated roads at night?" or "Are you comfortable navigating through traffic jams to save time on your journey?").
 4. **Set start and end** on the map (click or text search).
 5. **Get Route** — compare the absolute fastest path with the mode-optimized path, stats (Δ vs fastest), and optional route overlays (lit segments, TfL network, barriers, etc.).
@@ -40,6 +39,11 @@ Modes are **not implemented in the app yet**. The intended flow:
 | **Fast** | Direct, low-friction routing — prioritises flow (signals, junctions, barriers) and keeps detours short. |
 | **Safe** | Low-stress, low-risk routing — collision history, lit corridors, and infrastructure win when preferences conflict. |
 | **Leisure** | Scenic / comfortable rides — green space and calming-oriented choices, with safety still in the mix where it matters. |
+
+| | |
+|:---:|:---:|
+| <img width="334" height="328" alt="Screenshot 2026-07-04 235824" src="https://github.com/user-attachments/assets/30400eb8-b90b-45f8-a80e-8e1654f6ff93" /> | <img width="332" height="311" alt="Screenshot 2026-07-04 235852" src="https://github.com/user-attachments/assets/6e6fb93b-092c-4167-a9fe-9ed31e916c79" /> |
+| <img width="332" height="421" alt="Screenshot 2026-07-04 235919" src="https://github.com/user-attachments/assets/e51ed325-d5ff-4e21-8125-fcbffc20378e" /> | <img width="337" height="397" alt="Screenshot 2026-07-04 235944" src="https://github.com/user-attachments/assets/7601bbf9-4415-4e27-9ee8-e821eca82e51" /> |
 
 ---
 
