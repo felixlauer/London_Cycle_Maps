@@ -1,0 +1,175 @@
+/* Route points panel — Google Maps–like via stops */
+
+.rp-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rp-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.rp-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 2px 0;
+  border-radius: 10px;
+  transition: transform 0.2s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rp-row.is-dragging {
+  opacity: 0.55;
+  transform: scale(0.98);
+}
+
+.rp-row.is-drop-target {
+  background: color-mix(in srgb, var(--ui-accent, #d32f2f) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-accent, #d32f2f) 35%, transparent);
+}
+
+.rp-row__input {
+  flex: 1;
+  min-width: 0;
+}
+
+.rp-row__input .loc-search,
+.rp-row__input > div {
+  margin-bottom: 0 !important;
+}
+
+.rp-row__aside {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 8px;
+  flex-shrink: 0;
+}
+
+.rp-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  color: var(--ui-text-sub, #667085);
+}
+
+.rp-icon--end {
+  color: #1a1a1a;
+}
+
+.rp-icon--via {
+  color: var(--ui-text-sub, #667085);
+  opacity: 0.85;
+}
+
+.rp-grip {
+  cursor: grab;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--ui-text-sub, #667085);
+  user-select: none;
+  padding: 2px;
+}
+
+.rp-grip:active {
+  cursor: grabbing;
+}
+
+.rp-remove {
+  border: none;
+  background: transparent;
+  color: var(--ui-text-sub, #667085);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.rp-remove:hover {
+  background: rgba(180, 35, 24, 0.1);
+  color: #b42318;
+}
+
+.rp-swap-row {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  height: 20px;
+  margin: -2px 0;
+  padding: 0;
+}
+
+.rp-swap-row__spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.rp-swap {
+  border: none;
+  background: transparent;
+  color: var(--ui-text-sub, #667085);
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rp-swap:hover:not(:disabled) {
+  color: var(--ui-text, #23272d);
+}
+
+.rp-swap:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.rp-gap {
+  height: 6px;
+  list-style: none;
+}
+
+.rp-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: var(--ui-text-sub, #667085);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 2px;
+  font-family: inherit;
+  align-self: flex-start;
+}
+
+.rp-add:hover:not(:disabled) {
+  color: var(--ui-text, #23272d);
+}
+
+.rp-add:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rp-add__icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  object-fit: contain;
+}

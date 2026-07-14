@@ -1,0 +1,128 @@
+/* Long-route loading: dimmed overlay + fixed card (no screen blur). */
+
+.route-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 12, 16, 0.55);
+  pointer-events: auto;
+}
+
+.route-loading-card {
+  --rl-bg: #ffffff;
+  --rl-text: #23272d;
+  --rl-border: #e4e7ec;
+  --rl-shadow: 0 24px 64px rgba(16, 24, 40, 0.28);
+
+  box-sizing: border-box;
+  width: 340px;
+  height: 260px;
+  max-width: calc(100vw - 32px);
+  padding: 28px 24px 22px;
+  border-radius: 16px;
+  border: 1px solid var(--rl-border);
+  background: var(--rl-bg);
+  color: var(--rl-text);
+  box-shadow: var(--rl-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  pointer-events: none;
+}
+
+.route-loading-card[data-theme='dark'] {
+  --rl-bg: #1d2025;
+  --rl-text: #e6e8eb;
+  --rl-border: #343a43;
+  --rl-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+}
+
+.route-loading-bike {
+  width: 150px;
+  height: auto;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+/* Fixed text slot — no layout shift when copy wraps or fades */
+.route-loading-text {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.route-loading-text p {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  max-width: 100%;
+  transition: opacity 200ms ease;
+}
+
+.route-loading-text p.is-visible {
+  opacity: 1;
+}
+
+.route-loading-text p.is-hidden {
+  opacity: 0;
+}
+
+/* Road dashes */
+.route-loading-bike .road {
+  stroke-dasharray: 56 44;
+  animation: route-road-scroll 0.28s linear infinite;
+}
+
+@keyframes route-road-scroll {
+  to {
+    stroke-dashoffset: 100;
+  }
+}
+
+.route-loading-bike .arc-spin {
+  animation: route-wheel-spin 0.55s linear infinite;
+}
+
+@keyframes route-wheel-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.route-loading-bike .frame {
+  transform-origin: 237.8px 287.7px;
+  animation: route-frame-stretch 0.7s ease-in-out infinite;
+}
+
+@keyframes route-frame-stretch {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.07);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-loading-bike .road,
+  .route-loading-bike .arc-spin,
+  .route-loading-bike .frame {
+    animation: none;
+  }
+
+  .route-loading-text p {
+    transition: none;
+  }
+}

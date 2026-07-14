@@ -3,3 +3,17 @@ matplotlib>=3.8.0
 folium>=0.15.0
 plotly>=5.18.0
 networkx>=3.0
+
+# Web app
+flask>=3.0.0
+flask-cors>=4.0.0
+shapely>=2.0.0
+scipy>=1.11.0
+numba>=0.59.0
+sqlalchemy>=2.0.0
+python-dotenv>=1.0.0
+
+# Supabase auth + profile store
+PyJWT>=2.8.0
+cryptography>=41.0.0
+supabase>=2.0.0

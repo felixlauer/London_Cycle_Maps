@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="80 200 330 140" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+  <line class="road" x1="91" y1="322" x2="394" y2="322" stroke-width="5"/>
+  <g class="wheel-rear">
+    <ellipse class="rim" cx="181.62" cy="287.416" rx="30" ry="30" stroke-width="5"/>
+    <g class="arc-spin" style="transform-origin: 181.62px 287.416px">
+      <path class="arc" d="M 181.75 312.104 C 191.942 312.104 201.027 305.675 204.417 296.062" stroke-width="3"/>
+    </g>
+  </g>
+  <g class="wheel-front">
+    <ellipse class="rim" cx="294.039" cy="287.693" rx="30" ry="30" stroke-width="5"/>
+    <g class="arc-spin" style="transform-origin: 294.039px 287.693px">
+      <path class="arc" d="M 294.04 312.38 C 304.23 312.38 313.32 305.95 316.71 296.34" stroke-width="3"/>
+    </g>
+  </g>
+  <g class="frame">
+    <ellipse cx="181.749" cy="288.042" rx="5" ry="5" fill="currentColor" stroke="currentColor"/>
+    <ellipse cx="228.827" cy="287.693" rx="5" ry="5" fill="currentColor" stroke="currentColor" stroke-width="1"/>
+    <polygon points="181.75 287.693 197.442 231.897 272.418 232.246 228.827 287.693" stroke-width="5"/>
+    <polyline points="294.388 289.785 265.792 214.81 280.09 214.81" stroke-width="5"/>
+    <polyline points="228.827 286.995 188.375 215.507 177.216 215.507 198.14 215.507" stroke-width="5"/>
+  </g>
+</svg>

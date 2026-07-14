@@ -1,67 +1,35 @@
-Terminal 1 — Main backend (port 5000)
+## Main backend (port 5000)
+
+```powershell
 cd c:\London_Cycle_Maps\4_backend_engine
-pip install -r requirements.txt
 python app.py
-Wait until you see the graph loaded message. First start can take a while.
-Optional forced mode (dev): `python app.py --day` or `python app.py --night` — overrides the real sun position for the light_weight gating (night_time.is_dark). No flag = automatic.
+```
 
-Terminal 2 — Main frontend (port 3000)  
-cd c:\London_Cycle_Maps\5_frontend  
-npm start  
-Optional forced mode (dev): `npm start -- --day` or `npm start -- --night` — skips the sunrise/sunset auto-detection and forces the initial Night Mode toggle/theme. No flag = automatic. (Handled by 5_frontend/start.js, which sets REACT_APP_FORCE_MODE.)  
-Copy `5_frontend/.env.example` to `5_frontend/.env` and set `REACT_APP_MAPBOX_API_KEY` to your Mapbox public token (required for Start/End location search). Restart `npm start` after creating or editing `.env` — Create React App only reads env at startup.  
-Opens [http://localhost:3000](http://localhost:3000) → talks to 5000 (hardcoded in 5_frontend/src/App.js).
+Wait until you see the graph loaded message. First start can take a while (with routing cache v2: ~2–3 min ready).
 
-Terminal 3 — Debug backend (port 5001)
+Optional: `python app.py --day` / `--night` (force light_weight sun gate); `python app.py --no-live` (skip TfL/TomTom; or `$env:SKIP_DISRUPTION_FETCH=1` / `$env:LIVE_DISRUPTIONS=0`).
+
+Kill-switches (default all on): `ARRAY_COSTS=0` → Python weight fns; `CSR_ASTAR=0` → NetworkX uni A*; `NUMBA_ASTAR=0` → pure-Python CSR A*. **Routing cache** (`1_data/london_elev_final_tfl.routing_cache/`, `prebuild_routing_cache.py`): tables/CSR/junctions + lazy geom store. Format v2+. `ROUTING_CACHE=0` forces cold rebuild. Without cache, `GEOM_PREPARSE=background|sync|0` still applies. Requires `numba` for Phase C. Benches: `benchmark_csr_*.py`, `benchmark_geom_preparse.py`, `benchmark_startup_ram.py`.
+
+## Main frontend (port 3000)
+
+```powershell
+cd c:\London_Cycle_Maps\5_frontend
+npm start
+```
+
+Optional: `npm start -- --day` / `--night` (forces Night Mode theme via `start.js` → `REACT_APP_FORCE_MODE`). Copy `5_frontend/.env.example` → `.env` and set `REACT_APP_MAPBOX_API_KEY`; restart after editing. Opens [http://localhost:3000](http://localhost:3000) → talks to 5000.
+
+## Debug backend (port 5001)
+
+```powershell
 cd c:\London_Cycle_Maps\4_backend_engine
 python app_debug.py
-Runs on 5001 so it doesn’t clash with main.
+```
 
-Terminal 4 — Debug frontend (port 3001)
-Both CRA apps default to 3000, so set PORT for the debug UI:
+## Debug frontend (port 3001)
 
+```powershell
 cd c:\London_Cycle_Maps\8_debug\5_frontend
-$env:PORT=3001; npm start  
-  
-Special case commands:   
-**Automatic (normal behaviour, follows the real sun):**
-
-*# Terminal 1 — backend*
-
-cd c:\London_Cycle_Maps\4_backend_engine
-
-python [app.py](http://app.py)
-
-*# Terminal 2 — frontend*
-
-cd c:\London_Cycle_Maps\5_frontend
-
-npm start
-
-**Forced day mode (work on day mode at night):**
-
-*# Terminal 1 — backend*
-
-cd c:\London_Cycle_Maps\4_backend_engine
-
-python [app.py](http://app.py) --day
-
-*# Terminal 2 — frontend*
-
-cd c:\London_Cycle_Maps\5_frontend
-
-npm start -- --day
-
-**Forced night mode (work on night mode during the day):**
-
-*# Terminal 1 — backend*
-
-cd c:\London_Cycle_Maps\4_backend_engine
-
-python [app.py](http://app.py) --night
-
-*# Terminal 2 — frontend*
-
-cd c:\London_Cycle_Maps\5_frontend
-
-npm start -- --night
+$env:PORT=3001; npm start
+```

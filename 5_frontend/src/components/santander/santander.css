@@ -1,0 +1,356 @@
+/* Santander Cycles hire-mode map pins + chrome (match design mockup). */
+
+.santander-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ui-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.santander-toggle.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.santander-toggle input {
+  accent-color: var(--ui-accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.santander-toggle.is-disabled input {
+  cursor: not-allowed;
+}
+
+.santander-guide-pill {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  max-width: min(420px, calc(100vw - 40px));
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #fff;
+  color: #333;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 20px rgba(16, 24, 40, 0.14);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+}
+
+.app-root[data-theme='dark'] .santander-guide-pill {
+  background: #1d2025;
+  color: #e6e8eb;
+  border-color: #343a43;
+}
+
+.santander-soft-banner {
+  position: absolute;
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1100;
+  max-width: min(440px, calc(100vw - 40px));
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: #fff8e6;
+  color: #6b5300;
+  border: 1px solid #f0d78c;
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.1);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+}
+
+.app-root[data-theme='dark'] .santander-soft-banner {
+  background: #3a3218;
+  color: #f5e6a8;
+  border-color: #6b5300;
+}
+
+.santander-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(16, 24, 40, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.santander-modal {
+  width: min(360px, 100%);
+  padding: 18px 18px 14px;
+  border-radius: 14px;
+  background: var(--ui-bg, #fff);
+  color: var(--ui-text, #23272d);
+  border: 1px solid var(--ui-border, #e4e7ec);
+  box-shadow: 0 12px 36px rgba(16, 24, 40, 0.22);
+}
+
+.santander-modal h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.santander-modal p {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ui-text-sub, #667085);
+}
+
+.santander-modal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.santander-modal-actions .ui-btn {
+  flex: 1;
+}
+
+/* --- Map DivIcon: pill + beak as one silhouette --- */
+
+.leaflet-div-icon.santander-divicon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.santander-anchor {
+  position: relative;
+  width: 0;
+  height: 0;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  --beak-along: 32px;
+}
+
+/* Single drop-shadow on the combined white silhouette — no seam */
+.santander-pin-unit {
+  position: absolute;
+  left: 0;
+  top: 0;
+  filter: drop-shadow(0 3px 10px rgba(16, 24, 40, 0.22));
+}
+
+/* Tip at (0,0). Card left = tip - --beak-along so tip sits under "|". */
+.santander-pin-unit.side-bottom .santander-card {
+  position: absolute;
+  left: 0;
+  bottom: 10px;
+  transform: translateX(calc(-1 * var(--beak-along)));
+}
+
+.santander-pin-unit.side-bottom .santander-beak {
+  position: absolute;
+  left: 0;
+  top: -11px;
+  transform: translateX(-50%);
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-top: 11px solid #fff;
+  border-bottom: none;
+}
+
+.santander-pin-unit.side-top .santander-card {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  transform: translateX(calc(-1 * var(--beak-along)));
+}
+
+.santander-pin-unit.side-top .santander-beak {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translateX(-50%);
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 11px solid #fff;
+  border-top: none;
+}
+
+.santander-card {
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.santander-card.is-expanded {
+  border-radius: 16px;
+  padding: 10px 10px 10px 14px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 176px;
+}
+
+.santander-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.santander-counts {
+  font-size: 14px;
+  font-weight: 700;
+  color: #4a4a4a;
+  letter-spacing: 0.02em;
+}
+
+.santander-card.is-empty .santander-counts {
+  color: #8a8a8a;
+}
+
+.santander-breakdown {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.santander-bd-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 36px;
+  padding: 0 6px;
+}
+
+.santander-bd-item + .santander-bd-item {
+  border-left: 1px solid #d8d8d8;
+}
+
+.santander-bd-num {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #555;
+}
+
+.santander-bd-num.is-electric {
+  color: #2e7d32;
+}
+
+.santander-bd-num.is-empty-docks {
+  color: #9e9e9e;
+}
+
+.santander-bd-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: #9a9a9a;
+  margin-top: 2px;
+}
+
+.santander-bd-label.is-electric {
+  color: #2e7d32;
+}
+
+.santander-bike-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e53935;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.santander-bike-badge.is-empty {
+  background: #757575;
+}
+
+.santander-bike-badge .santander-icon {
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  -webkit-mask: var(--santander-bike-mask) center / contain no-repeat;
+  mask: var(--santander-bike-mask) center / contain no-repeat;
+}
+
+.santander-walk-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.santander-walk-icon {
+  width: 18px;
+  height: 18px;
+  background: #222;
+  flex-shrink: 0;
+  -webkit-mask: var(--santander-walk-mask) center / contain no-repeat;
+  mask: var(--santander-walk-mask) center / contain no-repeat;
+}
+
+.santander-walk-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.santander-walk-text strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: #333;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.santander-walk-text span {
+  display: block;
+  font-size: 11px;
+  color: #9a9a9a;
+  font-weight: 500;
+  line-height: 1.1;
+  margin-top: 0;
+}
+
+.santander-confirm-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: #e53935;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.santander-confirm-btn:hover {
+  background: #c62828;
+  box-shadow: none;
+}
+
+.santander-beak {
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}

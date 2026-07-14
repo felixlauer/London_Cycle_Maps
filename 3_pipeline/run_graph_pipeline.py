@@ -3,7 +3,7 @@
 Run the London Cycle Maps graph pipeline end-to-end (sequential subprocesses).
 
 Default (graph-only, PostgreSQL already loaded):
-  noded_network → build_graph → elevation → tag_attractions_osm → [tag_tfl_routes] → apply_tfl_export → apply_tfl_manual_edits → apply_attraction_manual
+  noded_network → build_graph → elevation → tag_attractions_osm → [tag_tfl_routes] → apply_tfl_export → apply_tfl_manual_edits → apply_attraction_manual → prebuild_routing_cache
 
 TfL final stage (when tfl_edges_from_graph.json exists):
   Export JSON is ground truth; use --skip-tagging to skip geometry tagging.
@@ -71,11 +71,15 @@ GRAPH_SAVE_STEPS = frozenset({
 STEP_TFL_EXPORT = ("apply_tfl_export.py", "Restore TfL tags from tfl_edges_from_graph.json (ground truth)")
 STEP_TFL_MANUAL = ("apply_tfl_manual_edits.py", "Apply debug-app manual TfL edits")
 STEP_ATTRACTION_MANUAL = ("apply_attraction_manual.py", "Apply manual park/river/sight regions")
+STEP_ROUTING_CACHE = (
+    "prebuild_routing_cache.py",
+    "Prebuild routing cache (tables/CSR/junctions/geom for fast server start)",
+)
 
 ALL_PIPELINE_SCRIPTS = (
     [s for s, _ in STEPS_FROM_DB]
     + [s for s, _ in STEPS_GRAPH_CORE]
-    + [STEP_TFL_EXPORT[0], STEP_TFL_MANUAL[0], STEP_ATTRACTION_MANUAL[0]]
+    + [STEP_TFL_EXPORT[0], STEP_TFL_MANUAL[0], STEP_ATTRACTION_MANUAL[0], STEP_ROUTING_CACHE[0]]
 )
 
 
@@ -203,6 +207,11 @@ def main() -> int:
         help=argparse.SUPPRESS,
     )
     parser.add_argument(
+        "--skip-routing-cache",
+        action="store_true",
+        help="Skip prebuild_routing_cache.py (server will cold-rebuild derived arrays)",
+    )
+    parser.add_argument(
         "--start-at",
         metavar="SCRIPT",
         default=None,
@@ -273,6 +282,9 @@ def main() -> int:
     if not args.skip_attraction_manual:
         steps.append(STEP_ATTRACTION_MANUAL)
 
+    if not args.skip_routing_cache:
+        steps.append(STEP_ROUTING_CACHE)
+
     steps, skipped, start_err = _slice_steps_from_start(steps, args.start_at)
     if start_err:
         print(start_err)
@@ -305,6 +317,9 @@ def main() -> int:
         print(f"  Output (runtime): {FINAL_GRAPH_FAST}")
     elif os.path.isfile(FINAL_GRAPH):
         print(f"  Output (runtime): {FINAL_GRAPH}")
+    cache_dir = os.path.join(DATA_DIR, "london_elev_final_tfl.routing_cache")
+    if os.path.isdir(cache_dir):
+        print(f"  Routing cache: {cache_dir}")
     print("  Restart app.py / app_debug.py to load the new graph.")
     print("=" * 72)
     return 0

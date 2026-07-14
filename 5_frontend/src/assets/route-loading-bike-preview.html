@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Route loading bike — preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background:
+        linear-gradient(135deg, #c5d5c0 0%, #a8c4d4 45%, #d4c9b0 100%);
+    }
+    .fake-map-label {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      padding: 10px 14px;
+      background: #fff;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      opacity: 0.9;
+      z-index: 1;
+    }
+
+    .route-loading-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1100;
+      display: grid;
+      place-items: center;
+      background: rgba(17, 17, 17, 0.28);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .route-loading-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding: 8px 16px;
+      color: #111;
+      text-align: center;
+    }
+
+    .route-loading-card p {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+
+    .route-loading-bike {
+      width: 160px;
+      height: auto;
+      overflow: visible;
+    }
+
+    .route-loading-bike .road {
+      stroke-dasharray: 56 44;
+      animation: route-road-scroll 0.32s linear infinite;
+    }
+    @keyframes route-road-scroll {
+      to { stroke-dashoffset: 100; }
+    }
+
+    .route-loading-bike .arc-spin {
+      animation: route-wheel-spin 0.55s linear infinite;
+    }
+    @keyframes route-wheel-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .route-loading-bike .frame {
+      transform-origin: 237.8px 287.7px;
+      animation: route-frame-stretch 0.7s ease-in-out infinite;
+    }
+    @keyframes route-frame-stretch {
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(1.07); }
+    }
+  </style>
+</head>
+<body>
+  <div class="fake-map-label">Preview only — open this file in a browser</div>
+
+  <div class="route-loading-overlay" role="status" aria-live="polite">
+    <div class="route-loading-card">
+      <svg
+        class="route-loading-bike"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="80 200 330 140"
+        fill="none"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <line class="road" x1="91" y1="322" x2="394" y2="322" stroke-width="5" />
+        <g class="wheel-rear">
+          <ellipse class="rim" cx="181.62" cy="287.416" rx="30" ry="30" stroke-width="5" />
+          <g class="arc-spin" style="transform-origin: 181.62px 287.416px">
+            <path d="M 181.75 312.104 C 191.942 312.104 201.027 305.675 204.417 296.062" stroke-width="3" />
+          </g>
+        </g>
+        <g class="wheel-front">
+          <ellipse class="rim" cx="294.039" cy="287.693" rx="30" ry="30" stroke-width="5" />
+          <g class="arc-spin" style="transform-origin: 294.039px 287.693px">
+            <path d="M 294.04 312.38 C 304.23 312.38 313.32 305.95 316.71 296.34" stroke-width="3" />
+          </g>
+        </g>
+        <g class="frame">
+          <ellipse cx="181.749" cy="288.042" rx="5" ry="5" fill="currentColor" stroke="currentColor" />
+          <ellipse cx="228.827" cy="287.693" rx="5" ry="5" fill="currentColor" stroke="currentColor" stroke-width="1" />
+          <polygon points="181.75 287.693 197.442 231.897 272.418 232.246 228.827 287.693" stroke-width="5" />
+          <polyline points="294.388 289.785 265.792 214.81 280.09 214.81" stroke-width="5" />
+          <polyline points="228.827 286.995 188.375 215.507 177.216 215.507 198.14 215.507" stroke-width="5" />
+        </g>
+      </svg>
+      <p>We are tuning your route ...</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -2,7 +2,7 @@
 Main routing backend: /route, /inspect, /profiles. Uses 1_data/london_elev_final_tfl.gpickle (fast) or .graphml fallback.
 Profile-driven routing via user_profiles.json (local mock DB). When changing API or cost logic, update 0_documentation/APP_MAIN.md.
 """
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g
 from flask_cors import CORS
 import math
 import networkx as nx
@@ -12,6 +12,7 @@ from shapely.wkt import loads as load_wkt
 import os
 import sys
 import time
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "3_pipeline"))
 from graph_io import load_graph, fast_path
@@ -19,16 +20,24 @@ from graph_io import load_graph, fast_path
 import tfl_live
 import tomtom_live
 import live_disruptions
+import santander_live
 from route_time_estimate import cruise_duration_min, duration_speed_multiplier_for_preset
 from routing_heuristic import (
     compute_optimized_cost_per_metre_lower_bound,
+    get_route_algorithm,
+    get_route_fastest_heuristic_epsilon,
     get_route_heuristic_epsilon,
     green_reward,
+    make_backward_heuristic,
     make_heuristic,
     set_penalty_floors,
     tfl_network_reward,
     vehicular_free_reward,
 )
+import pathfinding
+import edge_cost_arrays
+import graph_csr
+import pathfinding_numba
 from barrier_clusters import (
     BARRIER_HARD_COST,
     barrier_additive_penalty,
@@ -49,6 +58,12 @@ import night_time
 import translation_layer
 import user_profiles
 import park_opening_hours
+import auth_admin
+import auth_middleware
+import auth_rate_limit
+import route_vias
+from auth_middleware import require_auth, assert_profile_access, extract_bearer_token
+from auth_rate_limit import client_ip_from_request
 
 # --- CONFIGURATION ---
 # UPDATED: Pointing to the final, clean, dual-pass processed graph
@@ -58,21 +73,40 @@ USE_RELOADER = os.environ.get("FLASK_USE_RELOADER", "").lower() in ("1", "true",
 
 app = Flask(__name__)
 CORS(app)
+auth_middleware.init_auth(app)
 
 G = None
 node_data = []
 NODE_KDTREE = None
 NODE_IDS = []
+# Set True when static routing cache was applied (skips cold junction/tables/CSR/geom).
+_ROUTING_CACHE_HIT = False
+JUNCTION_CLUSTER_SUPPRESSED = frozenset()
 
 
 def _should_run_bootstrap():
+    if os.environ.get("ROUTING_CACHE_BUILD", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        return False
     if not USE_RELOADER:
         return True
     return os.environ.get("WERKZEUG_RUN_MAIN") == "true"
 
 
+def _apply_early_cli_env():
+    """Flags that must take effect before bootstrap (import-time)."""
+    if "--no-live" in sys.argv:
+        os.environ["SKIP_DISRUPTION_FETCH"] = "1"
+
+
+_apply_early_cli_env()
+
+
 def bootstrap_routing_engine():
-    global G, node_data, NODE_KDTREE, NODE_IDS
+    global G, node_data, NODE_KDTREE, NODE_IDS, _ROUTING_CACHE_HIT
     t_boot = time.perf_counter()
     print("--- STARTING STANDARD ROUTING ENGINE ---")
     if not os.path.exists(GRAPH_PATH) and not os.path.exists(fast_path(GRAPH_PATH)):
@@ -96,25 +130,74 @@ def bootstrap_routing_engine():
     NODE_KDTREE = cKDTree(coords)
     print(f"--> Node KD-tree: {len(NODE_IDS)} nodes ({time.perf_counter() - t0:.1f}s)")
 
+    # Node XY stamps for heuristics (cost tables / VF / _coords built after junction cluster).
     t0 = time.perf_counter()
-    live_disruptions.init(G)
-    if os.environ.get("SKIP_DISRUPTION_FETCH", "").lower() in ("1", "true", "yes"):
-        print(f"--> Live disruption index: init only ({time.perf_counter() - t0:.1f}s)")
-    else:
-        live_disruptions.start_background_refresh()
-        print(f"--> Live disruption index: {time.perf_counter() - t0:.1f}s")
+    n_xy = edge_cost_arrays.stamp_node_xy(G)
+    print(f"--> Node XY stamps: {n_xy} nodes ({time.perf_counter() - t0:.1f}s)")
 
-    # Precompute vehicular-free class flags per edge (configurable VF set is then
-    # a single int AND per edge on the routing hot path - no tag parsing).
-    t0 = time.perf_counter()
-    vf_edges = 0
-    for _u, _v, d in G.edges(data=True):
-        flags = vf_flags(d)
-        d['_vf'] = flags
-        if flags:
-            vf_edges += 1
-    print(f"--> VF edge flags: {vf_edges} flagged edges ({time.perf_counter() - t0:.1f}s)")
-    print(f"--- Bootstrap complete in {time.perf_counter() - t_boot:.1f}s ---")
+    # Try static routing cache before live STRtree / cold rebuilds.
+    import routing_cache
+
+    bundle, reason = routing_cache.try_load(GRAPH_PATH, G)
+    if bundle is not None:
+        t0 = time.perf_counter()
+        print(f"--> Routing cache: loading ({reason})...", flush=True)
+        try:
+            _apply_routing_cache_early(bundle)
+            _ROUTING_CACHE_HIT = True
+            print(
+                f"--> Routing cache: applied in {time.perf_counter() - t0:.1f}s "
+                f"(formula={bundle.meta.get('formula_id')})"
+            )
+        except Exception as exc:
+            print(f"--> Routing cache: apply failed ({exc}); falling back to cold build")
+            _ROUTING_CACHE_HIT = False
+            live_disruptions.init(G)
+            if live_disruptions.live_fetch_enabled():
+                live_disruptions.start_background_refresh()
+            santander_live.start_background_refresh()
+    else:
+        print(f"--> Routing cache: miss ({reason})")
+        t0 = time.perf_counter()
+        live_disruptions.init(G)
+        if not live_disruptions.live_fetch_enabled():
+            print(f"--> Live disruption index: init only, fetch off ({time.perf_counter() - t0:.1f}s)")
+        else:
+            live_disruptions.start_background_refresh()
+            print(f"--> Live disruption index: {time.perf_counter() - t0:.1f}s")
+        santander_live.start_background_refresh()
+
+    print(f"--- Early bootstrap complete in {time.perf_counter() - t_boot:.1f}s ---")
+
+
+def _apply_routing_cache_early(bundle):
+    """Stamp graph + install tables/CSR/STRtree from cache. Sets module globals later."""
+    global JUNCTION_CLUSTER_SUPPRESSED
+    import routing_cache
+    from routing_heuristic import set_penalty_floors
+
+    suppressed = routing_cache.apply_bundle_to_graph(G, bundle)
+    JUNCTION_CLUSTER_SUPPRESSED = suppressed
+    set_penalty_floors(bundle.floors)
+
+    tables = routing_cache.bundle_to_tables(bundle)
+    edge_cost_arrays.install_tables(tables, G)
+    csr = routing_cache.bundle_to_csr(bundle)
+    graph_csr.set_csr(csr)
+
+    geoms, keys = routing_cache.wkb_geoms_and_keys(bundle)
+    # Map keys to actual G node objects when float-tuple identity matches.
+    mapped_keys = []
+    for u, v in keys:
+        if u not in G or v not in G:
+            raise KeyError(f"cache edge endpoints not in G: {u!r}->{v!r}")
+        mapped_keys.append((u, v))
+    tfl_live.init_from_geoms(G, geoms, mapped_keys)
+    if live_disruptions.live_fetch_enabled():
+        live_disruptions.start_background_refresh()
+    else:
+        print("--> Live disruption index: from cache, fetch off")
+    santander_live.start_background_refresh()
 
 
 if _should_run_bootstrap():
@@ -516,15 +599,152 @@ def _build_heuristic_penalty_floors(graph):
     )
 
 
-if G is not None:
+if G is not None and not _ROUTING_CACHE_HIT:
     _cache_junction_node_flags(G)
     _build_heuristic_penalty_floors(G)
+    _t_junc_cluster = time.perf_counter()
+    JUNCTION_CLUSTER_SUPPRESSED = _build_junction_cluster_suppression()
+    print(
+        f"--> Junction cluster dedup: {len(JUNCTION_CLUSTER_SUPPRESSED)} nodes suppressed "
+        f"(radius {JUNCTION_CLUSTER_RADIUS_M:.0f} m; "
+        f"{time.perf_counter() - _t_junc_cluster:.1f}s)"
+    )
+elif G is not None and _ROUTING_CACHE_HIT:
+    print(
+        f"--> Junction/floors/cluster: from routing cache "
+        f"({len(JUNCTION_CLUSTER_SUPPRESSED)} suppressed)"
+    )
 
-JUNCTION_CLUSTER_SUPPRESSED = _build_junction_cluster_suppression()
-print(
-    f"Junction cluster dedup: {len(JUNCTION_CLUSTER_SUPPRESSED)} nodes suppressed "
-    f"(radius {JUNCTION_CLUSTER_RADIUS_M:.0f} m)."
-)
+
+def _finish_routing_from_cache():
+    """Shared overlays + Numba warmup after cache hit (geom already stamped)."""
+    if G is None:
+        return
+    live_disruptions.set_on_master_rebuilt(
+        edge_cost_arrays.refresh_shared_overlays_from_graph
+    )
+    shared = edge_cost_arrays.refresh_shared_overlays_from_graph()
+    if shared is not None:
+        print(
+            f"--> Shared overlays: bake {shared.bake_s*1000:.1f} ms "
+            f"(live={shared.has_live}, impassable={int(shared.impassable.sum()):,})"
+        )
+    csr = graph_csr.get_csr()
+    tables = edge_cost_arrays.get_tables()
+    if csr is not None:
+        print(
+            f"--> Graph CSR: {csr.n_nodes:,} nodes, {csr.n_edges:,} arcs "
+            f"(from routing cache; CSR_ASTAR="
+            f"{'on' if graph_csr.csr_astar_enabled() else 'off'} for search)"
+        )
+    if tables is not None:
+        vf_n = int(np.count_nonzero(tables.vf_flags))
+        print(
+            f"--> Edge cost arrays: {tables.n_edges:,} edges from routing cache "
+            f"(VF flagged={vf_n:,}; ARRAY_COSTS="
+            f"{'on' if edge_cost_arrays.array_costs_enabled() else 'off'})"
+        )
+    if (
+        pathfinding_numba.numba_astar_enabled()
+        and pathfinding_numba.is_available()
+        and tables is not None
+        and shared is not None
+        and csr is not None
+    ):
+        warm_s = pathfinding_numba.warmup(csr, tables, shared, hard_cost=BARRIER_HARD_COST)
+        print(f"--> Numba A* warmup: {warm_s:.1f}s (NUMBA_ASTAR=on)")
+    elif not pathfinding_numba.is_available():
+        print("--> Numba A*: skipped (numba not installed)")
+    elif not pathfinding_numba.numba_astar_enabled():
+        print("--> Numba A*: skipped (NUMBA_ASTAR=off)")
+    # Geometry already on edges from cache — do not start GEOM_PREPARSE.
+    n_e = int(tables.n_edges) if tables is not None else 0
+    edge_cost_arrays.mark_geom_preparse_from_cache(n_e)
+    print("--> Geometry: from routing cache (runtime GEOM_PREPARSE skipped)")
+
+
+def _install_edge_cost_arrays():
+    """One edge pass: VF + cost tables + _eid + _coords; initial SharedOverlays."""
+    if G is None:
+        return
+    tables, build_s = edge_cost_arrays.build_edge_cost_tables(
+        G,
+        junction_suppressed=JUNCTION_CLUSTER_SUPPRESSED,
+        bad_surfaces=BAD_SURFACES,
+        up_thresh=UP_THRESH,
+        down_thresh=DOWN_THRESH,
+        is_lit_fn=is_lit,
+        speed_stress_fn=_speed_stress_multiplier,
+        is_tfl_fn=_is_tfl_network,
+        has_attraction_fn=_has_attraction_edge,
+        highway_mult_fn=_highway_type_multiplier,
+        barrier_penalty_fn=_edge_barrier_penalty,
+        give_way_fn=_edge_give_way_penalty,
+        stop_sign_fn=_edge_stop_sign_penalty,
+        calming_fn=_traffic_calming_additive,
+        signal_fn=_node_signal_penalty,
+        intersection_fn=_node_intersection_penalty,
+        mini_rb_fn=_node_mini_roundabout_penalty,
+        is_yes_fn=_is_yes_attr,
+        parse_geometry=False,  # lazy _coords on first extract_segment_geometry (avoids ~minutes of WKT)
+    )
+    edge_cost_arrays.install_tables(tables, G)
+    vf_n = int(np.count_nonzero(tables.vf_flags))
+    print(
+        f"--> Edge cost arrays: {tables.n_edges:,} edges in {build_s:.1f}s "
+        f"(VF flagged={vf_n:,}; ARRAY_COSTS="
+        f"{'on' if edge_cost_arrays.array_costs_enabled() else 'off'})"
+    )
+    live_disruptions.set_on_master_rebuilt(
+        edge_cost_arrays.refresh_shared_overlays_from_graph
+    )
+    shared = edge_cost_arrays.refresh_shared_overlays_from_graph()
+    if shared is not None:
+        print(
+            f"--> Shared overlays: bake {shared.bake_s*1000:.1f} ms "
+            f"(live={shared.has_live}, impassable={int(shared.impassable.sum()):,})"
+        )
+    # Always build CSR after tables (Phase B NX/bi heuristics + optional CSR A*).
+    # CSR_ASTAR only gates whether uni /route uses CSR search vs NetworkX.
+    csr = graph_csr.build_csr(G)
+    graph_csr.set_csr(csr)
+    print(
+        f"--> Graph CSR: {csr.n_nodes:,} nodes, {csr.n_edges:,} arcs "
+        f"in {csr.build_s:.1f}s "
+        f"(CSR_ASTAR={'on' if graph_csr.csr_astar_enabled() else 'off'} for search)"
+    )
+    tables = edge_cost_arrays.get_tables()
+    shared = edge_cost_arrays.get_shared_overlays()
+    if (
+        pathfinding_numba.numba_astar_enabled()
+        and pathfinding_numba.is_available()
+        and tables is not None
+        and shared is not None
+    ):
+        warm_s = pathfinding_numba.warmup(csr, tables, shared, hard_cost=BARRIER_HARD_COST)
+        print(f"--> Numba A* warmup: {warm_s:.1f}s (NUMBA_ASTAR=on)")
+    elif not pathfinding_numba.is_available():
+        print("--> Numba A*: skipped (numba not installed)")
+    elif not pathfinding_numba.numba_astar_enabled():
+        print("--> Numba A*: skipped (NUMBA_ASTAR=off)")
+
+    # Phase D: WKT → _coords for all edges (TTF; not A*).
+    # TODO(review): keep vs drop — full warm ~4 min after every start; see
+    # 0_documentation/testing/geom_preparse_phase_d_report.md
+    # Prefer routing cache (prebuild_routing_cache.py) over runtime warm.
+    geom_mode = edge_cost_arrays.geom_preparse_mode()
+    if geom_mode == "sync":
+        print("--> Geometry preparse: sync (blocking)...", flush=True)
+        stats = edge_cost_arrays.preparse_edge_geometries(G)
+        print(
+            f"--> Geometry preparse: {stats['n_parsed']:,} parsed in "
+            f"{stats['elapsed_s']:.1f}s (GEOM_PREPARSE=sync)"
+        )
+    elif geom_mode == "background":
+        edge_cost_arrays.start_geom_preparse_background(G)
+        print("--> Geometry preparse: background thread started (GEOM_PREPARSE=background)")
+    else:
+        print("--> Geometry preparse: skipped (GEOM_PREPARSE=off; lazy _coords)")
 
 
 def _traffic_calming_additive(d, source='way'):
@@ -543,14 +763,43 @@ def _traffic_calming_additive(d, source='way'):
         return max(_cost(way_tc), _cost(point_tc))
     return _cost(way_tc)
 
+
+if G is not None:
+    if _ROUTING_CACHE_HIT:
+        _finish_routing_from_cache()
+    else:
+        _install_edge_cost_arrays()
+
 # --- COST FUNCTIONS ---
+DEPART_AT_FUTURE_THRESHOLD = timedelta(minutes=30)
+
+
+def parse_depart_at_arg(raw: str | None):
+    """Optional ISO depart_at; naive → Europe/London. Invalid/empty → london_now()."""
+    if not raw or not str(raw).strip():
+        return park_opening_hours.london_now()
+    try:
+        dt = datetime.fromisoformat(str(raw).strip().replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=park_opening_hours.LONDON_TZ)
+        return dt.astimezone(park_opening_hours.LONDON_TZ)
+    except Exception:
+        return park_opening_hours.london_now()
+
+
+def is_future_depart_at(at_time: datetime, now: datetime | None = None) -> bool:
+    """True when at_time is more than 30 minutes ahead of London now."""
+    now = now or park_opening_hours.london_now()
+    return (at_time - now) > DEPART_AT_FUTURE_THRESHOLD
+
+
 def _park_edge_blocked(d, hours_map, fallback_open):
     if _is_yes_attr(d.get('is_park')) and not park_opening_hours.is_park_edge_open(d, hours_map, fallback_open):
         return True
     return False
 
 
-def make_weight_fastest(hours_map, fallback_open):
+def make_weight_fastest(hours_map, fallback_open, apply_live: bool = True):
     def weight_fn(u, v, d):
         if is_service_access_denied(d):
             return BARRIER_HARD_COST
@@ -558,14 +807,15 @@ def make_weight_fastest(hours_map, fallback_open):
             return BARRIER_HARD_COST
         if _park_edge_blocked(d, hours_map, fallback_open):
             return BARRIER_HARD_COST
-        disruption = live_disruptions.get_edge_disruption(u, v)
-        if disruption and (disruption.get('has_closure') or disruption.get('is_closed')):
-            return BARRIER_HARD_COST
+        if apply_live:
+            disruption = live_disruptions.get_edge_disruption(u, v)
+            if disruption and (disruption.get('has_closure') or disruption.get('is_closed')):
+                return BARRIER_HARD_COST
         return float(d.get('length', 1.0)) * _highway_type_multiplier(d)
     return weight_fn
 
 
-def make_weight_optimized(w, hours_map, fallback_open):
+def make_weight_optimized(w, hours_map, fallback_open, apply_live: bool = True):
     """
     Return a weight function (u, v, d) -> cost using request-scoped weights (no globals).
     Rewards (TfL network, green, vehicular-free) are multipliers R < 1 on length -
@@ -615,11 +865,13 @@ def make_weight_optimized(w, hours_map, fallback_open):
         if _park_edge_blocked(d, hours_map, fallback_open):
             return hard_cost
 
-        # Live closures always hard-block, independent of tfl_live_weight;
-        # the weight only scales the soft jam/works penalties below.
-        disruption = live_disruptions.get_edge_disruption(u, v)
-        if disruption and (disruption.get('has_closure') or disruption.get('is_closed')):
-            return hard_cost
+        # Live closures always hard-block when apply_live (Leave now);
+        # future Depart at ignores soft + hard live (honest v1 policy).
+        disruption = None
+        if apply_live:
+            disruption = live_disruptions.get_edge_disruption(u, v)
+            if disruption and (disruption.get('has_closure') or disruption.get('is_closed')):
+                return hard_cost
 
         length = float(d.get('length', 1.0))
 
@@ -705,27 +957,15 @@ def make_weight_optimized(w, hours_map, fallback_open):
 
 # --- HELPERS ---
 def extract_segment_geometry(u, v):
+    """Polyline [[lat, lon], ...] for edge u→v. Never mutates G (thread-safe)."""
+    import edge_geom_store
+
     edge_data = G.get_edge_data(u, v)
-    coords = []
-    if 'geometry' in edge_data:
-        try:
-            line = load_wkt(edge_data['geometry'])
-            segment_coords = list(line.coords)
-            u_x, u_y = G.nodes[u]['x'], G.nodes[u]['y']
-            start_dist = (segment_coords[0][0] - u_x)**2 + (segment_coords[0][1] - u_y)**2
-            end_dist = (segment_coords[-1][0] - u_x)**2 + (segment_coords[-1][1] - u_y)**2
-            if end_dist < start_dist:
-                segment_coords.reverse()
-            for x, y in segment_coords:
-                coords.append([y, x]) 
-            return coords
-        except:
-            pass
-    node_u = G.nodes[u]
-    node_v = G.nodes[v]
-    coords.append([float(node_u['y']), float(node_u['x'])])
-    coords.append([float(node_v['y']), float(node_v['x'])])
-    return coords
+    if not edge_data:
+        return edge_geom_store.coords_for_edge(None, G, u, v)
+    if G.is_multigraph():
+        edge_data = next(iter(edge_data.values()))
+    return edge_geom_store.coords_for_edge(edge_data, G, u, v)
 
 def reconstruct_path_geometry(path_nodes):
     full_coords = []
@@ -898,7 +1138,8 @@ def get_tfl_cycleway_sections(path_nodes):
     for i in range(len(path_nodes) - 1):
         u, v = path_nodes[i], path_nodes[i+1]
         d = G.get_edge_data(u, v) or {}
-        if _is_tfl_cycleway_or_superhighway(d):
+        # Merged TfL infrastructure: cycleways + superhighways + quietways.
+        if _is_tfl_network(d):
             out.append(extract_segment_geometry(u, v))
     return out
 
@@ -917,6 +1158,18 @@ def get_green_sections(path_nodes):
         u, v = path_nodes[i], path_nodes[i+1]
         d = G.get_edge_data(u, v) or {}
         if _has_attraction_edge(d):
+            out.append(extract_segment_geometry(u, v))
+    return out
+
+
+def get_vehicular_free_sections(path_nodes, vf_mask_allowed):
+    out = []
+    vf_mask = vf_mask_allowed if vf_mask_allowed is not None else VF_MASK_ALL
+    for i in range(len(path_nodes) - 1):
+        u, v = path_nodes[i], path_nodes[i+1]
+        d = G.get_edge_data(u, v) or {}
+        edge_vf = int(d.get('_vf', 0)) or vf_flags(d)
+        if bool(edge_vf & vf_mask):
             out.append(extract_segment_geometry(u, v))
     return out
 
@@ -1221,6 +1474,67 @@ def get_tomtom_disruption_at():
         return jsonify({"error": str(e), "disruptions": []}), 500
 
 
+# --- SANTANDER CYCLE HIRE (BikePoint + walk proxy) ---
+
+@app.route('/santander/candidates', methods=['GET'])
+def santander_candidates():
+    """Nearest BikePoints within radius until 3 suitable (need=bikes|docks). Soft-fail 1B."""
+    try:
+        lat = request.args.get('lat', type=float)
+        lon = request.args.get('lon', type=float)
+        if lat is None or lon is None:
+            return jsonify({"error": "lat and lon required"}), 400
+        need = request.args.get('need', 'bikes')
+        radius_m = request.args.get('radius_m', type=float)
+        if radius_m is None:
+            radius_m = santander_live.DEFAULT_RADIUS_M
+        result = santander_live.get_candidates(lat, lon, need=need, radius_m=radius_m)
+        return jsonify(result)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/santander/walk', methods=['POST'])
+def santander_walk():
+    """ORS foot-walking polyline between two points. Body: {from:[lat,lon], to:[lat,lon]}."""
+    try:
+        body = request.get_json(silent=True) or {}
+        frm = body.get("from")
+        to = body.get("to")
+        if (
+            not isinstance(frm, (list, tuple)) or len(frm) < 2
+            or not isinstance(to, (list, tuple)) or len(to) < 2
+        ):
+            return jsonify({"error": "from and to must be [lat, lon]"}), 400
+        result = santander_live.walk_route(
+            float(frm[0]), float(frm[1]), float(to[0]), float(to[1])
+        )
+        return jsonify(result)
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 503
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/admin/santander_status', methods=['GET'])
+def admin_santander_status():
+    try:
+        return jsonify(santander_live.get_status())
+    except Exception as e:
+        return jsonify({"error": str(e), "station_count": 0}), 500
+
+
+@app.route('/admin/update_santander', methods=['POST'])
+def admin_update_santander():
+    try:
+        ok, message, count = santander_live.update_bikepoints()
+        return jsonify({"ok": ok, "message": message, "count": count})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e), "count": 0}), 500
+
+
 # --- OVERLAY CATALOG (main app route visualization) ---
 
 ROUTE_OVERLAY_CATALOG = {
@@ -1228,10 +1542,9 @@ ROUTE_OVERLAY_CATALOG = {
     "edge": [
         {"id": "lit", "label": "Lit segments", "chunk_key": "lit_chunks"},
         {"id": "steep", "label": "Steep / uphill", "chunk_key": "steep_chunks"},
-        {"id": "tflCycleway", "label": "TfL cycleways", "chunk_key": "tfl_cycleway_chunks"},
-        {"id": "tflQuietway", "label": "TfL quietways", "chunk_key": "tfl_quietway_chunks"},
+        {"id": "tflCycleway", "label": "TfL infrastructure (incl. quietways)", "chunk_key": "tfl_cycleway_chunks"},
         {"id": "green", "label": "Green / scenic", "chunk_key": "green_chunks"},
-        {"id": "narrow", "label": "Narrow facility", "chunk_key": "narrow_chunks"},
+        {"id": "vehicularFree", "label": "Car-free corridors", "chunk_key": "vehicular_free_chunks"},
         {"id": "disruptions", "label": "Live disruptions", "chunk_key": "disruption_chunks"},
     ],
     "point": [
@@ -1255,40 +1568,343 @@ def get_overlay_catalog():
 @app.route('/profiles', methods=['GET'])
 def list_profiles():
     try:
-        return jsonify({"profiles": user_profiles.list_profiles()})
+        return jsonify({"profiles": g.profile_store.list_profiles(g.user_id)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@app.route('/profiles/<user_id>', methods=['GET'])
-def get_profile(user_id):
+@app.route('/profiles/<profile_id>', methods=['GET'])
+def get_profile(profile_id):
     try:
-        profile = user_profiles.get_profile(user_id)
-        if not profile:
-            return jsonify({"error": "Profile not found"}), 404
+        profile = g.profile_store.get_profile(profile_id, g.user_id)
+        err_resp, status = assert_profile_access(profile)
+        if err_resp is not None:
+            return err_resp, status
         return jsonify(profile)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
+# Payload sanitization: only these fields are read from the client body.
+# user_id comes from the verified JWT and is_system is hardcoded False in the
+# store - client-sent user_id / is_system / id / slug are dropped.
+ALLOWED_CREATE_FIELDS = {"name", "weights", "bike_type", "preset", "toggles"}
+
+
 @app.route('/profiles', methods=['POST'])
+@require_auth
 def create_profile():
     try:
-        body = request.get_json(silent=True) or {}
-        name = body.get("name", "")
-        weights = body.get("weights", {})
-        profile, err = user_profiles.create_profile(
-            name,
-            weights,
+        raw = request.get_json(silent=True) or {}
+        body = {k: v for k, v in raw.items() if k in ALLOWED_CREATE_FIELDS}
+        profile, err = g.profile_store.create_profile(
+            g.user_id,
+            body.get("name", ""),
+            body.get("weights", {}),
             bike_type=body.get("bike_type"),
             preset=body.get("preset"),
             toggles=body.get("toggles"),
         )
         if err:
-            return jsonify({"error": err}), 400
+            status = 401 if err == "authentication required" else 400
+            return jsonify({"error": err}), status
         return jsonify(profile), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# --- AUTH ACCOUNT ENDPOINTS (server-side Supabase; rate-limited) ---
+
+
+def _rate_limited(result):
+    """Return a 429 Flask response when RateLimitResult.allowed is False."""
+    if result.allowed:
+        return None
+    resp = jsonify({"error": result.message})
+    resp.status_code = 429
+    if result.retry_after_s:
+        resp.headers["Retry-After"] = str(result.retry_after_s)
+    return resp
+
+
+@app.route('/auth/login', methods=['POST'])
+def auth_login():
+    if not auth_admin.anon_configured():
+        return jsonify({"error": "auth not configured"}), 503
+    body = request.get_json(silent=True) or {}
+    email = (body.get("email") or "").strip()
+    password = body.get("password") or ""
+    if not email or "@" not in email or not password:
+        return jsonify({"error": "email and password required"}), 400
+    ip = client_ip_from_request(request)
+    blocked = _rate_limited(auth_rate_limit.check_login_allowed(ip, email))
+    if blocked:
+        return blocked
+    session, err = auth_admin.sign_in(email, password)
+    if err or not session:
+        lock = auth_rate_limit.record_login_failure(email)
+        if lock is not None and not lock.allowed:
+            return _rate_limited(lock)
+        # Uniform message — do not reveal whether the email exists.
+        return jsonify({"error": "Invalid email or password."}), 401
+    auth_rate_limit.clear_login_failures(email)
+    return jsonify(session)
+
+
+@app.route('/auth/signup', methods=['POST'])
+def auth_signup():
+    if not auth_admin.anon_configured():
+        return jsonify({"error": "auth not configured"}), 503
+    body = request.get_json(silent=True) or {}
+    email = (body.get("email") or "").strip()
+    password = body.get("password") or ""
+    if not email or "@" not in email or not password:
+        return jsonify({"error": "email and password required"}), 400
+    ip = client_ip_from_request(request)
+    blocked = _rate_limited(auth_rate_limit.check_signup_allowed(ip))
+    if blocked:
+        return blocked
+    session, err, needs_confirm = auth_admin.sign_up(email, password)
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"session": session, "needs_confirm": needs_confirm}), 201
+
+
+@app.route('/auth/password-reset', methods=['POST'])
+def auth_password_reset():
+    """Check email exists, then send reset mail (rate-limited)."""
+    if not auth_admin.configured() or not auth_admin.anon_configured():
+        return jsonify({"error": "auth not configured"}), 503
+    body = request.get_json(silent=True) or {}
+    email = (body.get("email") or "").strip()
+    redirect_to = (body.get("redirect_to") or "").strip()
+    if not email or "@" not in email:
+        return jsonify({"error": "valid email required"}), 400
+    if not redirect_to:
+        return jsonify({"error": "redirect_to required"}), 400
+    ip = client_ip_from_request(request)
+    blocked = _rate_limited(auth_rate_limit.check_reset_allowed(ip, email))
+    if blocked:
+        return blocked
+    try:
+        if not auth_admin.user_exists_by_email(email):
+            return jsonify({"error": "No account found for this email address."}), 404
+        err = auth_admin.send_password_reset(email, redirect_to)
+        if err:
+            return jsonify({"error": err}), 500
+        return jsonify({"status": "sent"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/auth/refresh', methods=['POST'])
+def auth_refresh():
+    if not auth_admin.anon_configured():
+        return jsonify({"error": "auth not configured"}), 503
+    body = request.get_json(silent=True) or {}
+    refresh_token = (body.get("refresh_token") or "").strip()
+    if not refresh_token:
+        return jsonify({"error": "refresh_token required"}), 400
+    ip = client_ip_from_request(request)
+    blocked = _rate_limited(auth_rate_limit.check_ip_auth_budget(ip))
+    if blocked:
+        return blocked
+    session, err = auth_admin.refresh_session(refresh_token)
+    if err or not session:
+        return jsonify({"error": err or "Session refresh failed."}), 401
+    return jsonify(session)
+
+
+@app.route('/auth/change-password', methods=['POST'])
+@require_auth
+def auth_change_password():
+    if g.test_mode:
+        return jsonify({"error": "password change is not available in test mode"}), 400
+    if not g.user_id:
+        return jsonify({"error": "authentication required"}), 401
+    if not auth_admin.anon_configured():
+        return jsonify({"error": "auth not configured"}), 503
+    body = request.get_json(silent=True) or {}
+    current_password = body.get("current_password") or ""
+    new_password = body.get("new_password") or ""
+    confirm_password = body.get("confirm_password") or ""
+    if new_password != confirm_password:
+        return jsonify({"error": "New passwords do not match."}), 400
+    # Resolve email from the authenticated user — never trust a body email field.
+    try:
+        user_resp = auth_admin._service_client().auth.admin.get_user_by_id(g.user_id)
+        user_obj = getattr(user_resp, "user", None) or user_resp
+        email = (auth_admin._user_email(user_obj) or "").strip()
+    except Exception:
+        email = ""
+    if not email:
+        return jsonify({"error": "Could not resolve account email."}), 400
+    blocked = _rate_limited(auth_rate_limit.check_user_sensitive_allowed(g.user_id))
+    if blocked:
+        return blocked
+    # Also count against login budget for the password re-check.
+    ip = client_ip_from_request(request)
+    login_block = _rate_limited(auth_rate_limit.check_login_allowed(ip, email))
+    if login_block:
+        return login_block
+    err = auth_admin.change_password(email, current_password, new_password)
+    if err:
+        if err == "Current password is incorrect.":
+            lock = auth_rate_limit.record_login_failure(email)
+            if lock is not None and not lock.allowed:
+                return _rate_limited(lock)
+            return jsonify({"error": err}), 401
+        return jsonify({"error": err}), 400
+    auth_rate_limit.clear_login_failures(email)
+    return jsonify({"status": "updated"})
+
+
+@app.route('/auth/set-password', methods=['POST'])
+@require_auth
+def auth_set_password():
+    """Set a new password using the recovery (or logged-in) access token."""
+    if g.test_mode:
+        return jsonify({"error": "password change is not available in test mode"}), 400
+    if not g.user_id:
+        return jsonify({"error": "authentication required"}), 401
+    body = request.get_json(silent=True) or {}
+    new_password = body.get("new_password") or ""
+    confirm_password = body.get("confirm_password") or ""
+    if new_password != confirm_password:
+        return jsonify({"error": "Passwords do not match."}), 400
+    blocked = _rate_limited(auth_rate_limit.check_user_sensitive_allowed(g.user_id))
+    if blocked:
+        return blocked
+    token = extract_bearer_token(request)
+    err = auth_admin.update_password_with_access_token(token or "", new_password)
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"status": "updated"})
+
+
+@app.route('/auth/check-email', methods=['POST'])
+def auth_check_email():
+    """Return 404 when no auth.users row exists for the email (reset pre-check)."""
+    if not auth_admin.configured():
+        return jsonify({"error": "auth not configured"}), 503
+    body = request.get_json(silent=True) or {}
+    email = (body.get("email") or "").strip()
+    if not email or "@" not in email:
+        return jsonify({"error": "valid email required"}), 400
+    ip = client_ip_from_request(request)
+    blocked = _rate_limited(auth_rate_limit.check_ip_auth_budget(ip))
+    if blocked:
+        return blocked
+    try:
+        if not auth_admin.user_exists_by_email(email):
+            return jsonify({"error": "No account found for this email address."}), 404
+        return jsonify({"exists": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/auth/account', methods=['DELETE'])
+@require_auth
+def auth_delete_account():
+    """GDPR account deletion — removes auth.users; profiles cascade."""
+    if g.test_mode:
+        return jsonify({"error": "account deletion is not available in test mode"}), 400
+    if not g.user_id:
+        return jsonify({"error": "authentication required"}), 401
+    if not auth_admin.configured():
+        return jsonify({"error": "auth not configured"}), 503
+    blocked = _rate_limited(auth_rate_limit.check_user_sensitive_allowed(g.user_id))
+    if blocked:
+        return blocked
+    try:
+        auth_admin.delete_user(g.user_id)
+        return jsonify({"status": "deleted"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# --- GEOCODING (Mapbox key stays server-side) ---
+
+LONDON_BBOX = "-0.51,51.28,0.33,51.69"
+
+
+@app.route('/geocode/suggest', methods=['GET'])
+def geocode_suggest():
+    token = (os.environ.get("MAPBOX_API_KEY") or "").strip()
+    if not token:
+        return jsonify({"error": "geocoding not configured"}), 503
+    q = (request.args.get("q") or "").strip()
+    session_token = (request.args.get("session_token") or "").strip()
+    if not q or not session_token:
+        return jsonify({"error": "q and session_token required"}), 400
+    ip = client_ip_from_request(request)
+    blocked = _rate_limited(auth_rate_limit.check_geocode_allowed(ip))
+    if blocked:
+        return blocked
+    import urllib.parse
+    import urllib.request
+
+    params = urllib.parse.urlencode({
+        "q": q,
+        "session_token": session_token,
+        "access_token": token,
+        "limit": "5",
+        "language": "en",
+        "types": "address,poi,place",
+        "country": "GB",
+        "bbox": LONDON_BBOX,
+    })
+    url = f"https://api.mapbox.com/search/searchbox/v1/suggest?{params}"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            import json
+            data = json.loads(resp.read().decode("utf-8"))
+        return jsonify({"suggestions": data.get("suggestions") or []})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route('/geocode/retrieve/<path:mapbox_id>', methods=['GET'])
+def geocode_retrieve(mapbox_id):
+    token = (os.environ.get("MAPBOX_API_KEY") or "").strip()
+    if not token:
+        return jsonify({"error": "geocoding not configured"}), 503
+    session_token = (request.args.get("session_token") or "").strip()
+    if not session_token:
+        return jsonify({"error": "session_token required"}), 400
+    ip = client_ip_from_request(request)
+    blocked = _rate_limited(auth_rate_limit.check_geocode_allowed(ip))
+    if blocked:
+        return blocked
+    import urllib.parse
+    import urllib.request
+    import json
+
+    params = urllib.parse.urlencode({
+        "session_token": session_token,
+        "access_token": token,
+    })
+    url = (
+        f"https://api.mapbox.com/search/searchbox/v1/retrieve/"
+        f"{urllib.parse.quote(mapbox_id, safe='')}?{params}"
+    )
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        feature = (data.get("features") or [None])[0]
+        if not feature or not feature.get("geometry", {}).get("coordinates"):
+            return jsonify({"error": "No coordinates in retrieve response"}), 404
+        lon, lat = feature["geometry"]["coordinates"]
+        props = feature.get("properties") or {}
+        label = (
+            props.get("full_address")
+            or props.get("name")
+            or props.get("place_formatted")
+            or f"{lat:.4f}, {lon:.4f}"
+        )
+        return jsonify({"lat": lat, "lon": lon, "label": label})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
 
 
 @app.route('/preset_config', methods=['GET'])
@@ -1305,10 +1921,27 @@ def get_preset_config():
 @app.route('/route', methods=['GET'])
 def get_route():
     try:
+        # purpose=commit (default) counts toward 5 Get-Route/IP/min.
+        # purpose=prefetch is background UI calc and is NOT rate-limited
+        # (product accepts that informed attackers could spam prefetch).
+        purpose = (request.args.get("purpose") or "commit").strip().lower()
+        if purpose not in ("commit", "prefetch"):
+            purpose = "commit"
+        if purpose == "commit":
+            blocked = _rate_limited(
+                auth_rate_limit.check_route_commit_allowed(client_ip_from_request(request))
+            )
+            if blocked:
+                return blocked
+
         start_lat = float(request.args.get('start_lat'))
         start_lon = float(request.args.get('start_lon'))
         end_lat = float(request.args.get('end_lat'))
         end_lon = float(request.args.get('end_lon'))
+
+        vias, via_err = route_vias.parse_vias_arg(request.args.get("vias"))
+        if via_err:
+            return jsonify({"error": via_err}), 400
 
         profile_id = (request.args.get('profile_id') or '').strip() or None
         active_profile_id = None
@@ -1318,9 +1951,11 @@ def get_route():
         light_gated_off = False
 
         if profile_id:
-            profile = user_profiles.get_profile(profile_id)
+            profile = g.profile_store.get_profile(profile_id, g.user_id)
             if profile is None:
                 return jsonify({"error": f"Profile not found: {profile_id}"}), 404
+            if not g.test_mode and not profile.get("is_system", True) and g.user_id is None:
+                return jsonify({"error": "authentication required for custom profiles"}), 401
             w = dict(profile["weights"])
             w["calming_source"] = user_profiles.CALMING_SOURCE
             active_profile_id = profile_id
@@ -1328,11 +1963,8 @@ def get_route():
             preset = profile.get("preset")
             toggles = profile["toggles"]
 
-            # Dependency-matrix clamping (mode_dominant per preset).
             w, translation_clamps = translation_layer.apply_preset_clamps(w, preset)
 
-            # Illumination only matters in the dark: gate light_weight (from the
-            # lit-at-night toggle or a translation clamp) on actual darkness.
             if not night_time.is_dark():
                 if w.get("light_weight", 0.0) > 0:
                     light_gated_off = True
@@ -1356,77 +1988,282 @@ def get_route():
             painted_lane=bool(w.get("vf_painted_lane", False)),
         )
 
+        waypoints = [(start_lat, start_lon)] + list(vias) + [(end_lat, end_lon)]
+
         t_route = time.perf_counter()
-        start_snap = tfl_live.snap_to_edge(start_lat, start_lon)
-        end_snap = tfl_live.snap_to_edge(end_lat, end_lon)
+        snaps = []
+        for lat, lon in waypoints:
+            snap = tfl_live.snap_to_edge(lat, lon)
+            if not snap:
+                return jsonify({"error": "Could not snap to network"}), 400
+            snaps.append(snap)
         t_snap = time.perf_counter() - t_route
 
-        if not start_snap or not end_snap:
-            return jsonify({"error": "Could not snap to network"}), 400
+        depart_at_raw = (request.args.get("depart_at") or "").strip()
+        at_time = parse_depart_at_arg(depart_at_raw or None)
+        depart_mode = "depart_at" if depart_at_raw else "now"
+        live_applied = not is_future_depart_at(at_time)
+        if not live_applied:
+            w = dict(w)
+            w["tfl_live_weight"] = 0.0
 
-        start_node = start_snap.anchor_node
-        end_node = end_snap.anchor_node
-
-        at_time = park_opening_hours.london_now()
         unique_hours = G.graph.get("park_opening_hours_unique") or []
         hours_map, fallback_open = park_opening_hours.build_request_hours_context(unique_hours, at_time)
 
-        weight_fastest = make_weight_fastest(hours_map, fallback_open)
-        h_fast = make_heuristic(end_node, G, cost_per_m=1.0)
-        t0 = time.perf_counter()
-        path_fastest = nx.astar_path(G, start_node, end_node, heuristic=h_fast, weight=weight_fastest)
-        t_fast = time.perf_counter() - t0
-        coords_fastest = apply_endpoint_stubs(
-            reconstruct_path_geometry(path_fastest), start_snap, end_snap
+        tables = edge_cost_arrays.get_tables()
+        shared = edge_cost_arrays.get_shared_overlays()
+        if not live_applied and tables is not None:
+            shared = edge_cost_arrays.build_shared_overlays(
+                tables, hours_map, fallback_open, G=G, include_live=False
+            )
+        use_arrays = (
+            edge_cost_arrays.array_costs_enabled()
+            and tables is not None
+            and shared is not None
         )
-        stats_fastest = calculate_path_stats(
-            path_fastest, speed_kmh=speed_kmh, vf_mask_allowed=vf_mask_allowed
-        )
+        csr = graph_csr.get_csr()
+        cost_fast_eid = None
+        cost_opt_eid = None
+        if use_arrays:
+            weight_fastest = edge_cost_arrays.make_array_weight_fn_fastest(
+                tables, BARRIER_HARD_COST, shared, bike_type=bike_type
+            )
+            weight_optimized = edge_cost_arrays.make_array_weight_fn_optimized(
+                tables,
+                w,
+                shared,
+                hard_cost=BARRIER_HARD_COST,
+                m_min=M_MIN,
+                r_min=R_MIN,
+            )
+            cost_fast_eid = edge_cost_arrays.make_array_cost_by_eid_fastest(
+                tables, BARRIER_HARD_COST, shared, bike_type=bike_type
+            )
+            cost_opt_eid = edge_cost_arrays.make_array_cost_by_eid_optimized(
+                tables,
+                w,
+                shared,
+                hard_cost=BARRIER_HARD_COST,
+                m_min=M_MIN,
+                r_min=R_MIN,
+            )
+        else:
+            weight_fastest = make_weight_fastest(
+                hours_map, fallback_open, apply_live=live_applied
+            )
+            weight_optimized = make_weight_optimized(
+                w, hours_map, fallback_open, apply_live=live_applied
+            )
 
-        # Bounded-suboptimal A* on optimized path: cost <= (1+eps) x optimal.
-        # Default eps=0.5 (routing_heuristic.DEFAULT_ROUTE_HEURISTIC_EPSILON).
-        # Fastest path above stays exact (distance-only heuristic). Set
-        # ROUTE_HEURISTIC_EPSILON=0 for strictly admissible optimized search.
+        route_alg = (request.args.get("alg") or get_route_algorithm()).strip().lower()
+        if route_alg not in ("bi", "uni"):
+            route_alg = "uni"
+        alg_label = "bidirectional" if route_alg == "bi" else "unidirectional"
+        use_csr = (
+            route_alg == "uni"
+            and use_arrays
+            and graph_csr.csr_astar_enabled()
+            and csr is not None
+            and cost_fast_eid is not None
+            and cost_opt_eid is not None
+        )
+        use_numba = (
+            use_csr
+            and pathfinding_numba.numba_astar_enabled()
+            and pathfinding_numba.is_available()
+            and tables is not None
+            and shared is not None
+        )
+        opt_scalars = None
+        if use_numba:
+            opt_scalars = pathfinding_numba.pack_optimized_scalars(
+                w, shared, BARRIER_HARD_COST, M_MIN, R_MIN
+            )
+
+        eps_fast = get_route_fastest_heuristic_epsilon()
+        scale_fast = 1.0 * (1.0 + eps_fast)
         eps = get_route_heuristic_epsilon()
         scale = compute_optimized_cost_per_metre_lower_bound(w) * (1.0 + eps)
-        h_opt = make_heuristic(end_node, G, cost_per_m=scale)
-        weight_optimized = make_weight_optimized(w, hours_map, fallback_open)
-        t0 = time.perf_counter()
-        path_optimized = nx.astar_path(G, start_node, end_node, heuristic=h_opt, weight=weight_optimized)
-        t_opt = time.perf_counter() - t0
 
-        t_compute = t_snap + t_fast + t_opt
-        if os.environ.get("ROUTE_BENCHMARK", "").lower() in ("1", "true", "yes"):
-            print(
-                f"ROUTE_BENCHMARK snap={t_snap*1000:.1f}ms fastest={t_fast*1000:.1f}ms "
-                f"optimized={t_opt*1000:.1f}ms scale={scale:.3f}"
+        legs_out = []
+        leg_timings = []
+        t_fast_total = 0.0
+        t_opt_total = 0.0
+        exp_fast_total = 0
+        exp_opt_total = 0
+        relax_fast_total = 0
+        relax_opt_total = 0
+
+        for leg_i in range(len(snaps) - 1):
+            start_snap = snaps[leg_i]
+            end_snap = snaps[leg_i + 1]
+            start_node = start_snap.anchor_node
+            end_node = end_snap.anchor_node
+
+            h_fast_fwd = make_heuristic(end_node, G, cost_per_m=scale_fast, csr=csr)
+            h_fast_bwd = make_backward_heuristic(start_node, G, cost_per_m=scale_fast, csr=csr)
+            t0 = time.perf_counter()
+            path_fastest, stats_fast = pathfinding.run_astar(
+                G,
+                start_node,
+                end_node,
+                algorithm=route_alg,
+                heuristic_fwd=h_fast_fwd,
+                heuristic_bwd=h_fast_bwd,
+                weight_fn=weight_fastest,
+                csr=csr if use_csr else None,
+                cost_by_eid=cost_fast_eid if use_csr else None,
+                cost_per_m=scale_fast if use_csr else None,
+                numba_kwargs=(
+                    {
+                        "csr": csr,
+                        "source": start_node,
+                        "target": end_node,
+                        "tables": tables,
+                        "shared": shared,
+                        "mode": "fastest",
+                        "cost_per_m": scale_fast,
+                        "hard_cost": BARRIER_HARD_COST,
+                        "bike_type": bike_type,
+                    }
+                    if use_numba
+                    else None
+                ),
             )
-        coords_optimized = apply_endpoint_stubs(
-            reconstruct_path_geometry(path_optimized), start_snap, end_snap
+            t_fast = time.perf_counter() - t0
+            coords_fastest = apply_endpoint_stubs(
+                reconstruct_path_geometry(path_fastest), start_snap, end_snap
+            )
+            stats_fastest = calculate_path_stats(
+                path_fastest, speed_kmh=speed_kmh, vf_mask_allowed=vf_mask_allowed
+            )
+
+            h_opt_fwd = make_heuristic(end_node, G, cost_per_m=scale, csr=csr)
+            h_opt_bwd = make_backward_heuristic(start_node, G, cost_per_m=scale, csr=csr)
+            t0 = time.perf_counter()
+            path_optimized, stats_opt = pathfinding.run_astar(
+                G,
+                start_node,
+                end_node,
+                algorithm=route_alg,
+                heuristic_fwd=h_opt_fwd,
+                heuristic_bwd=h_opt_bwd,
+                weight_fn=weight_optimized,
+                csr=csr if use_csr else None,
+                cost_by_eid=cost_opt_eid if use_csr else None,
+                cost_per_m=scale if use_csr else None,
+                numba_kwargs=(
+                    {
+                        "csr": csr,
+                        "source": start_node,
+                        "target": end_node,
+                        "tables": tables,
+                        "shared": shared,
+                        "mode": "optimized",
+                        "cost_per_m": scale,
+                        "hard_cost": BARRIER_HARD_COST,
+                        "bike_type": bike_type,
+                        "opt_scalars": opt_scalars,
+                    }
+                    if use_numba
+                    else None
+                ),
+            )
+            t_opt = time.perf_counter() - t0
+            coords_optimized = apply_endpoint_stubs(
+                reconstruct_path_geometry(path_optimized), start_snap, end_snap
+            )
+            stats_optimized = calculate_path_stats(
+                path_optimized,
+                calming_source=user_profiles.CALMING_SOURCE,
+                speed_kmh=speed_kmh,
+                vf_mask_allowed=vf_mask_allowed,
+                duration_speed_multiplier=duration_speed_multiplier_for_preset(preset),
+            )
+
+            lit_chunks = get_lit_sections(path_optimized)
+            steep_chunks = get_steep_sections(path_optimized)
+            tfl_cycleway_chunks = get_tfl_cycleway_sections(path_optimized)
+            green_chunks = get_green_sections(path_optimized)
+            vehicular_free_chunks = get_vehicular_free_sections(path_optimized, vf_mask_allowed)
+            disruption_chunks = (
+                get_disruption_sections(path_optimized) if live_applied else []
+            )
+            node_highlights = get_node_highlights(path_optimized, w, overlay_mode=True)
+
+            t_fast_total += t_fast
+            t_opt_total += t_opt
+            exp_fast_total += stats_fast["expansions"]
+            exp_opt_total += stats_opt["expansions"]
+            relax_fast_total += stats_fast["edge_relaxations"]
+            relax_opt_total += stats_opt["edge_relaxations"]
+            leg_timings.append({
+                "index": leg_i,
+                "fastest_astar": round(t_fast * 1000, 1),
+                "optimized_astar": round(t_opt * 1000, 1),
+            })
+            legs_out.append({
+                "index": leg_i,
+                "from": _snap_meta(start_snap),
+                "to": _snap_meta(end_snap),
+                "fastest": {"path": coords_fastest, "stats": stats_fastest},
+                "safest": {
+                    "path": coords_optimized,
+                    "stats": stats_optimized,
+                    "lit_chunks": lit_chunks,
+                    "steep_chunks": steep_chunks,
+                    "tfl_cycleway_chunks": tfl_cycleway_chunks,
+                    "green_chunks": green_chunks,
+                    "vehicular_free_chunks": vehicular_free_chunks,
+                    "disruption_chunks": disruption_chunks,
+                    "node_highlights": node_highlights,
+                },
+            })
+
+        t_compute = t_snap + t_fast_total + t_opt_total
+        if os.environ.get("ROUTE_BENCHMARK", "").lower() in ("1", "true", "yes"):
+            _imp = None
+            if use_arrays and shared is not None:
+                _imp = int(shared.impassable.sum())
+            print(
+                f"ROUTE_BENCHMARK alg={route_alg} array_costs={use_arrays} "
+                f"csr={use_csr} numba={use_numba} legs={len(legs_out)} "
+                f"snap={t_snap*1000:.1f}ms "
+                f"fastest={t_fast_total*1000:.1f}ms(exp={exp_fast_total}) "
+                f"optimized={t_opt_total*1000:.1f}ms(exp={exp_opt_total}) "
+                f"scale={scale:.3f} eps={eps} eps_fast={eps_fast} "
+                f"light_gated={light_gated_off} purpose={purpose} "
+                f"impassable={_imp} live={bool(shared and getattr(shared, 'has_live', False)) if use_arrays else 'n/a'}"
+            )
+
+        coords_fastest_all = route_vias.concatenate_paths(
+            [leg["fastest"]["path"] for leg in legs_out]
         )
-        stats_optimized = calculate_path_stats(
-            path_optimized,
-            calming_source=user_profiles.CALMING_SOURCE,
-            speed_kmh=speed_kmh,
-            vf_mask_allowed=vf_mask_allowed,
-            duration_speed_multiplier=duration_speed_multiplier_for_preset(preset),
+        coords_opt_all = route_vias.concatenate_paths(
+            [leg["safest"]["path"] for leg in legs_out]
+        )
+        stats_fastest_all = route_vias.aggregate_path_stats(
+            [leg["fastest"]["stats"] for leg in legs_out]
+        )
+        stats_optimized_all = route_vias.aggregate_path_stats(
+            [leg["safest"]["stats"] for leg in legs_out]
         )
 
-        # Route-only overlay chunks (only segments on path_optimized that match each criterion)
-        lit_chunks = get_lit_sections(path_optimized)
-        steep_chunks = get_steep_sections(path_optimized)
-        tfl_cycleway_chunks = get_tfl_cycleway_sections(path_optimized)
-        tfl_quietway_chunks = get_tfl_quietway_sections(path_optimized)
-        green_chunks = get_green_sections(path_optimized)
-        narrow_chunks = get_narrow_sections(path_optimized)
-        disruption_chunks = get_disruption_sections(path_optimized)  # path-only, like lit/steep/narrow
-        node_highlights = get_node_highlights(path_optimized, w, overlay_mode=True)
+        def _merge_chunks(key):
+            out = []
+            for leg in legs_out:
+                out.extend(leg["safest"].get(key) or [])
+            return out
 
         return jsonify({
             "status": "success",
             "meta": {
                 "cost_per_m_lower_bound": round(scale, 4),
                 "heuristic_epsilon": eps,
+                "fastest_heuristic_epsilon": eps_fast,
+                "fastest_cost_per_m": round(scale_fast, 4),
+                "algorithm": alg_label,
+                "auth": {"mode": g.auth_mode, "user_id": g.user_id},
                 "active_profile_id": active_profile_id,
                 "weights": {k: w[k] for k in user_profiles.ROUTING_WEIGHT_KEYS},
                 "calming_source": user_profiles.CALMING_SOURCE,
@@ -1435,32 +2272,48 @@ def get_route():
                 "speed_kmh": speed_kmh,
                 "translation_clamps": translation_clamps,
                 "light_gated_off": light_gated_off,
+                "leg_count": len(legs_out),
+                "purpose": purpose,
                 "timing_ms": {
                     "snap": round(t_snap * 1000, 1),
-                    "fastest_astar": round(t_fast * 1000, 1),
-                    "optimized_astar": round(t_opt * 1000, 1),
+                    "fastest_astar": round(t_fast_total * 1000, 1),
+                    "optimized_astar": round(t_opt_total * 1000, 1),
                     "total": round(t_compute * 1000, 1),
+                    "legs": leg_timings,
+                },
+                "search_stats": {
+                    "fastest_expansions": exp_fast_total,
+                    "fastest_edge_relaxations": relax_fast_total,
+                    "optimized_expansions": exp_opt_total,
+                    "optimized_edge_relaxations": relax_opt_total,
                 },
                 "snap": {
-                    "start": _snap_meta(start_snap),
-                    "end": _snap_meta(end_snap),
+                    "start": _snap_meta(snaps[0]),
+                    "end": _snap_meta(snaps[-1]),
+                    "vias": [_snap_meta(s) for s in snaps[1:-1]],
                 },
                 "park_hours_at": at_time.isoformat(),
                 "park_fallback_open": fallback_open,
                 "park_hours_map_size": len(hours_map),
+                "depart_mode": depart_mode,
+                "live_applied": live_applied,
+                "array_costs": use_arrays,
+                "csr_astar": use_csr,
+                "numba_astar": use_numba,
+                "geom_preparse": edge_cost_arrays.get_geom_preparse_state(),
             },
-            "fastest": {"path": coords_fastest, "stats": stats_fastest},
+            "legs": legs_out,
+            "fastest": {"path": coords_fastest_all, "stats": stats_fastest_all},
             "safest": {
-                "path": coords_optimized,
-                "stats": stats_optimized,
-                "lit_chunks": lit_chunks,
-                "steep_chunks": steep_chunks,
-                "tfl_cycleway_chunks": tfl_cycleway_chunks,
-                "tfl_quietway_chunks": tfl_quietway_chunks,
-                "green_chunks": green_chunks,
-                "narrow_chunks": narrow_chunks,
-                "disruption_chunks": disruption_chunks,
-                "node_highlights": node_highlights,
+                "path": coords_opt_all,
+                "stats": stats_optimized_all,
+                "lit_chunks": _merge_chunks("lit_chunks"),
+                "steep_chunks": _merge_chunks("steep_chunks"),
+                "tfl_cycleway_chunks": _merge_chunks("tfl_cycleway_chunks"),
+                "green_chunks": _merge_chunks("green_chunks"),
+                "vehicular_free_chunks": _merge_chunks("vehicular_free_chunks"),
+                "disruption_chunks": _merge_chunks("disruption_chunks"),
+                "node_highlights": _merge_chunks("node_highlights"),
             },
         })
 
@@ -1476,11 +2329,17 @@ if __name__ == '__main__':
                             help="Force day mode (light_weight always gated off)")
     mode_group.add_argument("--night", action="store_true",
                             help="Force night mode (light_weight always active)")
+    parser.add_argument(
+        "--no-live",
+        action="store_true",
+        help="Skip TfL/TomTom fetch+poll (same as SKIP_DISRUPTION_FETCH=1 or LIVE_DISRUPTIONS=0)",
+    )
     args = parser.parse_args()
 
     if args.day:
         night_time.set_forced_mode("day")
     elif args.night:
         night_time.set_forced_mode("night")
+    # --no-live applied in _apply_early_cli_env() before bootstrap
 
     app.run(debug=True, port=5000, use_reloader=USE_RELOADER)

@@ -145,9 +145,11 @@ export default function LocationSearchInput({
 
   return (
     <div ref={containerRef} style={{ marginBottom: '8px', position: 'relative' }}>
+      {label ? (
       <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', color: theme.textSub, marginBottom: '4px' }}>
         {label}
       </label>
+      ) : null}
       <input
         type="text"
         value={query}

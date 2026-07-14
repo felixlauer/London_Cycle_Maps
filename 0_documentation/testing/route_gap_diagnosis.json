@@ -1,0 +1,276 @@
+{
+  "meta": {
+    "generated_at": "2026-07-10T16:45:43.400023+00:00",
+    "route": "route 10: Bromley to Ealing",
+    "start_node": [
+      0.018667,
+      51.405372
+    ],
+    "end_node": [
+      -0.303684,
+      51.513568
+    ],
+    "park_hours_at": "2026-07-10T17:39:45.670209+01:00",
+    "park_fallback_open": true,
+    "prod_impassable": 201629,
+    "bac_impassable": 201629,
+    "length_array_max_abs_diff": 0.0,
+    "ref_opt_exp": 674123,
+    "ref_opt_s": 13.401,
+    "ref_impassable": 199189,
+    "app_target_exp": 937387,
+    "clamp_sample": [
+      {
+        "coupling_id": "risk_surface_floor",
+        "preset": "safe",
+        "dominant": "risk_weight",
+        "clamped_weight": "surface_weight",
+        "from": 0.0,
+        "to": 0.2
+      }
+    ],
+    "movers_vs_bench_like": [
+      {
+        "name": "prod_arrays_same_inputs",
+        "delta_exp": 0,
+        "delta_s": -19.534,
+        "expansions": 674062
+      },
+      {
+        "name": "+clamps",
+        "delta_exp": -4927,
+        "delta_s": -22.634,
+        "expansions": 669135
+      },
+      {
+        "name": "+light_gate",
+        "delta_exp": -60030,
+        "delta_s": -24.796,
+        "expansions": 614032
+      },
+      {
+        "name": "+eps_0.75",
+        "delta_exp": -132860,
+        "delta_s": -26.057,
+        "expansions": 541202
+      },
+      {
+        "name": "+clamps+light_gate",
+        "delta_exp": -197131,
+        "delta_s": -28.133,
+        "expansions": 476931
+      },
+      {
+        "name": "profile_store_day",
+        "delta_exp": -197131,
+        "delta_s": -28.116,
+        "expansions": 476931
+      }
+    ]
+  },
+  "runs": [
+    {
+      "name": "bench_like",
+      "backend": "bac",
+      "eps": 0.5,
+      "scale": 0.683,
+      "impassable": 201629,
+      "weights": {
+        "risk_weight": 1.2,
+        "light_weight": 0.6,
+        "speed_weight": 2.0,
+        "junction_weight": 2.0,
+        "vehicular_free_weight": 2.5,
+        "tfl_cycleway_weight": 0.5,
+        "tfl_live_weight": 0.4,
+        "green_weight": 0.15,
+        "hill_weight": 0.3,
+        "barrier_weight": 0.3
+      },
+      "opt": {
+        "elapsed_s": 38.112,
+        "expansions": 674062,
+        "edge_relaxations": 1463182,
+        "ms_per_exp": 0.0565,
+        "path_nodes": 2069
+      },
+      "exp_vs_ref": 1.0,
+      "time_vs_ref": 2.844,
+      "exp_vs_app_target": 0.719
+    },
+    {
+      "name": "prod_arrays_same_inputs",
+      "backend": "prod",
+      "eps": 0.5,
+      "scale": 0.683,
+      "impassable": 201629,
+      "weights": {
+        "risk_weight": 1.2,
+        "light_weight": 0.6,
+        "speed_weight": 2.0,
+        "junction_weight": 2.0,
+        "vehicular_free_weight": 2.5,
+        "tfl_cycleway_weight": 0.5,
+        "tfl_live_weight": 0.4,
+        "green_weight": 0.15,
+        "hill_weight": 0.3,
+        "barrier_weight": 0.3
+      },
+      "opt": {
+        "elapsed_s": 18.578,
+        "expansions": 674062,
+        "edge_relaxations": 1463182,
+        "ms_per_exp": 0.0276,
+        "path_nodes": 2069
+      },
+      "exp_vs_ref": 1.0,
+      "time_vs_ref": 1.386,
+      "exp_vs_app_target": 0.719
+    },
+    {
+      "name": "+eps_0.75",
+      "backend": "prod",
+      "eps": 0.75,
+      "scale": 0.7968,
+      "impassable": 201629,
+      "weights": {
+        "risk_weight": 1.2,
+        "light_weight": 0.6,
+        "speed_weight": 2.0,
+        "junction_weight": 2.0,
+        "vehicular_free_weight": 2.5,
+        "tfl_cycleway_weight": 0.5,
+        "tfl_live_weight": 0.4,
+        "green_weight": 0.15,
+        "hill_weight": 0.3,
+        "barrier_weight": 0.3
+      },
+      "opt": {
+        "elapsed_s": 12.055,
+        "expansions": 541202,
+        "edge_relaxations": 1176587,
+        "ms_per_exp": 0.0223,
+        "path_nodes": 2069
+      },
+      "exp_vs_ref": 0.803,
+      "time_vs_ref": 0.9,
+      "exp_vs_app_target": 0.577
+    },
+    {
+      "name": "+light_gate",
+      "backend": "prod",
+      "eps": 0.5,
+      "scale": 0.683,
+      "impassable": 201629,
+      "weights": {
+        "risk_weight": 1.2,
+        "light_weight": 0.0,
+        "speed_weight": 2.0,
+        "junction_weight": 2.0,
+        "vehicular_free_weight": 2.5,
+        "tfl_cycleway_weight": 0.5,
+        "tfl_live_weight": 0.4,
+        "green_weight": 0.15,
+        "hill_weight": 0.3,
+        "barrier_weight": 0.3
+      },
+      "opt": {
+        "elapsed_s": 13.316,
+        "expansions": 614032,
+        "edge_relaxations": 1332900,
+        "ms_per_exp": 0.0217,
+        "path_nodes": 2062
+      },
+      "exp_vs_ref": 0.911,
+      "time_vs_ref": 0.994,
+      "exp_vs_app_target": 0.655
+    },
+    {
+      "name": "+clamps",
+      "backend": "prod",
+      "eps": 0.5,
+      "scale": 0.683,
+      "impassable": 201629,
+      "weights": {
+        "risk_weight": 1.2,
+        "light_weight": 0.6,
+        "speed_weight": 2.0,
+        "junction_weight": 2.0,
+        "vehicular_free_weight": 2.5,
+        "tfl_cycleway_weight": 0.5,
+        "tfl_live_weight": 0.4,
+        "green_weight": 0.15,
+        "hill_weight": 0.3,
+        "barrier_weight": 0.3
+      },
+      "opt": {
+        "elapsed_s": 15.478,
+        "expansions": 669135,
+        "edge_relaxations": 1452565,
+        "ms_per_exp": 0.0231,
+        "path_nodes": 2069
+      },
+      "exp_vs_ref": 0.993,
+      "time_vs_ref": 1.155,
+      "exp_vs_app_target": 0.714
+    },
+    {
+      "name": "+clamps+light_gate",
+      "backend": "prod",
+      "eps": 0.75,
+      "scale": 0.7968,
+      "impassable": 201629,
+      "weights": {
+        "risk_weight": 1.2,
+        "light_weight": 0.0,
+        "speed_weight": 2.0,
+        "junction_weight": 2.0,
+        "vehicular_free_weight": 2.5,
+        "tfl_cycleway_weight": 0.5,
+        "tfl_live_weight": 0.4,
+        "green_weight": 0.15,
+        "hill_weight": 0.3,
+        "barrier_weight": 0.3
+      },
+      "opt": {
+        "elapsed_s": 9.979,
+        "expansions": 476931,
+        "edge_relaxations": 1036846,
+        "ms_per_exp": 0.0209,
+        "path_nodes": 2061
+      },
+      "exp_vs_ref": 0.707,
+      "time_vs_ref": 0.745,
+      "exp_vs_app_target": 0.509
+    },
+    {
+      "name": "profile_store_day",
+      "backend": "prod",
+      "eps": 0.75,
+      "scale": 0.7968,
+      "impassable": 201629,
+      "weights": {
+        "risk_weight": 1.2,
+        "light_weight": 0.0,
+        "speed_weight": 2.0,
+        "junction_weight": 2.0,
+        "vehicular_free_weight": 2.5,
+        "tfl_cycleway_weight": 0.5,
+        "tfl_live_weight": 0.4,
+        "green_weight": 0.15,
+        "hill_weight": 0.3,
+        "barrier_weight": 0.3
+      },
+      "opt": {
+        "elapsed_s": 9.996,
+        "expansions": 476931,
+        "edge_relaxations": 1036846,
+        "ms_per_exp": 0.021,
+        "path_nodes": 2061
+      },
+      "exp_vs_ref": 0.707,
+      "time_vs_ref": 0.746,
+      "exp_vs_app_target": 0.509
+    }
+  ]
+}

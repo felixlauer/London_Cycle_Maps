@@ -77,8 +77,8 @@ def bootstrap_debug_engine():
 
     t0 = time.perf_counter()
     live_disruptions.init(G)
-    if os.environ.get("SKIP_DISRUPTION_FETCH", "").lower() in ("1", "true", "yes"):
-        print(f"--> Live disruption index: init only ({time.perf_counter() - t0:.1f}s)")
+    if not live_disruptions.live_fetch_enabled():
+        print(f"--> Live disruption index: init only, fetch off ({time.perf_counter() - t0:.1f}s)")
     else:
         live_disruptions.start_background_refresh()
         print(f"--> Live disruption index: {time.perf_counter() - t0:.1f}s")
@@ -99,27 +99,15 @@ def get_nearest_node(lat, lon):
     return best_node
 
 def extract_segment_geometry(u, v):
+    """Polyline [[lat, lon], ...] for edge u→v. Never mutates G (thread-safe)."""
+    import edge_geom_store
+
     edge_data = G.get_edge_data(u, v)
-    coords = []
-    if 'geometry' in edge_data:
-        try:
-            line = load_wkt(edge_data['geometry'])
-            segment_coords = list(line.coords)
-            u_x, u_y = G.nodes[u]['x'], G.nodes[u]['y']
-            start_dist = (segment_coords[0][0] - u_x)**2 + (segment_coords[0][1] - u_y)**2
-            end_dist = (segment_coords[-1][0] - u_x)**2 + (segment_coords[-1][1] - u_y)**2
-            if end_dist < start_dist:
-                segment_coords.reverse()
-            for x, y in segment_coords:
-                coords.append([y, x])
-            return coords
-        except:
-            pass
-    node_u = G.nodes[u]
-    node_v = G.nodes[v]
-    coords.append([float(node_u['y']), float(node_u['x'])])
-    coords.append([float(node_v['y']), float(node_v['x'])])
-    return coords
+    if not edge_data:
+        return edge_geom_store.coords_for_edge(None, G, u, v)
+    if G.is_multigraph():
+        edge_data = next(iter(edge_data.values()))
+    return edge_geom_store.coords_for_edge(edge_data, G, u, v)
 
 BAD_SURFACES = [
     'grass', 'dirt', 'sand', 'ground', 'unpaved', 'sett', 'gravel', 'wood',
@@ -135,20 +123,10 @@ SURFACE_CACHE = []
 UNLIT_CACHE = []
 
 def get_edge_coords(u, v, data):
-    coords = []
-    if 'geometry' in data:
-        try:
-            line = load_wkt(data['geometry'])
-            coords = [[y, x] for x, y in line.coords]
-        except:
-            pass
-    else:
-        if 'y' in G.nodes[u] and 'y' in G.nodes[v]:
-            coords = [
-                [float(G.nodes[u]['y']), float(G.nodes[u]['x'])],
-                [float(G.nodes[v]['y']), float(G.nodes[v]['x'])]
-            ]
-    return coords
+    """Overlay helper: same resolution as extract_segment_geometry (no graph writeback)."""
+    import edge_geom_store
+
+    return edge_geom_store.coords_for_edge(data, G, u, v)
 
 def make_bounds(coords):
     lats = [p[0] for p in coords]

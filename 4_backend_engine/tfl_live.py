@@ -94,11 +94,30 @@ def init(G):
             line = LineString([p1, p2])
         geoms.append(line)
         keys.append((u, v))
+    _init_from_geoms(G, geoms, keys)
+    elapsed = time.time() - t0
+    log.info("tfl_live: STRtree built from %d edges in %.1f s", len(geoms), elapsed)
+
+
+def init_from_geoms(G, geoms, keys):
+    """Install a prebuilt geometry list + (u,v) keys (routing cache path)."""
+    t0 = time.time()
+    if len(geoms) != len(keys):
+        raise ValueError("geoms/keys length mismatch")
+    _init_from_geoms(G, list(geoms), list(keys))
+    log.info(
+        "tfl_live: STRtree from cache (%d edges) in %.1f s",
+        len(geoms),
+        time.time() - t0,
+    )
+
+
+def _init_from_geoms(G, geoms, keys):
+    global _edge_tree, _edge_geoms, _edge_keys, _graph_ref
+    _graph_ref = G
     _edge_geoms = geoms
     _edge_keys = keys
     _edge_tree = STRtree(geoms)
-    elapsed = time.time() - t0
-    log.info("tfl_live: STRtree built from %d edges in %.1f s", len(geoms), elapsed)
 
 
 @dataclass

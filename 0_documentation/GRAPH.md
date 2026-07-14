@@ -25,8 +25,11 @@ The graph is produced by a multi-stage pipeline. Order matters.
 | 7b | **`apply_tfl_export.py`** | `tfl_edges_from_graph.json` + legacy graph | **`london_elev_final_tfl.gpickle`** (+ `.graphml`) | Restore master export via `osm_id` fan-out (`--legacy-graph`) |
 | 7c | **`apply_tfl_manual_edits.py`** | `tfl_manual_edits.json` + legacy graph | same final graph | Layer debug-app add/remove deltas via `osm_id` |
 | 7d | **`apply_attraction_manual.py`** | `attraction_manual_regions.json` | same final graph | Manual park/river/sight regions → `is_*` flags + `attraction_name` |
+| 8 | **`prebuild_routing_cache.py`** | final `london_elev_final_tfl.*` | **`london_elev_final_tfl.routing_cache/`** | Static routing sidecars (tables, CSR, junctions, lazy geom `.npy` + WKB). See [`ROUTING_CACHE.md`](ROUTING_CACHE.md). |
 
 **Fast I/O (`3_pipeline/graph_io.py`):** Pipeline scripts and backends load via `load_graph()` — prefer a companion **`.gpickle`** when present. GraphML newer than pickle by less than **24 hours** still loads pickle (dual-save writes pickle before GraphML). Larger gaps fall back to GraphML (manual external edit). Intermediate steps (5–6) write **pickle only**. GraphML is written at **build** and **final TfL tag** for external compatibility.
+
+**Routing cache (v2):** `meta.json` + `.npz` tables/CSR + **`geom_offsets.npy` / `geom_flat.npy`** (mmap). Fail-closed fingerprint + edge alignment (`1e-5` deg). Invalidated on graph mtime/size or `FORMULA_ID` / `CACHE_FORMAT_VERSION` bump. `ROUTING_CACHE=0` → cold rebuild. `--skip-routing-cache` to skip in pipeline.
 
 **Resume:** `python run_graph_pipeline.py --start-at Add_elevation_raster.py` skips earlier steps; requires upstream `.gpickle` files in `1_data/`.
 
@@ -39,7 +42,7 @@ The graph is produced by a multi-stage pipeline. Order matters.
 python run_graph_pipeline.py
 python run_graph_pipeline.py --skip-tagging --pickle-only
 ```
-Default flow: **`tag_attractions_osm.py`** (needs `osm_park_polygons.geojson`) → optional TfL: `tag_tfl_routes.py` → **`apply_tfl_export.py`** (ground truth) → **`apply_tfl_manual_edits.py`** → **`apply_attraction_manual.py`**. Use **`--skip-tagging`** when the export JSON is authoritative. **`--skip-osm-attractions`** / **`--skip-attraction-manual`** skip attraction steps. **`--legacy-graph`** (default `1_data/legacy_graph.graphml` if present) maps old `(source,target)` node ids to **`osm_id`** and fans out tags on the noded mesh. Also: `--from-db`, `--start-at SCRIPT`, `--skip-export`, `--skip-manual`, `--pickle-only`.
+Default flow: **`tag_attractions_osm.py`** (needs `osm_park_polygons.geojson`) → optional TfL: `tag_tfl_routes.py` → **`apply_tfl_export.py`** (ground truth) → **`apply_tfl_manual_edits.py`** → **`apply_attraction_manual.py`** → **`prebuild_routing_cache.py`**. Use **`--skip-tagging`** when the export JSON is authoritative. **`--skip-osm-attractions`** / **`--skip-attraction-manual`** skip attraction steps. **`--skip-routing-cache`** skips the static routing sidecar. **`--legacy-graph`** (default `1_data/legacy_graph.graphml` if present) maps old `(source,target)` node ids to **`osm_id`** and fans out tags on the noded mesh. Also: `--from-db`, `--start-at SCRIPT`, `--skip-export`, `--skip-manual`, `--pickle-only`.
 
 **Manual pipeline commands (`3_pipeline/`):**
 ```text
@@ -52,6 +55,8 @@ python tag_tfl_routes.py                    # optional geometry tags → london_
 python apply_tfl_export.py --legacy-graph ../1_data/legacy_graph.graphml
 python apply_tfl_manual_edits.py --legacy-graph ../1_data/legacy_graph.graphml
 python apply_attraction_manual.py --pickle-only
+python prebuild_routing_cache.py          # or: run_graph_pipeline.py (runs this last)
+python prebuild_routing_cache.py --parity # slow: rebuild tables/CSR and compare
 ```
 
 ---

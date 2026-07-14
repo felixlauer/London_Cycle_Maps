@@ -1,0 +1,22 @@
+---98---
+Here’s what changed:
+
+- **Beak:** larger (14px), and the whole pill+beak uses one `drop-shadow` (no card shadow / border seam)
+- **Alignment:** tip stays at the station; card is offset so the beak sits under the `|` (`--beak-along`)
+- **No selected outline** while picking the end station
+- **Stats:** greyscale `+ 5.0 min (walk)` above, cycle value as `21.0 min (cycle)` (same for km); left-aligned again
+
+If the beak still isn’t quite under the `|`, we can nudge `BEAK_ALONG_COMPACT` (currently `38`) in `labelLayout.js`.
+---100---
+<timestamp>Monday, Jul 13, 2026, 7:56 PM (UTC+1)</timestamp>
+<user_query>
+Move the beak slighty to the left and make it flatter slightly (vertical dimension decreased by like 20%).  Also time doesnt fit so make the entire box slightly wider so that we have enough space. 
+</user_query>
+---101---
+Nudging the beak left, flattening it ~20%, and widening the stats box so time fits.
+---102---
+Done.
+
+- Beak nudged left (`38→32` / `42→36`)
+- Beak flatter (~20% shorter: `14→11px`)
+- Analysis Time/Distance column widened (`118→148px`) so `(cycle)` fits

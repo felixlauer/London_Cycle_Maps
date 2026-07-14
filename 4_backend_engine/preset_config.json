@@ -60,7 +60,7 @@
       "rules": {
         "hill_weight_epsilon": true
       },
-      "note": "Hill avoidance is disabled - the motor does the climbing. Speed is capped at 25 km/h, so the average assumes 17 km/h."
+      "note": "Hill avoidance is disabled - the motor does the climbing. Speed is capped at 25 km/h, so the average assumes 18 km/h."
     },
     "cargo": {
       "label": "Cargo bike",

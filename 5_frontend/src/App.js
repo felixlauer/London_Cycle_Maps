@@ -9,12 +9,32 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import './ui.css';
 
-import LocationSearchInput from './LocationSearchInput';
 import MapFlyTo from './MapFlyTo';
 import RouteOverlayPicker from './RouteOverlayPicker';
 import PresetWizard from './wizard/PresetWizard';
 import { emptyOverlayVisibility, defaultOverlayVisibility } from './routeOverlayCatalog';
-import { getMapboxToken } from './mapboxGeocoding';
+import { AuthProvider, useAuth } from './auth/AuthProvider';
+import AuthModal from './auth/AuthModal';
+import PasswordRecoveryModal from './auth/PasswordRecoveryModal';
+import AccountSettingsModal from './components/AccountSettingsModal';
+import TopBar from './components/TopBar';
+import TestModePanel from './components/TestModePanel';
+import RouteLoadingBike, {
+  straightLineKm,
+  ROUTE_LOADING_MIN_KM,
+} from './components/RouteLoadingBike';
+import SantanderGuidePill from './components/santander/SantanderGuidePill';
+import SantanderSoftBanner from './components/santander/SantanderSoftBanner';
+import SantanderUnsuitableModal from './components/santander/SantanderUnsuitableModal';
+import SantanderStationsLayer from './components/santander/SantanderStationsLayer';
+import './components/santander/santander.css';
+import DepartAtControl, {
+  formatDepartStatusHint,
+  isFutureDepartAt,
+} from './components/DepartAtControl';
+import RoutePointsPanel, { MAX_VIAS } from './components/RoutePointsPanel';
+import LegAnalysisPager from './components/LegAnalysisPager';
+import { apiFetch, API_BASE } from './api/flaskClient';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
@@ -24,7 +44,6 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-const API_BASE = 'http://127.0.0.1:5000';
 const R_MIN = 0.1;
 
 // Schema v2 routing keys (width removed, quietway merged into cycleway,
@@ -93,64 +112,29 @@ const formatRouteStatus = (minWeight, timingMs, profileName) => {
 
 // --- STYLES & COMPONENTS ---
 
-const toggleStyle = {
-    container: { display: "flex", justifyContent: "space-between", marginBottom: "12px", cursor: "pointer" },
-    switch: { position: "relative", width: "36px", height: "18px", marginLeft: "10px" },
-    slider: (isOn, activeColor, bgColor) => ({
-        position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: isOn ? activeColor : bgColor, transition: ".3s", borderRadius: "18px"
-    }),
-    knob: (isOn) => ({
-        position: "absolute", height: "14px", width: "14px", left: "2px", bottom: "2px",
-        backgroundColor: "white", transition: ".3s", borderRadius: "50%",
-        transform: isOn ? "translateX(18px)" : "translateX(0)"
-    })
-};
-
-const Toggle = ({ label, isOn, setIsOn, activeColor, theme, compact = false }) => (
-    <div style={{ ...toggleStyle.container, marginBottom: compact ? 0 : "12px" }} onClick={() => setIsOn(!isOn)}>
-        <span style={{ fontSize: compact ? "12px" : "13px", fontWeight: "bold", color: theme.textMain }}>{label}</span>
-        <div style={toggleStyle.switch}>
-            <div style={toggleStyle.slider(isOn, activeColor, theme.toggleInactive)}>
-                <div style={toggleStyle.knob(isOn)}></div>
-            </div>
-        </div>
-    </div>
-);
-
-const HeaderBarToggle = ({ label, isOn, setIsOn }) => (
-    <div
-      onClick={() => setIsOn(!isOn)}
-      style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-    >
-      <span style={{ fontSize: '12px', color: isOn ? '#ce93d8' : '#888', fontWeight: 600 }}>{label}</span>
-      <div style={{ position: 'relative', width: '34px', height: '18px' }}>
-        <div style={{
-          position: 'absolute', inset: 0, borderRadius: '18px', transition: '.25s',
-          backgroundColor: isOn ? '#7b1fa2' : '#3a3a3a',
-        }} />
-        <div style={{
-          position: 'absolute', height: '14px', width: '14px', left: '2px', bottom: '2px',
-          backgroundColor: 'white', borderRadius: '50%', transition: '.25s',
-          transform: isOn ? 'translateX(16px)' : 'translateX(0)',
-        }} />
-      </div>
-    </div>
-);
-
-const RouteHeroCard = ({ label, fastest, optimized, unit, theme }) => {
+const RouteHeroCard = ({ label, fastest, optimized, unit, theme, walkValue, cycleMode }) => {
   const f = parseFloat(fastest);
   const o = parseFloat(optimized);
   const diff = o - f;
   const fmt = (n) => n.toFixed(1);
   const displayDiff = (diff > 0 ? '+' : '') + fmt(diff);
   const diffColor = diff > 0 ? '#f44336' : diff < 0 ? '#4CAF50' : theme.textSub;
+  const hasWalk = walkValue != null && Number.isFinite(Number(walkValue));
   return (
     <div className="ui-hero-card">
       <div className="ui-hero-card__label">{label}</div>
-      <div className="ui-hero-card__main">
-        <span className="ui-hero-card__value">{fmt(o)}</span>
-        <span className="ui-hero-card__unit">{unit}</span>
+      <div className="ui-hero-card__values">
+        {hasWalk && (
+          <div className="ui-hero-card__walk">
+            + {fmt(Number(walkValue))} {unit} (walk)
+          </div>
+        )}
+        <div className="ui-hero-card__main">
+          <span className="ui-hero-card__value">{fmt(o)}</span>
+          <span className="ui-hero-card__unit">
+            {unit}{cycleMode ? ' (cycle)' : ''}
+          </span>
+        </div>
       </div>
       <div className="ui-hero-card__foot">
         <span className="ui-hero-card__baseline">vs fastest: {fmt(f)} {unit}</span>
@@ -378,13 +362,128 @@ function NodeHighlightMarkers({ nodeHighlights, showBarriers, showSignals, showJ
   );
 }
 
+/**
+ * Multi-leg map layers. react-leaflet v5 only reapplies stroke styles via `pathOptions`
+ * (and create-time options) — changing top-level opacity props is ignored on update.
+ * Remount keys + pathOptions so analysis paging actually swaps emphasis/overlays.
+ */
+function MultiLegRouteLayers({
+  routeLegs,
+  activeLegIndex,
+  theme,
+  overlayVisibility,
+  lightingActive,
+}) {
+  const ordered = [
+    ...routeLegs.map((leg, i) => ({ leg, i })).filter(({ i }) => i !== activeLegIndex),
+    ...routeLegs.map((leg, i) => ({ leg, i })).filter(({ i }) => i === activeLegIndex),
+  ];
+
+  return ordered.map(({ leg, i }) => {
+    const active = i === activeLegIndex;
+    const fastestPath = leg?.fastest?.path;
+    const safest = leg?.safest || {};
+    const safestPath = safest.path;
+    return (
+      <React.Fragment key={`leg-${i}`}>
+        {fastestPath?.length > 1 && (
+          <Polyline
+            key={`fast-${i}-${active ? 'a' : 'i'}`}
+            positions={fastestPath}
+            pathOptions={{
+              color: theme.routeGrey,
+              weight: 6,
+              opacity: active ? 0.45 : 0.12,
+            }}
+          />
+        )}
+        {safestPath?.length > 1 && (
+          <Polyline
+            key={`safe-${i}-${active ? 'a' : 'i'}`}
+            positions={safestPath}
+            pathOptions={{
+              color: theme.routeOptimized,
+              // Inactive: same weight/opacity as the grey "fastest" underlay, keep optimized colour.
+              weight: active ? 5 : 6,
+              opacity: active ? 1.0 : 0.4,
+            }}
+          />
+        )}
+        {active && (
+          <React.Fragment key={`leg-overlays-${i}`}>
+            {overlayVisibility.lit && lightingActive && (safest.lit_chunks || []).map((s, j) => (
+              <Polyline
+                key={`lit-${i}-${j}`}
+                positions={s}
+                pathOptions={{ color: theme.litColor, weight: 4, opacity: 1.0 }}
+              />
+            ))}
+            {overlayVisibility.steep && !overlayVisibility.lit && (safest.steep_chunks || []).map((s, j) => (
+              <Polyline
+                key={`steep-${i}-${j}`}
+                positions={s}
+                pathOptions={{ color: theme.steepColor, weight: 5, opacity: 1.0 }}
+              />
+            ))}
+            {overlayVisibility.tflCycleway && (safest.tfl_cycleway_chunks || []).map((s, j) => (
+              <Polyline
+                key={`tfl-c-${i}-${j}`}
+                positions={s}
+                pathOptions={{ color: theme.tflCyclewayColor, weight: 4, opacity: 0.9 }}
+              />
+            ))}
+            {overlayVisibility.green && (safest.green_chunks || []).map((s, j) => (
+              <Polyline
+                key={`green-${i}-${j}`}
+                positions={s}
+                pathOptions={{ color: theme.greenColor, weight: 4, opacity: 0.9 }}
+              />
+            ))}
+            {overlayVisibility.vehicularFree && (safest.vehicular_free_chunks || []).map((s, j) => (
+              <Polyline
+                key={`vf-${i}-${j}`}
+                positions={s}
+                pathOptions={{ color: theme.vehicularFreeColor, weight: 4, opacity: 0.9 }}
+              />
+            ))}
+            {overlayVisibility.disruptions && (safest.disruption_chunks || []).map((s, j) => (
+              <Polyline
+                key={`dis-${i}-${j}`}
+                positions={s}
+                pathOptions={{ color: theme.disruptionColor, weight: 5, opacity: 0.9 }}
+              />
+            ))}
+            {(overlayVisibility.barriers || overlayVisibility.signals || overlayVisibility.junctionDanger || overlayVisibility.calming) && (
+              <NodeHighlightMarkers
+                nodeHighlights={safest.node_highlights || []}
+                showBarriers={overlayVisibility.barriers}
+                showSignals={overlayVisibility.signals}
+                showJunctionDanger={overlayVisibility.junctionDanger}
+                showCalming={overlayVisibility.calming}
+                theme={theme}
+              />
+            )}
+          </React.Fragment>
+        )}
+      </React.Fragment>
+    );
+  });
+}
+
 // --- MAIN APP ---
 
-function App() {
+function AppInner() {
+  const { user, isLoading: authLoading, authNotice, passwordRecoveryPending } = useAuth();
   const [start, setStart] = useState(null);
   const [end, setEnd] = useState(null);
   const [startLabel, setStartLabel] = useState('');
   const [endLabel, setEndLabel] = useState('');
+  /** @type {[{id:string, coord:[number,number]|null, label:string}]} */
+  const [vias, setVias] = useState([]);
+  const [routeLegs, setRouteLegs] = useState(null); // array from /route legs, or null
+  const [activeLegIndex, setActiveLegIndex] = useState(0);
+  const routeRequestIdRef = useRef(0);
+  const abortRef = useRef(null);
   const [flyTarget, setFlyTarget] = useState(null);
   const [status, setStatus] = useState("Loading profiles...");
 
@@ -394,27 +493,25 @@ function App() {
   );
   const [activeProfile, setActiveProfile] = useState(null);
   const [testMode, setTestMode] = useState(false);
+  const [manualWeightsMode, setManualWeightsMode] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [routeRevealed, setRouteRevealed] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [showLongRouteLoading, setShowLongRouteLoading] = useState(false);
+  const [longRouteLoadingKey, setLongRouteLoadingKey] = useState(0);
   const [lastRouteMeta, setLastRouteMeta] = useState(null);
   const routeRevealedRef = useRef(false);
   useEffect(() => { routeRevealedRef.current = routeRevealed; }, [routeRevealed]);
-
-  useEffect(() => {
-    if (!getMapboxToken()) {
-      console.warn('REACT_APP_MAPBOX_API_KEY is not set — location search disabled.');
-    }
-  }, []);
 
   const [fastestData, setFastestData] = useState(null);
   const [safestData, setSafestData] = useState(null);
   const [litSegments, setLitSegments] = useState([]);
   const [steepSegments, setSteepSegments] = useState([]);
   const [tflCyclewayChunks, setTflCyclewayChunks] = useState([]);
-  const [tflQuietwayChunks, setTflQuietwayChunks] = useState([]);
   const [greenChunks, setGreenChunks] = useState([]);
-  const [narrowChunks, setNarrowChunks] = useState([]);
+  const [vehicularFreeChunks, setVehicularFreeChunks] = useState([]);
   const [disruptionChunks, setDisruptionChunks] = useState([]);
   const [nodeHighlights, setNodeHighlights] = useState([]);
   const [overlayVisibility, setOverlayVisibility] = useState(emptyOverlayVisibility);
@@ -442,11 +539,31 @@ function App() {
   const [inspectorPos, setInspectorPos] = useState(null);
   const [inspectorGeo, setInspectorGeo] = useState(null);
 
+  // Santander Cycles hire mode (independent of riding profile)
+  const [santanderMode, setSantanderMode] = useState(false);
+  const [hireStep, setHireStep] = useState('idle'); // idle | pickup | dropoff | routing | done
+  const [hireStations, setHireStations] = useState([]);
+  const [pickupStation, setPickupStation] = useState(null);
+  const [dropoffStation, setDropoffStation] = useState(null);
+  const [hireBanner, setHireBanner] = useState('');
+  const [hireGuide, setHireGuide] = useState('');
+  const [unsuitableModal, setUnsuitableModal] = useState(null);
+  const [walkStartPath, setWalkStartPath] = useState(null);
+  const [walkEndPath, setWalkEndPath] = useState(null);
+  const [hireWalkStats, setHireWalkStats] = useState(null); // { duration_min, distance_m }
+  const [expandedStationId, setExpandedStationId] = useState(null);
+  const santanderModeRef = useRef(false);
+  useEffect(() => { santanderModeRef.current = santanderMode; }, [santanderMode]);
+
+  // Leave now / Depart at (Europe/London ISO or null)
+  const [departMode, setDepartMode] = useState('now'); // now | depart_at
+  const [departAtIso, setDepartAtIso] = useState(null);
+
   const theme = useLighting ? {
       mode: 'dark', bg: '#1a1a1a',
       textMain: '#e0e0e0', textSub: '#a0a0a0', border: '#333', toggleInactive: '#444',
       routeGrey: '#ffffff', routeOptimized: '#40E0D0', litColor: '#FFFF00', steepColor: '#00FF00',
-      tflCyclewayColor: '#2196F3', tflQuietwayColor: '#8BC34A', greenColor: '#009688', narrowColor: '#7B1FA2',
+      tflCyclewayColor: '#2196F3', greenColor: '#009688', vehicularFreeColor: '#7B1FA2',
       nodeBarrier: '#5D4037', nodeSignal: '#F57C00', nodeJunction: '#795548', nodeCalming: '#00838F',
       disruptionColor: '#FF0000',
       tileFilter: 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)'
@@ -454,7 +571,7 @@ function App() {
       mode: 'light', bg: 'white',
       textMain: '#333', textSub: '#666', border: '#f0f0f0', toggleInactive: '#ccc',
       routeGrey: '#555', routeOptimized: '#d32f2f', litColor: '#FFD700', steepColor: '#00cc00',
-      tflCyclewayColor: '#1976D2', tflQuietwayColor: '#388E3C', greenColor: '#00796B', narrowColor: '#7B1FA2',
+      tflCyclewayColor: '#1976D2', greenColor: '#00796B', vehicularFreeColor: '#7B1FA2',
       nodeBarrier: '#5D4037', nodeSignal: '#F57C00', nodeJunction: '#795548', nodeCalming: '#00838F',
       disruptionColor: '#FFD700',
       tileFilter: 'none'
@@ -466,37 +583,59 @@ function App() {
     useBarriers, useCalming, useJunctionDanger, useSignals, useTflLive, useTomtomLive,
   };
 
-  const effectiveWeights = testMode
+  // Manual weight overrides only apply inside Test Mode (nested sub-toggle).
+  const manualWeightsActive = testMode && manualWeightsMode;
+
+  const effectiveWeights = manualWeightsActive
     ? togglesToWeights(toggleState)
     : (activeProfile?.weights || emptyWeights());
 
+  // Leaving Test Mode also leaves manual-weights mode.
+  useEffect(() => {
+    if (!testMode) setManualWeightsMode(false);
+  }, [testMode]);
+
   const loadProfileList = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/profiles`);
+      const res = await apiFetch('/profiles', { testMode });
       const data = await res.json();
       setProfiles(data.profiles || []);
     } catch {
       setStatus('Could not load profiles');
     }
-  }, []);
+  }, [testMode]);
 
   const loadActiveProfile = useCallback(async (profileId) => {
     try {
-      const res = await fetch(`${API_BASE}/profiles/${profileId}`);
-      if (!res.ok) return;
+      const res = await apiFetch(`/profiles/${profileId}`, { testMode });
+      if (!res.ok) {
+        // Stored id no longer accessible (signed out / other store) - fall back.
+        if (profileId !== 'preset_safe') setActiveProfileId('preset_safe');
+        return;
+      }
       const data = await res.json();
       setActiveProfile(data);
     } catch { /* ignore */ }
-  }, []);
+  }, [testMode]);
 
-  useEffect(() => { loadProfileList(); }, [loadProfileList]);
+  // Defer all profile fetching until the Supabase session check has resolved
+  // (no guest-state fetch that would be redone as logged-in a moment later).
+  const authReady = testMode || !authLoading;
 
   useEffect(() => {
-    if (activeProfileId) {
-      localStorage.setItem('activeProfileId', activeProfileId);
-      loadActiveProfile(activeProfileId);
-    }
-  }, [activeProfileId, loadActiveProfile]);
+    if (!authReady) return;
+    loadProfileList();
+  }, [authReady, loadProfileList, user?.id]);
+
+  useEffect(() => {
+    if (!authReady || !activeProfileId) return;
+    localStorage.setItem('activeProfileId', activeProfileId);
+    loadActiveProfile(activeProfileId);
+  }, [authReady, activeProfileId, loadActiveProfile, user?.id]);
+
+  useEffect(() => {
+    if (authNotice) setStatus(authNotice);
+  }, [authNotice]);
 
   useEffect(() => {
     // Dev override via `npm start -- --day|--night` (see 5_frontend/start.js).
@@ -535,27 +674,101 @@ function App() {
     setLitSegments([]);
     setSteepSegments([]);
     setTflCyclewayChunks([]);
-    setTflQuietwayChunks([]);
     setGreenChunks([]);
-    setNarrowChunks([]);
+    setVehicularFreeChunks([]);
     setDisruptionChunks([]);
     setNodeHighlights([]);
     setLastRouteMeta(null);
+    setRouteLegs(null);
+    setActiveLegIndex(0);
   }, []);
 
+  const bumpRouteRequest = useCallback(() => {
+    routeRequestIdRef.current += 1;
+    if (abortRef.current) {
+      try { abortRef.current.abort(); } catch (_) { /* ignore */ }
+      abortRef.current = null;
+    }
+    return routeRequestIdRef.current;
+  }, []);
+
+  const resetHireState = useCallback(() => {
+    setHireStep('idle');
+    setHireStations([]);
+    setPickupStation(null);
+    setDropoffStation(null);
+    setHireBanner('');
+    setHireGuide('');
+    setUnsuitableModal(null);
+    setWalkStartPath(null);
+    setWalkEndPath(null);
+    setHireWalkStats(null);
+    setExpandedStationId(null);
+  }, []);
+
+  const applyCandidateResponse = useCallback((data, need) => {
+    const suitable = data.suitable_count ?? 0;
+    const total = data.total_in_radius ?? 0;
+    const shown = data.shown || [];
+    if (total === 0) {
+      setHireStations([]);
+      setHireBanner('No Santander stations within 1.5 km');
+      return;
+    }
+    if (suitable === 0) {
+      setHireStations([]);
+      const kind = need === 'docks' ? 'empty docks' : 'bikes';
+      setHireBanner(`No suitable Santander station with ${kind} within 1.5 km`);
+      return;
+    }
+    setHireStations(shown);
+    if (suitable < 3) {
+      const kind = need === 'docks' ? 'empty docks' : 'bikes';
+      setHireBanner(`Only ${suitable} station${suitable === 1 ? '' : 's'} with ${kind} nearby`);
+    } else {
+      setHireBanner('');
+    }
+  }, []);
+
+  const fetchHireCandidates = useCallback(async (lat, lon, need) => {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon),
+      need,
+      radius_m: '1500',
+    });
+    const res = await apiFetch(`/santander/candidates?${params}`, { testMode });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    applyCandidateResponse(data, need);
+    return data;
+  }, [applyCandidateResponse, testMode]);
+
   const setStartPoint = useCallback((lat, lon, label) => {
+    bumpRouteRequest();
     setStart([lat, lon]);
     setStartLabel(label ?? `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
     setRouteRevealed(false);
-    setStatus(end ? 'Calculating route in background...' : 'Set Destination.');
-  }, [end]);
+    resetHireState();
+    if (santanderModeRef.current) {
+      setStatus(end ? 'Ready — click Get Route to pick Santander stations' : 'Set Destination.');
+    } else {
+      setStatus(end ? 'Calculating route in background...' : 'Set Destination.');
+    }
+  }, [end, resetHireState, bumpRouteRequest]);
 
   const setEndPoint = useCallback((lat, lon, label) => {
+    bumpRouteRequest();
     setEnd([lat, lon]);
     setEndLabel(label ?? `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
     setRouteRevealed(false);
-    setStatus('Calculating route in background...');
-  }, []);
+    resetHireState();
+    if (santanderModeRef.current) {
+      setStatus('Ready — click Get Route to pick Santander stations');
+    } else {
+      setStatus('Calculating route in background...');
+    }
+  }, [resetHireState, bumpRouteRequest]);
 
   const handleStartSearchSelect = useCallback(({ lat, lon, label }) => {
     setStartPoint(lat, lon, label);
@@ -567,106 +780,428 @@ function App() {
     setFlyTarget([lat, lon]);
   }, [setEndPoint]);
 
+  const handleChangeWaypoints = useCallback((next) => {
+    bumpRouteRequest();
+    setStart(next.start);
+    setStartLabel(next.startLabel || '');
+    setEnd(next.end);
+    setEndLabel(next.endLabel || '');
+    setVias(next.vias || []);
+    setRouteRevealed(false);
+    clearRouteData();
+    resetHireState();
+    if ((next.vias || []).length > 0 && santanderModeRef.current) {
+      setSantanderMode(false);
+    }
+    if (next.start && next.end && !(next.vias || []).some((v) => !v.coord)) {
+      setStatus('Calculating route in background...');
+    }
+  }, [bumpRouteRequest, resetHireState, clearRouteData]);
+
+  const handleAddVia = useCallback(() => {
+    if (vias.length >= MAX_VIAS) return;
+    bumpRouteRequest();
+    // TODO(later): allow vias on Santander station→station bike leg instead of mutual exclusion.
+    if (santanderMode) {
+      setSantanderMode(false);
+      resetHireState();
+    }
+    setVias((prev) => [
+      ...prev,
+      { id: `via-${Date.now()}`, coord: null, label: '' },
+    ]);
+    setRouteRevealed(false);
+    clearRouteData();
+    setStatus('Set the new stop, then Get Route');
+  }, [vias.length, santanderMode, bumpRouteRequest, resetHireState, clearRouteData]);
+
+  const handleRemoveVia = useCallback((viaIndex) => {
+    bumpRouteRequest();
+    setVias((prev) => prev.filter((_, i) => i !== viaIndex));
+    setRouteRevealed(false);
+    clearRouteData();
+  }, [bumpRouteRequest, clearRouteData]);
+
+  const handleSwapStartEnd = useCallback(() => {
+    if (vias.length > 0 || !start || !end) return;
+    bumpRouteRequest();
+    setStart(end);
+    setEnd(start);
+    setStartLabel(endLabel);
+    setEndLabel(startLabel);
+    setRouteRevealed(false);
+    clearRouteData();
+    setStatus('Calculating route in background...');
+  }, [vias.length, start, end, startLabel, endLabel, bumpRouteRequest, clearRouteData]);
+
   const minWeightPreview = computeMinWeightPerM(effectiveWeights);
 
-  const fetchRoutes = useCallback(async (s, e) => {
+  const encodeViasParam = useCallback((viaList) => {
+    const filled = (viaList || []).filter((v) => v.coord && v.coord.length === 2);
+    if (!filled.length) return '';
+    return filled.map((v) => `${v.coord[0]},${v.coord[1]}`).join(';');
+  }, []);
+
+  const fetchRoutes = useCallback(async (s, e, viaList, purpose = 'prefetch') => {
     const startCoord = s || start;
     const endCoord = e || end;
+    const viasArg = viaList !== undefined ? viaList : vias;
     if (!startCoord || !endCoord) return;
+    // Incomplete vias (empty slots) — wait until filled.
+    if ((viasArg || []).some((v) => !v.coord)) {
+      setStatus('Fill all stops to calculate a route');
+      return;
+    }
+
+    const reqId = bumpRouteRequest();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsCalculating(true);
     if (routeRevealedRef.current) {
       setStatus(`Calculating... | min weight/m: ${minWeightPreview.toFixed(3)}`);
     } else {
-      setStatus('Calculating route in background...');
+      setStatus(purpose === 'commit' ? 'Calculating route...' : 'Calculating route in background...');
     }
     const params = new URLSearchParams({
       start_lat: startCoord[0], start_lon: startCoord[1],
       end_lat: endCoord[0], end_lon: endCoord[1],
+      purpose,
     });
-    if (testMode) {
+    const viasStr = encodeViasParam(viasArg);
+    if (viasStr) params.set('vias', viasStr);
+    if (manualWeightsActive) {
       const w = togglesToWeights(toggleState);
       ALL_WEIGHT_KEYS.forEach((k) => params.set(k, w[k]));
     } else if (activeProfileId) {
       params.set('profile_id', activeProfileId);
     }
+    if (departMode === 'depart_at' && departAtIso) {
+      params.set('depart_at', departAtIso);
+    }
     try {
-      const response = await fetch(`${API_BASE}/route?${params}`);
+      const response = await apiFetch(`/route?${params}`, { testMode, signal: controller.signal });
+      if (reqId !== routeRequestIdRef.current) return;
       const data = await response.json();
+      if (reqId !== routeRequestIdRef.current) return;
+      if (response.status === 429) {
+        setStatus(data.error || 'Too many route requests — try again shortly');
+        return;
+      }
       if (data.status === "success") {
         setFastestData(data.fastest);
         setSafestData(data.safest);
         setLitSegments(data.safest.lit_chunks || []);
         setSteepSegments(data.safest.steep_chunks || []);
         setTflCyclewayChunks(data.safest.tfl_cycleway_chunks || []);
-        setTflQuietwayChunks(data.safest.tfl_quietway_chunks || []);
         setGreenChunks(data.safest.green_chunks || []);
-        setNarrowChunks(data.safest.narrow_chunks || []);
+        setVehicularFreeChunks(data.safest.vehicular_free_chunks || []);
         setDisruptionChunks(data.safest.disruption_chunks || []);
         setNodeHighlights(data.safest.node_highlights || []);
+        const legs = Array.isArray(data.legs) && data.legs.length ? data.legs : null;
+        setRouteLegs(legs);
+        setActiveLegIndex(0);
         const meta = data.meta || {};
         const minWeight = meta.cost_per_m_lower_bound ?? minWeightPreview;
         const timingMs = meta.timing_ms?.total ?? 0;
-        const profileName = testMode ? 'Test Mode' : (activeProfile?.name || '');
+        const profileName = manualWeightsActive ? 'Manual weights' : (activeProfile?.name || '');
         const metaBundle = {
           minWeight, timingMs, profileName,
           bikeType: meta.bike_type, preset: meta.preset,
           clamps: meta.translation_clamps || [],
           lightGatedOff: !!meta.light_gated_off,
           lightingActive: (meta.weights?.light_weight ?? 0) > 0,
+          liveApplied: meta.live_applied !== false,
+          departMode: meta.depart_mode || 'now',
+          legCount: meta.leg_count || (legs ? legs.length : 1),
         };
         setLastRouteMeta(metaBundle);
+        const departHint = formatDepartStatusHint(departMode, departAtIso);
         setStatus(routeRevealedRef.current
-          ? formatRouteStatus(minWeight, timingMs, profileName)
+          ? (departHint
+            ? `${formatRouteStatus(minWeight, timingMs, profileName)} · ${departHint}`
+            : formatRouteStatus(minWeight, timingMs, profileName))
           : 'Route ready — click Get Route');
       } else {
         setStatus("Error: " + data.error);
       }
-    } catch {
+    } catch (err) {
+      if (err?.name === 'AbortError') return;
+      if (reqId !== routeRequestIdRef.current) return;
       setStatus("Backend Error.");
     } finally {
-      setIsCalculating(false);
+      if (reqId === routeRequestIdRef.current) {
+        setIsCalculating(false);
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    start, end, testMode, activeProfileId, activeProfile, minWeightPreview,
+    start, end, vias, testMode, manualWeightsActive, activeProfileId, activeProfile, minWeightPreview,
     useSafetyRouting, useLighting, useRoadBike, useHillRouting,
     useTflCycleway, useGreen, useSpeedStress, useVehicularFree,
     useBarriers, useCalming, useJunctionDanger, useSignals, useTflLive, useTomtomLive,
+    departMode, departAtIso, bumpRouteRequest, encodeViasParam,
   ]);
 
   useEffect(() => {
     if (!start || !end) return;
+    if (santanderMode) {
+      setRouteRevealed(false);
+      clearRouteData();
+      return;
+    }
+    if (vias.some((v) => !v.coord)) return;
     setRouteRevealed(false);
-    fetchRoutes(start, end);
+    fetchRoutes(start, end, vias, 'prefetch');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    start, end, activeProfileId, testMode,
+    start, end, vias, activeProfileId, testMode, manualWeightsActive, santanderMode,
     useSafetyRouting, useLighting, useRoadBike, useHillRouting,
     useTflCycleway, useGreen, useSpeedStress, useVehicularFree,
     useBarriers, useCalming, useJunctionDanger, useSignals, useTflLive, useTomtomLive,
+    departMode, departAtIso,
   ]);
 
   useEffect(() => {
     if (routeRevealed && !isCalculating && lastRouteMeta) {
-      setStatus(formatRouteStatus(lastRouteMeta.minWeight, lastRouteMeta.timingMs, lastRouteMeta.profileName));
+      const base = formatRouteStatus(lastRouteMeta.minWeight, lastRouteMeta.timingMs, lastRouteMeta.profileName);
+      const departHint = formatDepartStatusHint(departMode, departAtIso);
+      setStatus(departHint ? `${base} · ${departHint}` : base);
     }
-  }, [routeRevealed, isCalculating, lastRouteMeta]);
+  }, [routeRevealed, isCalculating, lastRouteMeta, departMode, departAtIso]);
+
+  const beginPickupStep = useCallback(async () => {
+    if (!start || !end) return;
+    setOverlayVisibility(defaultOverlayVisibility());
+    setRouteRevealed(false);
+    clearRouteData();
+    setWalkStartPath(null);
+    setWalkEndPath(null);
+    setHireWalkStats(null);
+    setPickupStation(null);
+    setDropoffStation(null);
+    setExpandedStationId(null);
+    setHireStep('pickup');
+    setHireGuide('Please select a pick-up station');
+    setHireBanner('');
+    setFlyTarget({ center: start, zoom: 16, duration: 0.9 });
+    setStatus('Select a Santander pick-up station');
+    setIsCalculating(true);
+    try {
+      await fetchHireCandidates(start[0], start[1], 'bikes');
+    } catch (e) {
+      setHireBanner(e.message || 'Could not load Santander stations');
+      setHireStations([]);
+    } finally {
+      setIsCalculating(false);
+    }
+  }, [start, end, clearRouteData, fetchHireCandidates]);
+
+  const commitPickup = useCallback(async (station) => {
+    setExpandedStationId(null);
+    setPickupStation(station);
+    setHireStep('dropoff');
+    setHireGuide('Please select a drop-off station');
+    setHireBanner('');
+    setFlyTarget({ center: end, zoom: 16, duration: 0.9 });
+    setStatus('Select a Santander drop-off station');
+    setIsCalculating(true);
+    try {
+      await fetchHireCandidates(end[0], end[1], 'docks');
+    } catch (e) {
+      setHireBanner(e.message || 'Could not load Santander stations');
+      setHireStations([]);
+    } finally {
+      setIsCalculating(false);
+    }
+  }, [end, fetchHireCandidates]);
+
+  const fetchWalkLeg = useCallback(async (from, to) => {
+    try {
+      const res = await apiFetch('/santander/walk', {
+        method: 'POST',
+        testMode,
+        body: { from, to },
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  }, [testMode]);
+
+  const commitDropoff = useCallback(async (station) => {
+    if (!start || !end || !pickupStation) return;
+    setExpandedStationId(null);
+    setDropoffStation(station);
+    setHireStep('routing');
+    setHireGuide('');
+    setHireBanner('');
+    setHireStations([]);
+    setIsCalculating(true);
+    setStatus('Calculating Santander route...');
+    setOverlayVisibility(defaultOverlayVisibility());
+
+    const bikeParams = new URLSearchParams({
+      start_lat: String(pickupStation.lat),
+      start_lon: String(pickupStation.lon),
+      end_lat: String(station.lat),
+      end_lon: String(station.lon),
+    });
+    if (manualWeightsActive) {
+      const w = togglesToWeights(toggleState);
+      ALL_WEIGHT_KEYS.forEach((k) => bikeParams.set(k, w[k]));
+    } else if (activeProfileId) {
+      bikeParams.set('profile_id', activeProfileId);
+    }
+    if (departMode === 'depart_at' && departAtIso) {
+      bikeParams.set('depart_at', departAtIso);
+    }
+
+    try {
+      const [routeRes, walkA, walkB] = await Promise.all([
+        apiFetch(`/route?${bikeParams}`, { testMode }),
+        fetchWalkLeg(start, [pickupStation.lat, pickupStation.lon]),
+        fetchWalkLeg([station.lat, station.lon], end),
+      ]);
+      const data = await routeRes.json();
+      if (data.status === 'success') {
+        setFastestData(data.fastest);
+        setSafestData(data.safest);
+        setLitSegments(data.safest.lit_chunks || []);
+        setSteepSegments(data.safest.steep_chunks || []);
+        setTflCyclewayChunks(data.safest.tfl_cycleway_chunks || []);
+        setGreenChunks(data.safest.green_chunks || []);
+        setVehicularFreeChunks(data.safest.vehicular_free_chunks || []);
+        setDisruptionChunks(data.safest.disruption_chunks || []);
+        setNodeHighlights(data.safest.node_highlights || []);
+        const meta = data.meta || {};
+        const minWeight = meta.cost_per_m_lower_bound ?? minWeightPreview;
+        const timingMs = meta.timing_ms?.total ?? 0;
+        const profileName = manualWeightsActive ? 'Manual weights' : (activeProfile?.name || '');
+        setLastRouteMeta({
+          minWeight, timingMs, profileName,
+          bikeType: meta.bike_type, preset: meta.preset,
+          clamps: meta.translation_clamps || [],
+          lightGatedOff: !!meta.light_gated_off,
+          lightingActive: (meta.weights?.light_weight ?? 0) > 0,
+          santander: true,
+          liveApplied: meta.live_applied !== false,
+          departMode: meta.depart_mode || 'now',
+        });
+        setWalkStartPath(walkA?.path || [start, [pickupStation.lat, pickupStation.lon]]);
+        setWalkEndPath(walkB?.path || [[station.lat, station.lon], end]);
+        const walkDur = (Number(walkA?.duration_min) || 0) + (Number(walkB?.duration_min) || 0);
+        const walkDistM = (Number(walkA?.distance_m) || 0) + (Number(walkB?.distance_m) || 0);
+        const fallbackDur = (Number(pickupStation.walk_estimate_min) || 0)
+          + (Number(station.walk_estimate_min) || 0);
+        setHireWalkStats({
+          duration_min: walkDur > 0 ? walkDur : (fallbackDur || null),
+          distance_m: walkDistM > 0 ? walkDistM : null,
+        });
+        if (walkA?.duration_min != null) {
+          setPickupStation((prev) => prev ? { ...prev, walk_duration_min: walkA.duration_min } : prev);
+        }
+        if (walkB?.duration_min != null) {
+          setDropoffStation({ ...station, walk_duration_min: walkB.duration_min });
+        } else {
+          setDropoffStation(station);
+        }
+        setRouteRevealed(true);
+        setHireStep('done');
+        const departHint = formatDepartStatusHint(departMode, departAtIso);
+        setStatus(departHint
+          ? `${formatRouteStatus(minWeight, timingMs, profileName)} · ${departHint}`
+          : formatRouteStatus(minWeight, timingMs, profileName));
+        setFlyTarget({
+          center: [
+            (pickupStation.lat + station.lat) / 2,
+            (pickupStation.lon + station.lon) / 2,
+          ],
+          zoom: 13,
+          duration: 1.0,
+        });
+      } else {
+        setStatus(`Error: ${data.error}`);
+        setHireStep('dropoff');
+        setHireGuide('Please select a drop-off station');
+      }
+    } catch {
+      setStatus('Backend Error.');
+      setHireStep('dropoff');
+      setHireGuide('Please select a drop-off station');
+    } finally {
+      setIsCalculating(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    start, end, pickupStation, testMode, manualWeightsActive, activeProfileId, activeProfile,
+    minWeightPreview, fetchWalkLeg, departMode, departAtIso,
+  ]);
+
+  const handleStationExpand = useCallback((station) => {
+    if (hireStep !== 'pickup' && hireStep !== 'dropoff') return;
+    setExpandedStationId((prev) => (prev === station.id ? null : station.id));
+  }, [hireStep]);
+
+  const handleStationConfirm = useCallback((station) => {
+    if (hireStep !== 'pickup' && hireStep !== 'dropoff') return;
+    const unsuitable = hireStep === 'pickup'
+      ? !(station.nb_bikes > 0)
+      : !(station.nb_empty > 0);
+    if (unsuitable) {
+      setUnsuitableModal({
+        station,
+        title: hireStep === 'pickup' ? 'No bikes available' : 'No empty docks',
+        message: hireStep === 'pickup'
+          ? 'This station currently has no bikes. Proceed anyway?'
+          : 'This station currently has no empty docks for drop-off. Proceed anyway?',
+      });
+      return;
+    }
+    if (hireStep === 'pickup') commitPickup(station);
+    else commitDropoff(station);
+  }, [hireStep, commitPickup, commitDropoff]);
 
   const handleGetRoute = () => {
     if (!start || !end) return;
-    setOverlayVisibility(defaultOverlayVisibility());
-    setRouteRevealed(true);
-    if (isCalculating) {
-      setStatus(`Calculating... | min weight/m: ${minWeightPreview.toFixed(3)}`);
+    if (vias.some((v) => !v.coord)) {
+      setStatus('Fill all stops before getting a route');
       return;
     }
-    if (lastRouteMeta && fastestData && safestData) {
-      setStatus(formatRouteStatus(lastRouteMeta.minWeight, lastRouteMeta.timingMs, lastRouteMeta.profileName));
-    } else {
-      fetchRoutes(start, end);
+
+    if (santanderMode) {
+      beginPickupStep();
+      return;
     }
+
+    setOverlayVisibility(defaultOverlayVisibility());
+
+    // Always commit-fetch so the Get Route press counts toward the IP rate limit
+    // (prefetch is intentionally free and not counted).
+    const longHop = straightLineKm(start, end) > ROUTE_LOADING_MIN_KM;
+    if (longHop) {
+      setRouteRevealed(false);
+      setLongRouteLoadingKey((k) => k + 1);
+      setShowLongRouteLoading(true);
+      setStatus(`Calculating... | min weight/m: ${minWeightPreview.toFixed(3)}`);
+      fetchRoutes(start, end, vias, 'commit');
+      return;
+    }
+
+    setShowLongRouteLoading(false);
+    setRouteRevealed(true);
+    setStatus(`Calculating... | min weight/m: ${minWeightPreview.toFixed(3)}`);
+    fetchRoutes(start, end, vias, 'commit');
   };
 
-  const handleProfileChange = (e) => setActiveProfileId(e.target.value);
+  const handleLongRouteLoadingDismiss = useCallback(() => {
+    setShowLongRouteLoading(false);
+    if (fastestData && safestData) {
+      setRouteRevealed(true);
+    }
+  }, [fastestData, safestData]);
 
   const handleProfileCreated = async (profile) => {
     setShowWizard(false);
@@ -731,16 +1266,32 @@ function App() {
       const mapLabel = 'Map location';
       if (!start) {
         setStartPoint(lat, lon, mapLabel);
-      } else if (!end) {
-        setEndPoint(lat, lon, mapLabel);
-      } else {
-        setStartPoint(lat, lon, mapLabel);
-        setEnd(null);
-        setEndLabel('');
-        clearRouteData();
-        setRouteRevealed(false);
-        setStatus('New Start.');
+        return;
       }
+      const emptyViaIdx = vias.findIndex((v) => !v.coord);
+      if (emptyViaIdx >= 0) {
+        bumpRouteRequest();
+        setVias((prev) => prev.map((v, i) => (
+          i === emptyViaIdx ? { ...v, coord: [lat, lon], label: mapLabel } : v
+        )));
+        setRouteRevealed(false);
+        clearRouteData();
+        setStatus('Calculating route in background...');
+        return;
+      }
+      if (!end) {
+        setEndPoint(lat, lon, mapLabel);
+        return;
+      }
+      // Restart: new start, clear end + vias.
+      bumpRouteRequest();
+      setStartPoint(lat, lon, mapLabel);
+      setEnd(null);
+      setEndLabel('');
+      setVias([]);
+      clearRouteData();
+      setRouteRevealed(false);
+      setStatus('New Start.');
     };
 
     useMapEvents({
@@ -791,78 +1342,141 @@ function App() {
     <div className="app-root" data-theme={theme.mode} style={{ height: "100vh", position: "relative", fontFamily: "Segoe UI, Arial, sans-serif" }}>
       <style>{`.leaflet-tile { filter: ${theme.tileFilter} !important; }`}</style>
 
-      <div style={{
-        position: "absolute", top: 0, left: 0, right: 0, height: "50px",
-        background: "#111", color: "white", display: "flex", alignItems: "center",
-        justifyContent: "space-between", padding: "0 20px", zIndex: 1000,
-        boxShadow: "0 2px 10px rgba(0,0,0,0.5)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", minWidth: 0, flex: 1 }}>
-          <span style={{ fontWeight: "bold", flexShrink: 0 }}>Tuned Cycling</span>
-          <span style={{ marginLeft: "15px", fontSize: "14px", color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            | {status}
-          </span>
-        </div>
-        <HeaderBarToggle label="Test Mode" isOn={testMode} setIsOn={setTestMode} />
-      </div>
+      <TopBar
+        status={status}
+        testMode={testMode}
+        setTestMode={setTestMode}
+        profiles={profiles}
+        activeProfileId={activeProfileId}
+        onSelectProfile={setActiveProfileId}
+        onCreateProfile={() => setShowWizard(true)}
+        onOpenAuth={() => setShowAuthModal(true)}
+        onOpenSettings={() => setShowAccountSettings(true)}
+      />
 
-      {/* PROFILE SELECTOR */}
+      {showLongRouteLoading && (
+        <RouteLoadingBike
+          key={longRouteLoadingKey}
+          busy={isCalculating}
+          themeMode={theme.mode}
+          onDismiss={handleLongRouteLoadingDismiss}
+        />
+      )}
+
+      {/* ROUTE POINTS (profile selection lives in the top-bar ProfileMenu) */}
       <div className="ui-panel" style={{
-        position: "absolute", top: "60px", left: "20px", width: "260px", padding: "12px",
+        position: "absolute", top: "60px", left: "20px", width: "300px", padding: "12px",
         zIndex: 1000,
       }}>
-        <div className="ui-panel-title">Active Profile</div>
-        <select
-          className="ui-select"
-          value={activeProfileId}
-          onChange={handleProfileChange}
-          style={{ marginBottom: "10px" }}
-        >
-          {profiles.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-        <div style={{ fontSize: "10px", fontWeight: "bold", color: theme.textSub, textTransform: "uppercase", marginBottom: "6px", borderTop: `1px solid ${theme.border}`, paddingTop: "8px" }}>
-          Route points
-        </div>
-        <LocationSearchInput
-          label="Start"
-          value={startLabel}
-          placeholder="Search start location"
+        <div className="ui-panel-title">Route points</div>
+        <RoutePointsPanel
           theme={theme}
-          onSelect={handleStartSearchSelect}
+          start={start}
+          end={end}
+          startLabel={startLabel}
+          endLabel={endLabel}
+          vias={vias}
+          onChangeWaypoints={handleChangeWaypoints}
+          onAddVia={handleAddVia}
+          onRemoveVia={handleRemoveVia}
+          onSwapStartEnd={handleSwapStartEnd}
+          santanderMode={santanderMode}
+          santanderDisabled={departMode === 'depart_at'}
+          departMode={departMode}
+          onSantanderChange={(on) => {
+            if (on && departMode === 'depart_at') return;
+            // TODO(later): vias on Santander bike leg — for now mutual exclusion.
+            if (on && vias.length > 0) {
+              setVias([]);
+            }
+            bumpRouteRequest();
+            setSantanderMode(on);
+            resetHireState();
+            setRouteRevealed(false);
+            clearRouteData();
+            if (on) {
+              setStatus(start && end
+                ? 'Ready — click Get Route to pick Santander stations'
+                : 'Set start and end, then Get Route');
+            } else if (start && end) {
+              setStatus('Calculating route in background...');
+            }
+          }}
         />
-        <LocationSearchInput
-          label="End"
-          value={endLabel}
-          placeholder="Search destination"
-          theme={theme}
-          onSelect={handleEndSearchSelect}
-        />
-        <button
-          type="button"
-          className="ui-btn"
-          onClick={() => setShowWizard(true)}
-          style={{ marginBottom: "8px" }}
-        >
-          New Profile Wizard
-        </button>
         <button
           type="button"
           className="ui-btn primary"
           onClick={handleGetRoute}
-          disabled={!start || !end}
+          disabled={!start || !end || hireStep === 'routing' || vias.some((v) => !v.coord)}
         >
-          {isCalculating && routeRevealed ? 'Calculating...' : 'Get Route'}
+          {hireStep === 'routing'
+            ? 'Working...'
+            : (isCalculating && routeRevealed && !santanderMode)
+              ? 'Calculating...'
+              : 'Get Route'}
         </button>
+        <DepartAtControl
+          mode={departMode}
+          departAtIso={departAtIso}
+          onChange={({ mode, departAtIso: iso }) => {
+            setDepartMode(mode);
+            setDepartAtIso(iso);
+            if (mode === 'depart_at' && santanderMode) {
+              bumpRouteRequest();
+              setSantanderMode(false);
+              resetHireState();
+              setRouteRevealed(false);
+              clearRouteData();
+              if (start && end) {
+                setStatus('Calculating route in background...');
+              }
+            }
+          }}
+        />
+        {(isFutureDepartAt(departAtIso) || (lastRouteMeta && lastRouteMeta.liveApplied === false)) && (
+          <div className="depart-at-banner">
+            Live traffic not applied for future departures.
+          </div>
+        )}
       </div>
+
+      <SantanderGuidePill text={hireGuide} />
+      <SantanderSoftBanner text={hireBanner} />
+      <SantanderUnsuitableModal
+        open={!!unsuitableModal}
+        title={unsuitableModal?.title}
+        message={unsuitableModal?.message}
+        onCancel={() => setUnsuitableModal(null)}
+        onProceed={() => {
+          const st = unsuitableModal?.station;
+          setUnsuitableModal(null);
+          if (!st) return;
+          if (hireStep === 'pickup') commitPickup(st);
+          else if (hireStep === 'dropoff') commitDropoff(st);
+        }}
+      />
 
       {showWizard && (
         <PresetWizard
-          apiBase={API_BASE}
           themeMode={theme.mode}
+          testMode={testMode}
           onClose={() => setShowWizard(false)}
           onCreated={handleProfileCreated}
+        />
+      )}
+
+      {showAuthModal && (
+        <AuthModal themeMode={theme.mode} onClose={() => setShowAuthModal(false)} />
+      )}
+
+      {passwordRecoveryPending && (
+        <PasswordRecoveryModal themeMode={theme.mode} />
+      )}
+
+      {showAccountSettings && (
+        <AccountSettingsModal
+          themeMode={theme.mode}
+          onClose={() => setShowAccountSettings(false)}
         />
       )}
 
@@ -886,63 +1500,125 @@ function App() {
         <MapEvents />
         {start && <Marker position={start} />}
         {end && <Marker position={end} />}
-        {inspectorGeo && <Polyline positions={inspectorGeo} color="red" weight={6} opacity={0.8} />}
-        {routeRevealed && fastestData && <Polyline positions={fastestData.path} color={theme.routeGrey} weight={6} opacity={0.4} />}
-        {routeRevealed && safestData && <Polyline positions={safestData.path} color={theme.routeOptimized} weight={5} opacity={1.0} />}
-        {routeRevealed && overlayVisibility.lit && lastRouteMeta?.lightingActive && litSegments.map((s, i) => <Polyline key={`lit-${i}`} positions={s} color={theme.litColor} weight={4} opacity={1.0} />)}
-        {routeRevealed && overlayVisibility.steep && !overlayVisibility.lit && steepSegments.map((s, i) => <Polyline key={`steep-${i}`} positions={s} color={theme.steepColor} weight={5} opacity={1.0} />)}
-        {routeRevealed && overlayVisibility.tflCycleway && tflCyclewayChunks.map((s, i) => <Polyline key={`tfl-c-${i}`} positions={s} color={theme.tflCyclewayColor} weight={4} opacity={0.9} />)}
-        {routeRevealed && overlayVisibility.tflQuietway && tflQuietwayChunks.map((s, i) => <Polyline key={`tfl-q-${i}`} positions={s} color={theme.tflQuietwayColor} weight={4} opacity={0.9} />)}
-        {routeRevealed && overlayVisibility.green && greenChunks.map((s, i) => <Polyline key={`green-${i}`} positions={s} color={theme.greenColor} weight={4} opacity={0.9} />)}
-        {routeRevealed && overlayVisibility.narrow && narrowChunks.map((s, i) => <Polyline key={`narrow-${i}`} positions={s} color={theme.narrowColor} weight={4} opacity={0.9} />)}
-        {routeRevealed && overlayVisibility.disruptions && disruptionChunks.map((s, i) => <Polyline key={`dis-${i}`} positions={s} color={theme.disruptionColor} weight={5} opacity={0.9} />)}
-        {routeRevealed && (overlayVisibility.barriers || overlayVisibility.signals || overlayVisibility.junctionDanger || overlayVisibility.calming) && (
-          <NodeHighlightMarkers
-            nodeHighlights={nodeHighlights}
-            showBarriers={overlayVisibility.barriers}
-            showSignals={overlayVisibility.signals}
-            showJunctionDanger={overlayVisibility.junctionDanger}
-            showCalming={overlayVisibility.calming}
-            theme={theme}
+        {vias.map((v) => (
+          v.coord ? (
+            <CircleMarker
+              key={v.id}
+              center={v.coord}
+              radius={7}
+              pathOptions={{
+                color: '#1a1a1a',
+                fillColor: '#ffffff',
+                fillOpacity: 1,
+                weight: 2,
+              }}
+            />
+          ) : null
+        ))}
+        {hireStep === 'dropoff' && pickupStation && (
+          <SantanderStationsLayer
+            stations={[pickupStation]}
+            expandedId={null}
+            showConfirm={false}
           />
+        )}
+        {(hireStep === 'pickup' || hireStep === 'dropoff') && hireStations.length > 0 && (
+          <SantanderStationsLayer
+            stations={hireStations}
+            expandedId={expandedStationId}
+            confirmLabel={hireStep === 'pickup' ? 'Start' : 'End'}
+            showConfirm
+            onExpand={handleStationExpand}
+            onConfirm={handleStationConfirm}
+          />
+        )}
+        {hireStep === 'done' && (pickupStation || dropoffStation) && (
+          <SantanderStationsLayer
+            stations={[pickupStation, dropoffStation].filter(Boolean)}
+            expandedId={expandedStationId}
+            showConfirm={false}
+            onExpand={(st) => setExpandedStationId((prev) => (prev === st.id ? null : st.id))}
+          />
+        )}
+        {walkStartPath && walkStartPath.length > 1 && (
+          <Polyline positions={walkStartPath} color="#4fc3f7" weight={5} opacity={0.95} dashArray="10 8" />
+        )}
+        {walkEndPath && walkEndPath.length > 1 && (
+          <Polyline positions={walkEndPath} color="#4fc3f7" weight={5} opacity={0.95} dashArray="10 8" />
+        )}
+        {inspectorGeo && <Polyline positions={inspectorGeo} color="red" weight={6} opacity={0.8} />}
+        {routeRevealed && routeLegs && routeLegs.length > 1 ? (
+          <MultiLegRouteLayers
+            routeLegs={routeLegs}
+            activeLegIndex={activeLegIndex}
+            theme={theme}
+            overlayVisibility={overlayVisibility}
+            lightingActive={!!lastRouteMeta?.lightingActive}
+          />
+        ) : (
+          <>
+            {routeRevealed && fastestData && (
+              <Polyline
+                positions={fastestData.path}
+                pathOptions={{ color: theme.routeGrey, weight: 6, opacity: 0.4 }}
+              />
+            )}
+            {routeRevealed && safestData && (
+              <Polyline
+                positions={safestData.path}
+                pathOptions={{ color: theme.routeOptimized, weight: 5, opacity: 1.0 }}
+              />
+            )}
+            {routeRevealed && overlayVisibility.lit && lastRouteMeta?.lightingActive && litSegments.map((s, i) => (
+              <Polyline key={`lit-${i}`} positions={s} pathOptions={{ color: theme.litColor, weight: 4, opacity: 1.0 }} />
+            ))}
+            {routeRevealed && overlayVisibility.steep && !overlayVisibility.lit && steepSegments.map((s, i) => (
+              <Polyline key={`steep-${i}`} positions={s} pathOptions={{ color: theme.steepColor, weight: 5, opacity: 1.0 }} />
+            ))}
+            {routeRevealed && overlayVisibility.tflCycleway && tflCyclewayChunks.map((s, i) => (
+              <Polyline key={`tfl-c-${i}`} positions={s} pathOptions={{ color: theme.tflCyclewayColor, weight: 4, opacity: 0.9 }} />
+            ))}
+            {routeRevealed && overlayVisibility.green && greenChunks.map((s, i) => (
+              <Polyline key={`green-${i}`} positions={s} pathOptions={{ color: theme.greenColor, weight: 4, opacity: 0.9 }} />
+            ))}
+            {routeRevealed && overlayVisibility.vehicularFree && vehicularFreeChunks.map((s, i) => (
+              <Polyline key={`vf-${i}`} positions={s} pathOptions={{ color: theme.vehicularFreeColor, weight: 4, opacity: 0.9 }} />
+            ))}
+            {routeRevealed && overlayVisibility.disruptions && disruptionChunks.map((s, i) => (
+              <Polyline key={`dis-${i}`} positions={s} pathOptions={{ color: theme.disruptionColor, weight: 5, opacity: 0.9 }} />
+            ))}
+            {routeRevealed && (overlayVisibility.barriers || overlayVisibility.signals || overlayVisibility.junctionDanger || overlayVisibility.calming) && (
+              <NodeHighlightMarkers
+                nodeHighlights={nodeHighlights}
+                showBarriers={overlayVisibility.barriers}
+                showSignals={overlayVisibility.signals}
+                showJunctionDanger={overlayVisibility.junctionDanger}
+                showCalming={overlayVisibility.calming}
+                theme={theme}
+              />
+            )}
+          </>
         )}
       </MapContainer>
 
-      {/* TEST MODE PANEL (routing overrides — separate from route overlay picker) */}
+      {/* TEST MODE PANEL — level 1: Supabase bypass; level 2 (nested): manual weights */}
       {testMode && (
-      <div className="ui-panel" style={{ position: "absolute", bottom: "200px", right: "20px", width: "240px", maxHeight: "45vh", overflowY: "auto", padding: "15px", zIndex: 1000 }}>
-          <h4 style={{ margin: "0 0 4px 0", color: theme.textMain }}>Test Mode</h4>
-          <p style={{ fontSize: "10px", color: theme.textSub, margin: "0 0 8px 0", borderBottom: `1px solid ${theme.border}`, paddingBottom: "6px" }}>Overrides active profile</p>
-          <div style={{ fontSize: "10px", fontWeight: "bold", color: theme.textSub, marginBottom: "6px", textTransform: "uppercase" }}>Safety</div>
-          <Toggle label="Avoid Accidents" isOn={useSafetyRouting} setIsOn={setUseSafetyRouting} activeColor={theme.routeOptimized} theme={theme} />
-          <Toggle label="Night Mode" isOn={useLighting} setIsOn={setUseLighting} activeColor="#1976D2" theme={theme} />
-          <Toggle label="TfL network (incl. quietways)" isOn={useTflCycleway} setIsOn={setUseTflCycleway} activeColor="#1976D2" theme={theme} />
-          <Toggle label="Car-free corridors" isOn={useVehicularFree} setIsOn={setUseVehicularFree} activeColor="#7B1FA2" theme={theme} />
-          <Toggle label="Speed stress" isOn={useSpeedStress} setIsOn={setUseSpeedStress} activeColor="#E65100" theme={theme} />
-          <Toggle label="Traffic signals" isOn={useSignals} setIsOn={setUseSignals} activeColor="#F57C00" theme={theme} />
-          <Toggle label="Barriers" isOn={useBarriers} setIsOn={setUseBarriers} activeColor="#5D4037" theme={theme} />
-          <Toggle label="Junction danger" isOn={useJunctionDanger} setIsOn={setUseJunctionDanger} activeColor="#795548" theme={theme} />
-          <Toggle label="Live TfL Disruptions" isOn={useTflLive} setIsOn={setUseTflLive} activeColor={theme.disruptionColor} theme={theme} />
-          {useTflLive && (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", marginLeft: "12px" }}>
-              <button type="button" onClick={handleRefreshTfl} style={{ padding: "4px 10px", fontSize: "11px", background: theme.toggleInactive, border: `1px solid ${theme.border}`, borderRadius: "4px", cursor: "pointer", color: theme.textMain }}>Refresh</button>
-              <span style={{ fontSize: "10px", color: theme.textSub }}>{tflDisruptionStatus || "Not loaded"}</span>
-            </div>
-          )}
-          <Toggle label="Live TomTom Disruptions" isOn={useTomtomLive} setIsOn={setUseTomtomLive} activeColor={theme.disruptionColor} theme={theme} />
-          {useTomtomLive && (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", marginLeft: "12px" }}>
-              <button type="button" onClick={handleRefreshTomtom} style={{ padding: "4px 10px", fontSize: "11px", background: theme.toggleInactive, border: `1px solid ${theme.border}`, borderRadius: "4px", cursor: "pointer", color: theme.textMain }}>Refresh</button>
-              <span style={{ fontSize: "10px", color: theme.textSub }}>{tomtomDisruptionStatus || "Not loaded"}</span>
-            </div>
-          )}
-          <div style={{ fontSize: "10px", fontWeight: "bold", color: theme.textSub, marginTop: "8px", marginBottom: "6px", textTransform: "uppercase" }}>Comfort</div>
-          <Toggle label="Road Bike (Smooth)" isOn={useRoadBike} setIsOn={setUseRoadBike} activeColor="#4CAF50" theme={theme} />
-          <Toggle label="Flat Route" isOn={useHillRouting} setIsOn={setUseHillRouting} activeColor="#FFA500" theme={theme} />
-          <Toggle label="Traffic calming" isOn={useCalming} setIsOn={setUseCalming} activeColor="#00838F" theme={theme} />
-          <div style={{ fontSize: "10px", fontWeight: "bold", color: theme.textSub, marginTop: "8px", marginBottom: "6px", textTransform: "uppercase" }}>Scenery</div>
-          <Toggle label="Green / scenic" isOn={useGreen} setIsOn={setUseGreen} activeColor="#00796B" theme={theme} />
-      </div>
+        <TestModePanel
+          theme={theme}
+          manualWeightsMode={manualWeightsMode}
+          setManualWeightsMode={setManualWeightsMode}
+          toggles={toggleState}
+          setters={{
+            setUseSafetyRouting, setUseLighting, setUseTflCycleway, setUseVehicularFree,
+            setUseSpeedStress, setUseSignals, setUseBarriers, setUseJunctionDanger,
+            setUseTflLive, setUseTomtomLive, setUseRoadBike, setUseHillRouting,
+            setUseCalming, setUseGreen,
+          }}
+          onRefreshTfl={handleRefreshTfl}
+          onRefreshTomtom={handleRefreshTomtom}
+          tflDisruptionStatus={tflDisruptionStatus}
+          tomtomDisruptionStatus={tomtomDisruptionStatus}
+        />
       )}
 
       <RouteOverlayPicker
@@ -957,7 +1633,20 @@ function App() {
       />
 
       {/* STATS PANEL */}
-      {routeRevealed && fastestData && safestData && (
+      {routeRevealed && fastestData && safestData && (() => {
+        const multiLeg = Array.isArray(routeLegs) && routeLegs.length > 1;
+        const leg = multiLeg ? routeLegs[activeLegIndex] : null;
+        const displayFastest = leg?.fastest || fastestData;
+        const displaySafest = leg?.safest || safestData;
+        const pointNames = [
+          'Start',
+          ...vias.map((_, i) => `Via ${i + 1}`),
+          'End',
+        ];
+        const legLabel = multiLeg
+          ? `Leg ${activeLegIndex + 1}/${routeLegs.length} · ${pointNames[activeLegIndex]} → ${pointNames[activeLegIndex + 1]}`
+          : '';
+        return (
       <div className="ui-panel ui-stats-panel" style={{ position: "absolute", bottom: "30px", left: "20px", zIndex: 1000 }}>
           <h4 className="ui-stats-title">Route Analysis</h4>
           {lastRouteMeta?.bikeType && (
@@ -972,10 +1661,34 @@ function App() {
               )}
             </div>
           )}
+          <LegAnalysisPager
+            legCount={multiLeg ? routeLegs.length : 1}
+            activeLegIndex={activeLegIndex}
+            onChangeLeg={setActiveLegIndex}
+            legLabel={legLabel}
+          >
           <div className="ui-stats-layout">
             <div className="ui-stats-hero">
-              <RouteHeroCard label="Time" fastest={fastestData.stats.duration_min} optimized={safestData.stats.duration_min} unit="min" theme={theme} />
-              <RouteHeroCard label="Distance" fastest={(fastestData.stats.length_m / 1000).toFixed(1)} optimized={(safestData.stats.length_m / 1000).toFixed(1)} unit="km" theme={theme} />
+              <RouteHeroCard
+                label="Time"
+                fastest={displayFastest.stats.duration_min}
+                optimized={displaySafest.stats.duration_min}
+                unit="min"
+                theme={theme}
+                walkValue={!multiLeg && lastRouteMeta?.santander ? hireWalkStats?.duration_min : null}
+                cycleMode={!multiLeg && !!lastRouteMeta?.santander}
+              />
+              <RouteHeroCard
+                label="Distance"
+                fastest={(displayFastest.stats.length_m / 1000).toFixed(1)}
+                optimized={(displaySafest.stats.length_m / 1000).toFixed(1)}
+                unit="km"
+                theme={theme}
+                walkValue={!multiLeg && lastRouteMeta?.santander && hireWalkStats?.distance_m != null
+                  ? hireWalkStats.distance_m / 1000
+                  : null}
+                cycleMode={!multiLeg && !!lastRouteMeta?.santander}
+              />
             </div>
             <div className="ui-stats-detail">
               <div className="ui-stats-detail-head">
@@ -990,8 +1703,8 @@ function App() {
                   key={row.key}
                   label={row.label}
                   statKey={row.key}
-                  statsFastest={fastestData.stats}
-                  statsOptimized={safestData.stats}
+                  statsFastest={displayFastest.stats}
+                  statsOptimized={displaySafest.stats}
                   unit={row.unit}
                   invertDiff={row.invertDiff}
                   integer={row.integer}
@@ -1000,10 +1713,18 @@ function App() {
               ))}
             </div>
           </div>
+          </LegAnalysisPager>
       </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  );
+}

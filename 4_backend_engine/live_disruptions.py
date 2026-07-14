@@ -10,6 +10,22 @@ import threading
 import time
 
 log = logging.getLogger("live_disruptions")
+
+
+def live_fetch_enabled() -> bool:
+    """Whether TfL/TomTom fetch + poll should run.
+
+    Disabled by ``SKIP_DISRUPTION_FETCH=1`` (benches/smoke) or ``LIVE_DISRUPTIONS=0``.
+    CLI: ``python app.py --no-live`` sets ``SKIP_DISRUPTION_FETCH`` before bootstrap.
+    """
+    if os.environ.get("SKIP_DISRUPTION_FETCH", "").lower() in ("1", "true", "yes"):
+        return False
+    raw = os.environ.get("LIVE_DISRUPTIONS", "1").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    return True
+
+
 logging.basicConfig(level=logging.INFO)
 
 # ---------------------------------------------------------------------------
@@ -23,6 +39,15 @@ _TOMTOM_VIS = []     # [{id, p, b, type, source: "tomtom", iconCategory, magnitu
 
 # Master state (exposed to app.py for A*)
 MASTER_LIVE_LOOKUP = {}  # {(u, v): merged disruption_dict}
+
+# Optional callback after master rebuild (e.g. edge_cost_arrays.refresh_shared_overlays).
+_ON_MASTER_REBUILT = None
+
+
+def set_on_master_rebuilt(callback) -> None:
+    """Register fn() called after MASTER_LIVE_LOOKUP is rebuilt (live refresh / admin)."""
+    global _ON_MASTER_REBUILT
+    _ON_MASTER_REBUILT = callback
 
 
 def init(G):
@@ -45,6 +70,12 @@ def _rebuild_master_lookup():
             merged[key] = _merge_two(existing, _normalize_tomtom_rec(rec))
     MASTER_LIVE_LOOKUP = merged
     log.info("live_disruptions: master lookup rebuilt with %d edges", len(merged))
+    cb = _ON_MASTER_REBUILT
+    if cb is not None:
+        try:
+            cb()
+        except Exception:
+            log.exception("live_disruptions: on_master_rebuilt callback failed")
 
 
 def _normalize_tfl_rec(rec):
@@ -109,6 +140,9 @@ def update_disruptions(fetch_tfl=False, fetch_tomtom=False):
     """Update one or both sources, then rebuild master lookup. Safe: updating one never clears the other.
     Returns (ok: bool, message: str, count: int). Count is for the updated source(s) or master size."""
     global _TFL_EDGES, _TFL_VIS, _TOMTOM_EDGES, _TOMTOM_VIS
+
+    if not live_fetch_enabled():
+        return (True, "live fetch disabled (SKIP_DISRUPTION_FETCH / LIVE_DISRUPTIONS=0)", 0)
 
     last_ok, last_msg, last_count = True, "", 0
 
@@ -219,6 +253,9 @@ def _poll_loop(interval_s: int) -> None:
 
 def start_background_refresh(interval_s: int | None = None) -> None:
     """Fetch TfL + TomTom disruptions now, then refresh every interval_s (default 10 min)."""
+    if not live_fetch_enabled():
+        log.info("live_disruptions: fetch disabled (SKIP_DISRUPTION_FETCH / LIVE_DISRUPTIONS=0)")
+        return
     interval_s = int(
         interval_s
         if interval_s is not None

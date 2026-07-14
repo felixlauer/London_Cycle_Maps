@@ -22,9 +22,10 @@ VEHICULAR_FREE_WEIGHT_CAP = 3.0
 R_MIN = 0.1
 M_MIN = 0.1
 
-# Production default: bounded-suboptimal A* (cost <= (1+eps) x optimal). Verified on
-# all 11 leisure test routes 2026-07-06. Override with ROUTE_HEURISTIC_EPSILON env.
-DEFAULT_ROUTE_HEURISTIC_EPSILON = 0.5
+# Production default: bounded-suboptimal A* (cost <= (1+eps) x optimal). Verified
+# 2026-07-09: exact path match vs eps=0.5 on routes 1 and 10 (Safe preset).
+# Override with ROUTE_HEURISTIC_EPSILON env.
+DEFAULT_ROUTE_HEURISTIC_EPSILON = 0.75
 
 
 def get_route_heuristic_epsilon() -> float:
@@ -38,6 +39,24 @@ def get_route_heuristic_epsilon() -> float:
         return max(0.0, float(raw))
     except ValueError:
         return DEFAULT_ROUTE_HEURISTIC_EPSILON
+
+
+# Fastest leg: admissible scale is 1.0 (cost ≈ length × M_highway, M_highway ≥ 1).
+# Default 0 keeps exact shortest/fastest. Override with ROUTE_FASTEST_HEURISTIC_EPSILON.
+DEFAULT_ROUTE_FASTEST_HEURISTIC_EPSILON = 0.0
+
+
+def get_route_fastest_heuristic_epsilon() -> float:
+    """ROUTE_FASTEST_HEURISTIC_EPSILON env; default 0 (exact fastest path)."""
+    import os
+
+    raw = os.environ.get("ROUTE_FASTEST_HEURISTIC_EPSILON")
+    if raw is None or not str(raw).strip():
+        return DEFAULT_ROUTE_FASTEST_HEURISTIC_EPSILON
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return DEFAULT_ROUTE_FASTEST_HEURISTIC_EPSILON
 
 PENALTY_FLOOR_KEYS = (
     "risk_weight",
@@ -117,14 +136,99 @@ def compute_optimized_cost_per_metre_lower_bound(w: dict) -> float:
     return m_lb * r_lb
 
 
-def make_heuristic(goal_node, G, cost_per_m: float = 1.0):
-    """NetworkX A* heuristic: h(u, v) with v the goal node."""
-    goal_lon = float(G.nodes[goal_node]["x"])
-    goal_lat = float(G.nodes[goal_node]["y"])
+def _node_xy(nd) -> tuple[float, float]:
+    """Prefer bootstrap-stamped floats _x/_y; fall back to x/y."""
+    if "_x" in nd and "_y" in nd:
+        return nd["_x"], nd["_y"]
+    return float(nd["x"]), float(nd["y"])
+
+
+def make_heuristic(goal_node, G, cost_per_m: float = 1.0, csr=None):
+    """A* heuristic: h(u, v) with v the goal node.
+
+    When ``csr`` is provided (Phase B), uses dense lat/lon radian arrays instead
+    of ``G.nodes[u]`` attr lookups. Values match ``haversine_m`` within float noise.
+    """
     scale = float(cost_per_m)
+    if csr is not None:
+        t = csr.node_to_idx.get(goal_node)
+        if t is None:
+            raise KeyError(f"goal_node {goal_node!r} not in CSR")
+        goal_lon_rad = float(csr.lon_rad[t])
+        goal_lat_rad = float(csr.lat_rad[t])
+        goal_cos = float(csr.cos_lat[t])
+        node_to_idx = csr.node_to_idx
+        lat_rad = csr.lat_rad
+        lon_rad = csr.lon_rad
+        cos_lat = csr.cos_lat
+
+        def heuristic(u, _v):
+            ui = node_to_idx[u]
+            p1 = float(lat_rad[ui])
+            dl = float(lon_rad[ui]) - goal_lon_rad
+            dp = p1 - goal_lat_rad
+            a = (
+                math.sin(dp * 0.5) ** 2
+                + float(cos_lat[ui]) * goal_cos * math.sin(dl * 0.5) ** 2
+            )
+            return scale * (2.0 * 6371000.0 * math.asin(min(1.0, math.sqrt(a))))
+
+        return heuristic
+
+    goal_lon, goal_lat = _node_xy(G.nodes[goal_node])
 
     def heuristic(u, v):
-        nd = G.nodes[u]
-        return haversine_m(float(nd["x"]), float(nd["y"]), goal_lon, goal_lat) * scale
+        lon, lat = _node_xy(G.nodes[u])
+        return haversine_m(lon, lat, goal_lon, goal_lat) * scale
 
     return heuristic
+
+
+def make_heuristic_xy(goal_node, G, cost_per_m: float = 1.0, csr=None):
+    """Alias for make_heuristic (uses stamped _x/_y or CSR arrays when present)."""
+    return make_heuristic(goal_node, G, cost_per_m=cost_per_m, csr=csr)
+
+
+def make_backward_heuristic(start_node, G, cost_per_m: float = 1.0, csr=None):
+    """Bidirectional backward frontier: h(u) = haversine(u, start) * scale."""
+    scale = float(cost_per_m)
+    if csr is not None:
+        s = csr.node_to_idx.get(start_node)
+        if s is None:
+            raise KeyError(f"start_node {start_node!r} not in CSR")
+        start_lon_rad = float(csr.lon_rad[s])
+        start_lat_rad = float(csr.lat_rad[s])
+        start_cos = float(csr.cos_lat[s])
+        node_to_idx = csr.node_to_idx
+        lat_rad = csr.lat_rad
+        lon_rad = csr.lon_rad
+        cos_lat = csr.cos_lat
+
+        def heuristic(u, _v):
+            ui = node_to_idx[u]
+            p1 = float(lat_rad[ui])
+            dl = float(lon_rad[ui]) - start_lon_rad
+            dp = p1 - start_lat_rad
+            a = (
+                math.sin(dp * 0.5) ** 2
+                + float(cos_lat[ui]) * start_cos * math.sin(dl * 0.5) ** 2
+            )
+            return scale * (2.0 * 6371000.0 * math.asin(min(1.0, math.sqrt(a))))
+
+        return heuristic
+
+    start_lon, start_lat = _node_xy(G.nodes[start_node])
+
+    def heuristic(u, _v):
+        lon, lat = _node_xy(G.nodes[u])
+        return haversine_m(lon, lat, start_lon, start_lat) * scale
+
+    return heuristic
+
+
+def get_route_algorithm() -> str:
+    """ROUTE_ALGORITHM env: 'uni' (default) or 'bi'. Request ?alg= overrides at call site."""
+    import os
+
+    raw = os.environ.get("ROUTE_ALGORITHM", "uni").strip().lower()
+    return "bi" if raw in ("bi", "bidirectional", "bidir") else "uni"

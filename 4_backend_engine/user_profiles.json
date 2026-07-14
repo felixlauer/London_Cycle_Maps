@@ -210,6 +210,66 @@
         "signal_weight": 0.3,
         "tfl_live_weight": 0.4
       }
+    },
+    "test_profile_3": {
+      "name": "test profile 3",
+      "preset": "safe",
+      "bike_type": "road",
+      "toggles": {
+        "light_night": true,
+        "surface": false,
+        "jam_comfort": false,
+        "vf_infrastructure": {
+          "shared_path": true,
+          "bus_lane": true,
+          "painted_lane": false
+        }
+      },
+      "weights": {
+        "risk_weight": 1.2,
+        "light_weight": 0.6,
+        "surface_weight": 0.6,
+        "hill_weight": 2.9,
+        "tfl_cycleway_weight": 0.5,
+        "vehicular_free_weight": 3.0,
+        "speed_weight": 2.0,
+        "green_weight": 0.15,
+        "barrier_weight": 0.3,
+        "calming_weight": 0.0001,
+        "junction_weight": 2.0,
+        "signal_weight": 0.0001,
+        "tfl_live_weight": 0.4
+      }
+    },
+    "test": {
+      "name": "Test",
+      "preset": "leisure",
+      "bike_type": "cargo",
+      "toggles": {
+        "light_night": false,
+        "surface": false,
+        "jam_comfort": true,
+        "vf_infrastructure": {
+          "shared_path": true,
+          "bus_lane": true,
+          "painted_lane": true
+        }
+      },
+      "weights": {
+        "risk_weight": 0.1,
+        "light_weight": 0.0,
+        "surface_weight": 0.0,
+        "hill_weight": 0.0001,
+        "tfl_cycleway_weight": 0.5,
+        "vehicular_free_weight": 1.6,
+        "speed_weight": 0.1,
+        "green_weight": 1.0,
+        "barrier_weight": 0.0,
+        "calming_weight": 0.0,
+        "junction_weight": 0.0,
+        "signal_weight": 0.1,
+        "tfl_live_weight": 0.1
+      }
     }
   }
 }

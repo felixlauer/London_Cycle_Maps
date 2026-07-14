@@ -3,10 +3,9 @@
 export const ROUTE_OVERLAY_EDGE = [
   { id: 'lit', label: 'Lit segments', themeColor: 'litColor', requiresLighting: true },
   { id: 'steep', label: 'Steep / uphill', themeColor: 'steepColor' },
-  { id: 'tflCycleway', label: 'TfL cycleways', themeColor: 'tflCyclewayColor' },
-  { id: 'tflQuietway', label: 'TfL quietways', themeColor: 'tflQuietwayColor' },
+  { id: 'tflCycleway', label: 'TfL infrastructure (incl. quietways)', themeColor: 'tflCyclewayColor' },
   { id: 'green', label: 'Green / scenic', themeColor: 'greenColor' },
-  { id: 'narrow', label: 'Narrow facility', themeColor: 'narrowColor' },
+  { id: 'vehicularFree', label: 'Car-free corridors', themeColor: 'vehicularFreeColor' },
   { id: 'disruptions', label: 'Live disruptions', themeColor: 'disruptionColor' },
 ];
 
