@@ -28,6 +28,8 @@
 4_backend_engine/.env.*
 4_backend_engine/graph-cache/
 4_backend_engine/run_command.txt
+4_backend_engine/mapbox_usage.json
+4_backend_engine/mapbox_usage.json.tmp
 
 # --- 5_frontend: env & build (node_modules/build also in 5_frontend/.gitignore) ---
 5_frontend/.env

@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import HelpTip from './HelpTip';
+
+const DEFAULT_NAME_MAX = 8;
 
 const Switch = ({ on, onToggle }) => (
   <button
@@ -16,10 +18,31 @@ const Switch = ({ on, onToggle }) => (
 
 export default function QuestionsStep({
   config, bikeType, toggles, onToggleChange, name, onNameChange,
+  nameMaxLen = DEFAULT_NAME_MAX,
+  nameHint = `Max ${DEFAULT_NAME_MAX} characters`,
 }) {
   const cfg = config.toggles || {};
   const hideSurface = (cfg.surface?.hidden_for || []).includes(bikeType);
   const vfOptions = cfg.vf_infrastructure?.options || {};
+  const [nameShake, setNameShake] = useState(false);
+  const [hintPulse, setHintPulse] = useState(false);
+
+  const softFailName = () => {
+    setNameShake(true);
+    setHintPulse(true);
+    window.setTimeout(() => setNameShake(false), 340);
+    window.setTimeout(() => setHintPulse(false), 900);
+  };
+
+  const handleNameChange = (e) => {
+    const next = e.target.value;
+    if (nameMaxLen != null && next.length > nameMaxLen) {
+      softFailName();
+      onNameChange(next.slice(0, nameMaxLen));
+      return;
+    }
+    onNameChange(next);
+  };
 
   const row = (key, question, help, extraSub) => (
     <div className="wiz-question" key={key}>
@@ -81,13 +104,25 @@ export default function QuestionsStep({
 
       <div className="wiz-panel">
         <div className="wiz-panel-title">Profile name</div>
-        <input
-          className="wiz-input"
-          type="text"
-          value={name}
-          placeholder="e.g. Weekday commute"
-          onChange={(e) => onNameChange(e.target.value)}
-        />
+        <div className={`wiz-name-field${nameShake ? ' is-shake' : ''}`}>
+          <input
+            className="wiz-input"
+            type="text"
+            value={name}
+            placeholder="e.g. Commute"
+            maxLength={nameMaxLen != null ? nameMaxLen + 1 : undefined}
+            onChange={handleNameChange}
+            aria-describedby="wiz-name-hint"
+          />
+          {nameHint && (
+            <p
+              id="wiz-name-hint"
+              className={`wiz-name-hint${hintPulse ? ' is-pulse' : ''}`}
+            >
+              {nameHint}
+            </p>
+          )}
+        </div>
       </div>
     </>
   );

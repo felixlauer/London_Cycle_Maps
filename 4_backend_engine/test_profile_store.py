@@ -68,6 +68,14 @@ class FakeQuery:
         self.inserted = row
         return self
 
+    def update(self, row):
+        self.inserted = row
+        return self
+
+    def delete(self):
+        self._deleting = True
+        return self
+
     def upsert(self, rows, **_kw):
         self.inserted = rows
         return self
@@ -77,7 +85,15 @@ class FakeQuery:
         if self.inserted is not None:
             # Real Supabase returns the row with generated defaults (id, ...).
             data = [self.inserted] if isinstance(self.inserted, dict) else self.inserted
-            data = [{"id": r.get("id", str(uuid.uuid4())), **r} for r in data]
+            # Prefer matching an existing fixture row so UPDATE returns the right id.
+            matched = [
+                r for r in self._rows
+                if all(r.get(col) == val for col, val in self.filters)
+            ]
+            if matched and isinstance(self.inserted, dict):
+                data = [{**matched[0], **self.inserted}]
+            else:
+                data = [{"id": r.get("id", str(uuid.uuid4())), **r} for r in data]
             return mock.Mock(data=data)
         data = [
             r for r in self._rows
@@ -128,6 +144,19 @@ class LocalJsonStoreTest(unittest.TestCase):
         profile, err = self.store.create_profile(None, "Bad", bad)
         self.assertIsNone(profile)
         self.assertIsNotNone(err)
+
+    def test_update_roundtrip(self):
+        profile, err = self.store.create_profile(None, "My ride", VALID_WEIGHTS)
+        self.assertIsNone(err)
+        updated, err = self.store.update_profile(
+            profile["id"], None, "Renamed", VALID_WEIGHTS, bike_type="road", preset="safe"
+        )
+        self.assertIsNone(err)
+        self.assertEqual(updated["name"], "Renamed")
+        self.assertEqual(updated["bike_type"], "road")
+        self.assertEqual(updated["preset"], "safe")
+        fetched = self.store.get_profile(profile["id"], user_id=None)
+        self.assertEqual(fetched["name"], "Renamed")
 
 
 class SupabaseStoreTenancyTest(unittest.TestCase):

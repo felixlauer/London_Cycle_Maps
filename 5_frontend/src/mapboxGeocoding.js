@@ -34,6 +34,9 @@ export async function suggest(query, sessionToken) {
   });
   const res = await fetch(`${API_BASE}/geocode/suggest?${params}`);
   const data = await res.json().catch(() => ({}));
+  if (res.status === 429) {
+    throw new Error(data.error || 'Search limit reached for this month. Try again next month.');
+  }
   if (!res.ok) {
     throw new Error(data.error || `Suggest failed (${res.status})`);
   }
@@ -47,6 +50,9 @@ export async function retrieve(mapboxId, sessionToken) {
     `${API_BASE}/geocode/retrieve/${encodeURIComponent(mapboxId)}?${params}`
   );
   const data = await res.json().catch(() => ({}));
+  if (res.status === 429) {
+    throw new Error(data.error || 'Search limit reached for this month. Try again next month.');
+  }
   if (!res.ok) {
     throw new Error(data.error || `Retrieve failed (${res.status})`);
   }

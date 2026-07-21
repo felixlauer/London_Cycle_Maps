@@ -108,7 +108,7 @@ Frontend can stay on Cloudflare Pages / Netlify **or** same nginx static root.
 
 ### Why switch
 
-| | Leaflet + OSM (now) | Mapbox GL JS |
+| | Leaflet + OSM (retired) | Mapbox GL JS |
 |--|---------------------|--------------|
 | Cost | Free | Free tier then paid |
 | Look / feel | Fine | Vector styles, smoother zoom, brandable night mode |
@@ -207,7 +207,7 @@ Defer: full overlay chrome parity, Depart-at complexity, Santander inside nav se
 |----------|--------|
 | Route authority | **Tuned Flask** |
 | Guidance | **Mapbox Navigation** via Map Matching BYOR |
-| Basemap (target) | **Mapbox** (web GL JS + mobile Maps SDK) |
+| Web basemap (target) | **Mapbox GL JS** (shipped on main web app 15 Jul 2026; Leaflet removed) |
 | Hosting | **Hetzner ~16 GB** unmanaged VPS |
 | Mobile framework | **Expo / React Native** (not Capacitor-only for TBT) |
 | Horizontal API scale | Single process first; second VPS = second full graph |
@@ -234,9 +234,9 @@ Defer: full overlay chrome parity, Depart-at complexity, Santander inside nav se
 - [ ] Smoke long hop + live refresh  
 
 **P1**
-- [ ] `react-map-gl` / Mapbox GL map module  
-- [ ] Port polylines, markers, fly-to, overlays  
-- [ ] Style (day/night) in Mapbox Studio  
+- [x] `react-map-gl` / Mapbox GL map module (15 Jul 2026)
+- [x] Port polylines, markers, fly-to, overlays
+- [x] Style (day/night) — Mapbox streets-v12 / dark-v11 (Studio custom optional)
 
 **P2**
 - [ ] Expo app skeleton + HTTPS API client  
@@ -260,4 +260,4 @@ Defer: full overlay chrome parity, Depart-at complexity, Santander inside nav se
 | Map UI | `5_frontend/src/App.js`, `MapFlyTo.js`, overlay / Santander layers |
 | Backend serve | `4_backend_engine/app.py` (`app.run`, CORS, `/admin`) |
 | New (future) | `6_mobile/` or `apps/mobile/` Expo project; optional `/route` navigate helpers |
-| Secrets | `4_backend_engine/.env` — Mapbox public + secret tokens; never CRA `REACT_APP_*` secrets |
+| Secrets | `4_backend_engine/.env` for Search/auth secrets; web basemap uses URL-restricted `REACT_APP_MAPBOX_TOKEN` (`pk.` only) |

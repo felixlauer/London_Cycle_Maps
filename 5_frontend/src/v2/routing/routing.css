@@ -1,0 +1,694 @@
+/* v2 Routing Core — utilitarian, neutral surfaces, one accent (Get Route + dots).
+   Motion: ease-out entries, :active scale press feedback, origin-aware menus. */
+
+.rc-panel {
+  --rc-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --rc-text: #1c1c1e;
+  --rc-text-sub: #71717a;
+  --rc-icon: #52525b;
+  --rc-surface: #f4f4f5;
+  --rc-surface-hover: #ebebec;
+  --rc-inset: #f7f7f8;
+  --rc-line: #e7e7e9;
+  --rc-accent: var(--shell-brand, #ff0061);
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 354px;
+  padding: 14px;
+  box-sizing: border-box;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  color: var(--rc-text);
+}
+
+.map-shell[data-theme='dark'] .rc-panel {
+  --rc-text: #f4f4f5;
+  --rc-text-sub: #a1a1aa;
+  --rc-icon: #a1a1aa;
+  --rc-surface: #2c2c2e;
+  --rc-surface-hover: #3a3a3c;
+  --rc-inset: #232325;
+  --rc-line: #3a3a3c;
+}
+
+/* ---------- Quick-select row: Mode | Bike | Santander ---------- */
+
+.rc-quick {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 7px;
+}
+
+.rc-quick__slot {
+  position: relative;
+  min-width: 0;
+}
+
+.rc-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 34px;
+  padding: 0 9px;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 10px;
+  background: var(--rc-surface);
+  color: var(--rc-text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms var(--rc-ease-out), transform 160ms var(--rc-ease-out);
+}
+
+.rc-pill:hover {
+  background: var(--rc-surface-hover);
+}
+
+.rc-pill:active {
+  transform: scale(0.97);
+}
+
+.rc-pill.is-open {
+  background: var(--rc-surface-hover);
+}
+
+.rc-pill__lead {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--rc-icon);
+}
+
+.rc-pill__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.rc-pill__chevron {
+  flex-shrink: 0;
+  color: var(--rc-text-sub);
+  transition: transform 180ms var(--rc-ease-out);
+}
+
+.rc-pill.is-open .rc-pill__chevron {
+  transform: rotate(180deg);
+}
+
+/* Favourite slot badge (C1–C3) — neutral, not accent */
+.rc-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 16px;
+  border-radius: 5px;
+  background: var(--rc-icon);
+  color: var(--rc-surface);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+/* Santander pill — label + status dot; dot is the only accent use here */
+.rc-pill--santander {
+  width: auto;
+  flex-shrink: 0;
+}
+
+.rc-santander-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #b3b3b8;
+  flex-shrink: 0;
+  transition: background-color 200ms var(--rc-ease-out), box-shadow 200ms var(--rc-ease-out);
+}
+
+.rc-pill--santander.is-on .rc-santander-dot {
+  background: var(--rc-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rc-accent) 18%, transparent);
+}
+
+.rc-pill--santander.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Bike pill flash when Santander overrides the bike type */
+.rc-pill.is-pulse {
+  animation: rc-bike-pulse 700ms var(--rc-ease-out);
+}
+
+@keyframes rc-bike-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--rc-accent) 35%, transparent); }
+  100% { box-shadow: 0 0 0 7px transparent; }
+}
+
+/* ---------- Dropdown menus (overlay — never resize the panel) ---------- */
+
+.rc-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 40;
+  min-width: 100%;
+  width: max-content;
+  max-width: 220px;
+  padding: 5px;
+  box-sizing: border-box;
+  border-radius: 11px;
+  background: var(--shell-bg, #fff);
+  border: 1px solid var(--rc-line);
+  box-shadow: 0 8px 28px rgba(16, 24, 40, 0.14);
+  transform-origin: top left;
+  animation: rc-menu-in 160ms var(--rc-ease-out);
+}
+
+@keyframes rc-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+}
+
+.rc-menu__section + .rc-menu__section {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--rc-line);
+}
+
+.rc-menu__heading {
+  padding: 4px 8px 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--rc-text-sub);
+}
+
+.rc-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rc-text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background-color 120ms var(--rc-ease-out);
+}
+
+.rc-menu__item svg {
+  color: var(--rc-icon);
+  flex-shrink: 0;
+}
+
+.rc-menu__item:hover {
+  background: var(--rc-surface);
+}
+
+.rc-menu__item.is-active {
+  font-weight: 700;
+}
+
+.rc-menu__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+/* Active indicator — tiny accent dot, per restraint rule */
+.rc-menu__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--rc-accent);
+  flex-shrink: 0;
+}
+
+.rc-menu__footer {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: none;
+  border-top: 1px solid var(--rc-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--rc-text-sub);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.rc-menu__footer:hover {
+  color: var(--rc-text);
+}
+
+/* ---------- Waypoints — single grouped card (Apple Maps structure) ---------- */
+
+.rc-waypoints {
+  display: flex;
+  flex-direction: column;
+}
+
+.rc-wpcard {
+  border-radius: 11px;
+  background: var(--rc-inset);
+  border: 1px solid var(--rc-line);
+  overflow: visible;
+}
+
+.rc-wpcard__divider {
+  height: 1px;
+  margin-left: 38px;
+  background: var(--rc-line);
+}
+
+.rc-wp-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 45px;
+  padding: 0 9px 0 11px;
+  box-sizing: border-box;
+  transition: background-color 150ms var(--rc-ease-out), opacity 150ms var(--rc-ease-out);
+}
+
+.rc-wp-row.is-dragging {
+  opacity: 0.45;
+}
+
+.rc-wp-row.is-drop-target {
+  background: var(--rc-surface);
+}
+
+/* Start/end lucide icons — greyscale */
+.rc-slot {
+  flex-shrink: 0;
+  color: var(--rc-icon);
+  display: block;
+}
+
+/* Via journey letter — small greyscale chip */
+.rc-letter--via {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #52525b;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Search input — flat inside the card, text vertically centred */
+.rc-wp-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.rc-wp-input > div {
+  margin-bottom: 0 !important;
+}
+
+.rc-wp-input input {
+  height: 45px !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--rc-text) !important;
+  font-family: inherit !important;
+  font-size: 13.5px !important;
+  font-weight: 550 !important;
+  line-height: 45px !important;
+  outline: none;
+  box-shadow: none !important;
+}
+
+.rc-wp-input input::placeholder {
+  color: var(--rc-text-sub);
+  font-weight: 450;
+}
+
+/* Permanent grab bars (drag = reorder / swap) */
+.rc-wp-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 45px;
+  flex-shrink: 0;
+  color: var(--rc-text-sub);
+  cursor: grab;
+}
+
+.rc-wp-grip:active {
+  cursor: grabbing;
+}
+
+.rc-wp-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--rc-text-sub);
+  cursor: pointer;
+  transition: background-color 120ms var(--rc-ease-out), color 120ms var(--rc-ease-out);
+}
+
+.rc-wp-remove:hover {
+  background: var(--rc-surface);
+  color: var(--rc-text);
+}
+
+/* ---------- Text links (Add stop / Leave now) ---------- */
+
+.rc-textlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 4px 5px;
+  border: none;
+  background: transparent;
+  color: var(--rc-text-sub);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 130ms var(--rc-ease-out);
+}
+
+.rc-textlink svg {
+  display: block;
+  flex-shrink: 0;
+  /* Lucide glyphs sit optically high — nudge down to meet the text midline */
+  transform: translateY(1px);
+}
+
+.rc-textlink span {
+  line-height: 1;
+  display: inline-block;
+}
+
+.rc-textlink:hover {
+  color: var(--rc-text);
+}
+
+.rc-textlink:disabled,
+.rc-textlink.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rc-textlink.is-disabled:hover {
+  color: var(--rc-text-sub);
+}
+
+/* ---------- Sub-row: Leave now (left) + Add stop (right) ---------- */
+
+.rc-subrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 24px;
+}
+
+.rc-subrow__add {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.rc-subrow.is-depart-disabled .rc-depart__trigger {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rc-subrow.is-depart-disabled .rc-depart__trigger:hover {
+  color: var(--rc-text-sub);
+}
+
+/* ---------- Get Route — the one accent element ---------- */
+
+.rc-get-route {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: var(--rc-accent);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: filter 150ms var(--rc-ease-out), transform 160ms var(--rc-ease-out),
+    opacity 150ms var(--rc-ease-out);
+}
+
+.rc-get-route__label {
+  transition: opacity 180ms var(--rc-ease-out);
+}
+
+.rc-get-route__label.is-visible {
+  opacity: 1;
+}
+
+.rc-get-route__label.is-hidden {
+  opacity: 0;
+}
+
+.rc-get-route__dots {
+  display: inline-flex;
+  align-items: flex-end;
+  width: 1.05em;
+  margin-left: 1px;
+  line-height: 1;
+}
+
+.rc-get-route__dot {
+  font-weight: 700;
+  animation: rc-get-route-dot 1400ms var(--rc-ease-out) infinite;
+}
+
+.rc-get-route__dot:nth-child(2) {
+  animation-delay: 220ms;
+}
+
+.rc-get-route__dot:nth-child(3) {
+  animation-delay: 440ms;
+}
+
+@keyframes rc-get-route-dot {
+  0%, 70%, 100% {
+    opacity: 0.28;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+
+.rc-get-route.is-busy {
+  cursor: wait;
+}
+
+.rc-get-route.is-busy:active {
+  transform: none;
+}
+
+.rc-get-route:hover:not(:disabled):not(.is-disabled) {
+  filter: brightness(1.06);
+}
+
+.rc-get-route:active:not(:disabled):not(.is-disabled):not(.is-busy) {
+  transform: scale(0.98);
+}
+
+.rc-get-route:disabled,
+.rc-get-route.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rc-get-route.is-disabled:hover {
+  filter: none;
+}
+
+/* ---------- Depart at — inline expansion above Get Route ---------- */
+
+.rc-depart {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.rc-depart.is-disabled .rc-depart__trigger {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rc-depart.is-disabled .rc-depart__trigger:hover {
+  color: var(--rc-text-sub);
+}
+
+.rc-depart__chevron {
+  transition: transform 180ms var(--rc-ease-out);
+}
+
+.rc-depart__chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.rc-depart__inline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 9px;
+  border-radius: 11px;
+  background: var(--rc-inset);
+  border: 1px solid var(--rc-line);
+  transform-origin: top center;
+  animation: rc-menu-in 180ms var(--rc-ease-out);
+}
+
+.rc-depart__seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--rc-surface);
+}
+
+.rc-depart__seg button {
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rc-text-sub);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms var(--rc-ease-out), color 150ms var(--rc-ease-out);
+}
+
+.rc-depart__seg button.is-active {
+  background: var(--shell-bg, #fff);
+  color: var(--rc-text);
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.1);
+}
+
+.rc-depart__pickers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.rc-depart__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  height: 30px;
+  padding: 0 2px;
+  border-radius: 8px;
+  background: var(--rc-surface);
+}
+
+.rc-depart__row > span {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--rc-text);
+}
+
+.rc-depart__time {
+  font-variant-numeric: tabular-nums;
+}
+
+.rc-depart__row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rc-icon);
+  cursor: pointer;
+  transition: background-color 120ms var(--rc-ease-out), transform 140ms var(--rc-ease-out);
+}
+
+.rc-depart__row button:hover {
+  background: var(--rc-surface-hover);
+}
+
+.rc-depart__row button:active {
+  transform: scale(0.94);
+}
+
+/* ---------- Reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .rc-menu,
+  .rc-depart__inline {
+    animation-duration: 1ms;
+  }
+
+  .rc-pill.is-pulse {
+    animation: none;
+  }
+
+  .rc-pill:active,
+  .rc-get-route:active:not(:disabled):not(.is-busy),
+  .rc-depart__row button:active {
+    transform: none;
+  }
+
+  .rc-get-route__dot {
+    animation: none;
+    opacity: 1;
+  }
+}

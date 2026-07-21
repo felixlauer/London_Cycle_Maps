@@ -1,0 +1,23 @@
+---
+description: Frontend complete UI overhaul — design hub + Taste/Emil skills; preserve logic, replace chrome.
+globs: 5_frontend/**/*.{js,jsx,css,html}
+alwaysApply: false
+---
+
+# Frontend design overhaul (complete swap)
+
+When editing UI under `5_frontend/`:
+
+1. Read **`0_documentation/design/README.md`**.
+2. Read **`0_documentation/design/BRIEF.md`**, **`ARCHITECTURE_DIRECTION.md`**, and **`competitor_benchmarks/`**.
+3. **Do not rebuild UI** until the user provides per-element build specs (see design hub status).
+4. Primary skills under **`.agents/skills/`**:
+   - `design-taste-frontend`
+   - `high-end-visual-design`
+   - `emil-design-eng`
+   - Motion as needed: `improve-animations`, `review-animations`, `apple-design`
+   - **`redesign-existing-projects` is optional only** — do not use it as the lead for a greenfield visual rebuild.
+5. **Preserve functioning:** routing state, Flask `/route` + auth + geocode, overlays, vias, Santander, Depart at, map module behaviour.
+6. **Replace visuals freely:** new layout/components/CSS; do not feel bound to current panel structure or `ui.css` look.
+7. **Icons:** `lucide-react` (best-guess per `ARCHITECTURE_DIRECTION.md`). **Logo:** `logo_assets/logo_transparent_bg_noshadow.svg`.
+8. Do not mix conflicting Taste dialects (e.g. brutalist vs soft) against `BRIEF.md`.

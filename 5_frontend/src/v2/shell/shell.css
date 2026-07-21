@@ -1,0 +1,391 @@
+/* v2 shell — solid floating panels per BRIEF (no glassmorphism) */
+
+.map-shell {
+  --shell-bg: #ffffff;
+  --shell-border: #e5e7eb;
+  --shell-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  --shell-radius: 14px;
+  --shell-inset: 17px;
+  --shell-gap: 13px;
+  --shell-brand: #ff0061;
+  /* Dynamic Island: 4× default inset when collapsed */
+  --shell-island-bottom: calc(var(--shell-inset) * 6);
+  --shell-island-h: 108px;
+  /* Profile drawer inset — animated via JS on open/close */
+  --shell-sidebar-w: 0px;
+
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: #f4f4f5;
+}
+
+.map-shell[data-theme='dark'] {
+  --shell-bg: #1c1c1e;
+  --shell-border: #3a3a3c;
+  --shell-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  background: #0a0a0a;
+}
+
+.map-shell__map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.map-shell__chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Attribution on full-bleed map — shift with sidebar; stay pinned to bottom */
+.map-shell .mapboxgl-ctrl-bottom-right {
+  bottom: 0;
+  right: var(--shell-sidebar-w);
+  transition: right 320ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.map-shell .mapboxgl-ctrl-bottom-left {
+  bottom: 0;
+  left: 0;
+}
+
+/* Shared zone chrome — empty containers */
+.shell-zone {
+  position: absolute;
+  pointer-events: auto;
+  background: var(--shell-bg);
+  border: 1px solid var(--shell-border);
+  border-radius: var(--shell-radius);
+  box-shadow: var(--shell-shadow);
+}
+
+/* Top-left — routing core (fixed width; height only changes for real content) */
+.shell-zone--routing {
+  top: var(--shell-inset);
+  left: var(--shell-inset);
+  min-height: 0;
+  height: auto;
+  max-height: calc(100dvh - var(--shell-inset) * 2 - 80px);
+  overflow: visible;
+}
+
+/* Top-center — alert pill (viewport-centered; ignores sidebar overlay) */
+.shell-zone--alert {
+  top: var(--shell-inset);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - var(--shell-inset) * 2 - 400px));
+  min-height: 40px;
+  border-radius: 999px;
+}
+
+/* Top-right — profile + logo pill (expands left; logo pinned on the right) */
+.shell-zone--profile {
+  top: var(--shell-inset);
+  right: var(--shell-inset);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  width: 112px;
+  padding: 5px;
+  border-radius: 999px;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* No spring bounce — ease-out only; width driven by sidebar inset var */
+  transition: width 320ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.shell-zone--profile.is-sidebar-open {
+  width: calc(var(--shell-sidebar-w) - (var(--shell-inset) * 2));
+  max-width: calc(100vw - var(--shell-inset) * 2);
+}
+
+/* Wizard is fullscreen, but the account pill keeps the expanded-sidebar size */
+.map-shell.is-wizard-open .shell-zone--profile.is-sidebar-open {
+  width: calc(320px - (var(--shell-inset) * 2));
+  max-width: calc(320px - (var(--shell-inset) * 2));
+}
+
+.profile-pill__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.profile-pill__slot {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-pill__slot--logo {
+  /* Pinned to the trailing edge — does not reflow when identity opens */
+  margin-left: auto;
+}
+
+.profile-pill__slot--avatar {
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff0061, #ff4d8f);
+  border: none;
+  box-sizing: border-box;
+  padding: 0 4px;
+  margin: 0;
+  font: inherit;
+  color: #fff;
+  cursor: pointer;
+  transition: filter 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.profile-pill__slot--avatar.is-guest {
+  background: linear-gradient(135deg, #7768ae, #9b8fc9);
+  color: #fff;
+}
+
+.profile-pill__slot--avatar:hover {
+  filter: brightness(1.06);
+}
+
+.profile-pill__slot--avatar.is-signed-in {
+  color: #fff;
+}
+
+.profile-pill__slot--avatar.is-loading {
+  cursor: default;
+  background: #e4e4e7;
+  animation: profile-pill-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes profile-pill-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.profile-pill__initials {
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  user-select: none;
+}
+
+.profile-pill__initials.is-guest-label {
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.profile-pill__identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    opacity 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    max-width 320ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.shell-zone--profile.is-sidebar-open .profile-pill__identity {
+  opacity: 1;
+  max-width: 220px;
+  pointer-events: auto;
+}
+
+.profile-pill__email {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #18181b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  line-height: 1.2;
+}
+
+.map-shell[data-theme='dark'] .profile-pill__email {
+  color: #fafafa;
+}
+
+.profile-pill__auth-link {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  color: #71717a;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.profile-pill__auth-link:hover {
+  color: #18181b;
+}
+
+.map-shell[data-theme='dark'] .profile-pill__auth-link {
+  color: #a1a1aa;
+}
+
+.map-shell[data-theme='dark'] .profile-pill__auth-link:hover {
+  color: #f4f4f5;
+}
+
+.profile-pill__logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+  transform: translateX(-5px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-zone--profile,
+  .profile-pill__identity {
+    transition: none;
+  }
+}
+
+/* Bottom-center — dynamic island (overlay; the map canvas never resizes) */
+.map-shell.is-island-expanded {
+  --shell-island-h: 300px;
+}
+
+.map-shell.is-island-multi:not(.is-island-expanded) {
+  --shell-island-h: 122px;
+}
+
+.shell-zone--island {
+  bottom: var(--shell-island-bottom);
+  left: calc((100% - var(--shell-sidebar-w)) / 2);
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - var(--shell-sidebar-w) - var(--shell-inset) * 2));
+  height: var(--shell-island-h);
+  border-radius: 999px;
+  overflow: hidden;
+  transition:
+    width 360ms cubic-bezier(0.23, 1, 0.32, 1),
+    height 360ms cubic-bezier(0.23, 1, 0.32, 1),
+    bottom 360ms cubic-bezier(0.23, 1, 0.32, 1),
+    border-radius 360ms cubic-bezier(0.23, 1, 0.32, 1);
+  animation: island-spawn 260ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Expanded: full width; bottom clearance ~40% more than side inset */
+.map-shell.is-island-expanded .shell-zone--island {
+  bottom: calc(var(--shell-inset) * 1.4);
+  width: calc(100vw - var(--shell-sidebar-w) - var(--shell-inset) * 2);
+  border-radius: 20px;
+}
+
+@keyframes island-spawn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.97);
+  }
+}
+
+@media (max-width: 720px) {
+  .map-shell {
+    --shell-inset: 12px;
+  }
+
+  .shell-zone--routing {
+    width: calc(100vw - var(--shell-inset) * 2);
+    max-width: none;
+  }
+
+  .shell-zone--alert {
+    width: calc(100vw - var(--shell-inset) * 2 - 128px);
+    top: calc(var(--shell-inset) + 56px);
+  }
+}
+
+/* Unsuitable station modal (v2) */
+.v2-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(16, 24, 40, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  pointer-events: auto;
+}
+
+.v2-modal {
+  width: min(360px, 100%);
+  padding: 18px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 12px 36px rgba(16, 24, 40, 0.22);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+.v2-modal h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.v2-modal p {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.4;
+}
+
+.v2-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.v2-modal__actions button {
+  border: 1px solid #e5e7eb;
+  background: #f7f7f8;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.v2-modal__actions button.is-primary {
+  background: #ff0061;
+  border-color: #ff0061;
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-shell .mapboxgl-ctrl-bottom-right {
+    transition: none;
+  }
+}

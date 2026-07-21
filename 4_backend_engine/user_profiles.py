@@ -54,6 +54,8 @@ EPSILON = 0.0001
 BIKE_TYPES = ("standard", "road", "ebike", "cargo")
 BIKE_SPEEDS_KMH = {"standard": 15.0, "road": 21.0, "ebike": 18.0, "cargo": 15.0}
 DEFAULT_BIKE_TYPE = "standard"
+# Cap stored custom profile names so routing Mode pills stay tidy (C1–C3 labels).
+MAX_PROFILE_NAME_LEN = 22
 
 DEFAULT_TOGGLES = {
     "light_night": False,
@@ -181,6 +183,7 @@ def list_profiles() -> list[dict[str, str]]:
             "name": entry.get("name", pid),
             "preset": entry.get("preset"),
             "bike_type": _normalize_bike_type(entry.get("bike_type")),
+            "is_system": bool(entry.get("is_system")) or str(pid).startswith("preset_"),
         }
         for pid, entry in sorted(profiles.items())
     ]
@@ -218,6 +221,8 @@ def create_profile(
     name = (name or "").strip()
     if not name:
         return None, "name is required"
+    if len(name) > MAX_PROFILE_NAME_LEN:
+        name = name[:MAX_PROFILE_NAME_LEN].rstrip()
     ok, err = validate_weights(weights)
     if not ok:
         return None, err
@@ -240,6 +245,65 @@ def create_profile(
     }
     _save_store(store)
     return get_profile(user_id), None
+
+
+def update_profile(
+    profile_id: str,
+    name: str,
+    weights: dict,
+    bike_type: str | None = None,
+    preset: str | None = None,
+    toggles: dict | None = None,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Update a non-system local profile in place. Returns (profile, error)."""
+    pid = str(profile_id or "").strip()
+    if not pid:
+        return None, "profile not found"
+    if pid.startswith("preset_") or pid in ("preset_fast", "preset_safe", "preset_leisure"):
+        return None, "cannot edit system presets"
+    name = (name or "").strip()
+    if not name:
+        return None, "name is required"
+    if len(name) > MAX_PROFILE_NAME_LEN:
+        name = name[:MAX_PROFILE_NAME_LEN].rstrip()
+    ok, err = validate_weights(weights)
+    if not ok:
+        return None, err
+
+    store = _load_store()
+    profiles = store.setdefault("profiles", {})
+    entry = profiles.get(pid)
+    if not entry:
+        return None, "profile not found"
+    if entry.get("is_system"):
+        return None, "cannot edit system presets"
+
+    entry["name"] = name
+    entry["preset"] = (str(preset).strip().lower() or None) if preset else None
+    entry["bike_type"] = _normalize_bike_type(bike_type)
+    entry["toggles"] = _normalize_toggles(toggles)
+    entry["weights"] = {key: float(weights[key]) for key in ROUTING_WEIGHT_KEYS}
+    _save_store(store)
+    return get_profile(pid), None
+
+
+def delete_profile(profile_id: str) -> tuple[bool, str | None]:
+    """Remove a non-system local profile. Returns (ok, error)."""
+    pid = str(profile_id or "").strip()
+    if not pid:
+        return False, "profile not found"
+    if pid.startswith("preset_") or pid in ("preset_fast", "preset_safe", "preset_leisure"):
+        return False, "cannot delete system presets"
+    store = _load_store()
+    profiles = store.setdefault("profiles", {})
+    entry = profiles.get(pid)
+    if not entry:
+        return False, "profile not found"
+    if entry.get("is_system"):
+        return False, "cannot delete system presets"
+    del profiles[pid]
+    _save_store(store)
+    return True, None
 
 
 def build_weight_dict_from_request(args, defaults: dict | None = None) -> dict:

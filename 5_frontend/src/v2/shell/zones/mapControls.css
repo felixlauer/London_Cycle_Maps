@@ -1,0 +1,212 @@
+/* Bottom-right map controls — free-floating, raised above bottom edge */
+
+.map-ctl {
+  --mc-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --mc-icon: #52525b;
+  /* Sit above Dynamic Island / attribution — not flush to the corner */
+  --mc-bottom: calc(var(--shell-island-bottom) + 28px);
+
+  position: absolute;
+  right: calc(var(--shell-inset) + var(--shell-sidebar-w));
+  bottom: var(--mc-bottom);
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  pointer-events: none;
+  overflow: visible;
+  transition:
+    right 320ms var(--mc-ease),
+    bottom 360ms var(--mc-ease);
+}
+
+/* Overlay rail + zoom/locate ride above the expanded sheet */
+.map-shell.is-island-expanded .map-ctl {
+  bottom: calc(var(--shell-inset) * 1.4 + var(--shell-island-h) + 16px);
+}
+
+.map-ctl__btn,
+.map-ctl__zoom {
+  pointer-events: auto;
+}
+
+.map-ctl__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--shell-border);
+  border-radius: 14px;
+  background: var(--shell-bg);
+  box-shadow: var(--shell-shadow);
+  color: var(--mc-icon);
+  cursor: pointer;
+  transition:
+    background-color 150ms var(--mc-ease),
+    color 150ms var(--mc-ease),
+    transform 160ms var(--mc-ease);
+}
+
+.map-ctl__btn:hover {
+  background: #f4f4f5;
+  color: #1c1c1e;
+}
+
+.map-ctl__btn--north:hover {
+  color: var(--mc-icon);
+}
+
+.map-ctl__btn:active {
+  transform: scale(0.94);
+}
+
+.map-ctl__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.map-ctl__btn.is-pending {
+  animation: map-ctl-pulse 900ms var(--mc-ease) infinite;
+}
+
+/* Locate / north: brand accent when actionable (same cue as overlay pills) */
+.map-ctl__btn.is-active:not(.map-ctl__btn--north) {
+  color: var(--shell-brand, #ff0061);
+}
+
+.map-ctl__btn--north {
+  color: var(--mc-icon);
+}
+
+.map-ctl__btn--north[aria-disabled='true'] {
+  opacity: 1;
+  cursor: default;
+}
+
+.map-ctl__btn--north[aria-disabled='true']:active {
+  transform: none;
+}
+
+.map-ctl__north {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  gap: 0;
+  transform: translateY(2px);
+}
+
+.map-ctl__north-icon {
+  display: block;
+  margin-top: -4px;
+  color: var(--mc-icon);
+}
+
+.map-ctl__north-n {
+  display: block;
+  margin-top: -1px;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--shell-brand, #ff0061);
+  transition: color 150ms var(--mc-ease);
+}
+
+/* Needs reset: mute the N accent (arrow stays icon grey) */
+.map-ctl__btn--north.is-active .map-ctl__north-n {
+  color: var(--mc-icon);
+}
+
+/* Apple-style stacked zoom */
+.map-ctl__zoom {
+  display: flex;
+  flex-direction: column;
+  width: 44px;
+  border: 1px solid var(--shell-border);
+  border-radius: 14px;
+  background: var(--shell-bg);
+  box-shadow: var(--shell-shadow);
+  overflow: hidden;
+}
+
+.map-ctl__zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--mc-icon);
+  cursor: pointer;
+  transition:
+    background-color 150ms var(--mc-ease),
+    color 150ms var(--mc-ease);
+}
+
+.map-ctl__zoom-btn:hover {
+  background: #f4f4f5;
+  color: #1c1c1e;
+}
+
+.map-ctl__zoom-btn:active {
+  background: #ececef;
+}
+
+.map-ctl__zoom-rule {
+  display: block;
+  height: 1px;
+  margin: 0 8px;
+  background: var(--shell-border);
+  flex-shrink: 0;
+}
+
+@keyframes map-ctl-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.map-shell[data-theme='dark'] .map-ctl {
+  --mc-icon: #a1a1aa;
+}
+
+.map-shell[data-theme='dark'] .map-ctl__btn:hover,
+.map-shell[data-theme='dark'] .map-ctl__zoom-btn:hover {
+  background: #2c2c2e;
+  color: #f4f4f5;
+}
+
+.map-shell[data-theme='dark'] .map-ctl__btn--north:hover {
+  color: var(--mc-icon);
+}
+
+.map-shell[data-theme='dark'] .map-ctl__btn.is-active:not(.map-ctl__btn--north) {
+  color: var(--shell-brand, #ff0061);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-ctl {
+    transition: none;
+  }
+
+  .map-ctl__btn.is-pending {
+    animation: none;
+  }
+
+  .map-ctl__btn:active {
+    transform: none;
+  }
+}

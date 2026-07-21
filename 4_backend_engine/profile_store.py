@@ -52,6 +52,25 @@ class ProfileStore(ABC):
     ) -> tuple[dict[str, Any] | None, str | None]:
         """Create a non-system profile owned by user_id. Returns (profile, error)."""
 
+    @abstractmethod
+    def update_profile(
+        self,
+        profile_id: str,
+        user_id: str | None,
+        name: str,
+        weights: dict,
+        bike_type: str | None = None,
+        preset: str | None = None,
+        toggles: dict | None = None,
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        """Update a non-system profile owned by user_id. Returns (profile, error)."""
+
+    @abstractmethod
+    def delete_profile(
+        self, profile_id: str, user_id: str | None
+    ) -> tuple[bool, str | None]:
+        """Delete a non-system profile owned by user_id. Returns (ok, error)."""
+
 
 class LocalJsonStore(ProfileStore):
     """Dev / test-mode store backed by user_profiles.json. No ownership checks —
@@ -75,6 +94,25 @@ class LocalJsonStore(ProfileStore):
         return user_profiles.create_profile(
             name, weights, bike_type=bike_type, preset=preset, toggles=toggles
         )
+
+    def update_profile(
+        self,
+        profile_id: str,
+        user_id: str | None,
+        name: str,
+        weights: dict,
+        bike_type: str | None = None,
+        preset: str | None = None,
+        toggles: dict | None = None,
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        return user_profiles.update_profile(
+            profile_id, name, weights, bike_type=bike_type, preset=preset, toggles=toggles
+        )
+
+    def delete_profile(
+        self, profile_id: str, user_id: str | None
+    ) -> tuple[bool, str | None]:
+        return user_profiles.delete_profile(profile_id)
 
 
 def _row_to_profile(row: dict) -> dict[str, Any]:
@@ -197,6 +235,8 @@ class SupabaseStore(ProfileStore):
         name = (name or "").strip()
         if not name:
             return None, "name is required"
+        if len(name) > user_profiles.MAX_PROFILE_NAME_LEN:
+            name = name[: user_profiles.MAX_PROFILE_NAME_LEN].rstrip()
         ok, err = user_profiles.validate_weights(weights)
         if not ok:
             return None, err
@@ -215,6 +255,72 @@ class SupabaseStore(ProfileStore):
         if not rows:
             return None, "insert failed"
         return _row_to_profile(rows[0]), None
+
+    def update_profile(
+        self,
+        profile_id: str,
+        user_id: str | None,
+        name: str,
+        weights: dict,
+        bike_type: str | None = None,
+        preset: str | None = None,
+        toggles: dict | None = None,
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        if not user_id:
+            return None, "authentication required"
+        if not _looks_like_uuid(profile_id):
+            return None, "profile not found"
+        name = (name or "").strip()
+        if not name:
+            return None, "name is required"
+        if len(name) > user_profiles.MAX_PROFILE_NAME_LEN:
+            name = name[: user_profiles.MAX_PROFILE_NAME_LEN].rstrip()
+        ok, err = user_profiles.validate_weights(weights)
+        if not ok:
+            return None, err
+
+        patch = {
+            "name": name,
+            "preset": (str(preset).strip().lower() or None) if preset else None,
+            "bike_type": user_profiles._normalize_bike_type(bike_type),
+            "toggles": user_profiles._normalize_toggles(toggles),
+            "weights": {k: float(weights[k]) for k in user_profiles.ROUTING_WEIGHT_KEYS},
+        }
+        rows = (
+            self._client.table("profiles")
+            .update(patch)
+            .eq("id", profile_id)
+            .eq("user_id", user_id)  # tenancy filter — required (service role)
+            .eq("is_system", False)
+            .execute()
+            .data
+            or []
+        )
+        if not rows:
+            return None, "profile not found"
+        return _row_to_profile(rows[0]), None
+
+    def delete_profile(
+        self, profile_id: str, user_id: str | None
+    ) -> tuple[bool, str | None]:
+        if not user_id:
+            return False, "authentication required"
+        if not _looks_like_uuid(profile_id):
+            return False, "profile not found"
+        # Never delete system presets; always scope to owner (service role).
+        rows = (
+            self._client.table("profiles")
+            .delete()
+            .eq("id", profile_id)
+            .eq("user_id", user_id)
+            .eq("is_system", False)
+            .execute()
+            .data
+            or []
+        )
+        if not rows:
+            return False, "profile not found"
+        return True, None
 
 
 def _looks_like_uuid(value: str) -> bool:

@@ -1,0 +1,288 @@
+/* v2 fullscreen wizard — tokens match sidebar / shell language */
+
+.v2wiz {
+  /* Remap v1 step component vars → current v2 palette */
+  --wiz-bg: var(--shell-bg, #ffffff);
+  --wiz-bg-soft: #f7f7f8;
+  --wiz-bg-softer: #f4f4f5;
+  --wiz-text: #1c1c1e;
+  --wiz-text-sub: #71717a;
+  --wiz-border: #e7e7e9;
+  --wiz-accent: var(--shell-brand, #ff0061);
+  --wiz-accent-soft: color-mix(in srgb, var(--shell-brand, #ff0061) 12%, transparent);
+  --wiz-good: #166534;
+  --wiz-warn: #b54708;
+  --wiz-warn-bg: #fff4e5;
+
+  --v2wiz-text: var(--wiz-text);
+  --v2wiz-text-sub: var(--wiz-text-sub);
+  --v2wiz-surface: #f4f4f5;
+  --v2wiz-surface-hover: #ebebec;
+  --v2wiz-line: var(--wiz-border);
+  --v2wiz-brand: var(--wiz-accent);
+
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  color: var(--v2wiz-text);
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+.v2wiz[data-theme='dark'] {
+  --wiz-bg: var(--shell-bg, #1c1c1e);
+  --wiz-bg-soft: #232325;
+  --wiz-bg-softer: #2c2c2e;
+  --wiz-text: #f4f4f5;
+  --wiz-text-sub: #a1a1aa;
+  --wiz-border: #3a3a3c;
+  --wiz-accent: var(--shell-brand, #ff0061);
+  --wiz-accent-soft: color-mix(in srgb, var(--shell-brand, #ff0061) 18%, transparent);
+  --wiz-good: #75e0b3;
+  --wiz-warn: #ffb74d;
+  --wiz-warn-bg: rgba(255, 183, 77, 0.12);
+
+  --v2wiz-text: var(--wiz-text);
+  --v2wiz-text-sub: var(--wiz-text-sub);
+  --v2wiz-surface: #2c2c2e;
+  --v2wiz-surface-hover: #3a3a3c;
+  --v2wiz-line: var(--wiz-border);
+}
+
+.v2wiz__header {
+  flex-shrink: 0;
+  padding: 12px 24px 12px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.v2wiz__progress {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.v2wiz__progress-seg {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--v2wiz-line);
+  transition: background-color 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.v2wiz__progress-seg.is-done {
+  background: color-mix(in srgb, var(--v2wiz-brand) 45%, var(--v2wiz-line));
+}
+
+.v2wiz__progress-seg.is-current {
+  background: var(--v2wiz-brand);
+}
+
+.v2wiz__step-label {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v2wiz-text-sub);
+}
+
+.v2wiz__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--v2wiz-text);
+}
+
+.v2wiz__blurb {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--v2wiz-text-sub);
+  max-width: 42em;
+}
+
+.v2wiz__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 24px 20px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  color: var(--v2wiz-text);
+}
+
+.v2wiz__footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px calc(18px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--v2wiz-line);
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.v2wiz-btn {
+  border: 1px solid var(--v2wiz-line);
+  background: var(--v2wiz-surface);
+  color: var(--v2wiz-text);
+  border-radius: 10px;
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    background-color 150ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.v2wiz-btn:hover:not(:disabled) {
+  background: var(--v2wiz-surface-hover);
+}
+
+.v2wiz-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.v2wiz-btn--primary {
+  margin-left: auto;
+  background: var(--v2wiz-brand);
+  border-color: var(--v2wiz-brand);
+  color: #fff;
+}
+
+.v2wiz-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  background: var(--v2wiz-brand);
+}
+
+.v2wiz-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.v2wiz-est {
+  font-size: 12.5px;
+  color: var(--v2wiz-text-sub);
+}
+
+.v2wiz-est strong {
+  color: var(--v2wiz-text);
+  font-weight: 700;
+}
+
+.v2wiz-error {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.v2wiz-intro {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--v2wiz-text-sub);
+}
+
+/* Step components inherit remapped --wiz-* tokens above */
+.v2wiz .wiz-intro {
+  color: var(--wiz-text-sub);
+}
+
+.v2wiz .wiz-panel,
+.v2wiz .wiz-card,
+.v2wiz .wiz-collapse-toggle {
+  background: var(--wiz-bg-soft);
+  border-color: var(--wiz-border);
+  color: var(--wiz-text);
+}
+
+.v2wiz .wiz-card:hover {
+  border-color: var(--wiz-accent);
+  background: var(--wiz-bg-softer);
+}
+
+.v2wiz .wiz-card.selected {
+  border-color: var(--wiz-accent);
+  background: var(--wiz-accent-soft);
+  color: var(--wiz-text);
+}
+
+.v2wiz .wiz-card-title,
+.v2wiz .wiz-question-text,
+.v2wiz .wiz-slider-label,
+.v2wiz .wiz-check-row {
+  color: var(--wiz-text);
+}
+
+.v2wiz .wiz-card-note,
+.v2wiz .wiz-question-sub,
+.v2wiz .wiz-panel-title,
+.v2wiz .wiz-slider-cost,
+.v2wiz .wiz-slider-question,
+.v2wiz .wiz-budget-note,
+.v2wiz .wiz-anchor-label {
+  color: var(--wiz-text-sub);
+}
+
+.v2wiz .wiz-card-badge {
+  background: var(--wiz-bg-softer);
+  color: var(--wiz-text-sub);
+}
+
+.v2wiz .wiz-card.selected .wiz-card-badge {
+  background: var(--wiz-accent);
+  color: #fff;
+}
+
+.v2wiz .wiz-input {
+  background: var(--wiz-bg);
+  border: 1px solid var(--wiz-border);
+  color: var(--wiz-text);
+  border-radius: 10px;
+}
+
+.v2wiz .wiz-input:focus {
+  outline: none;
+  border-color: var(--wiz-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wiz-accent) 18%, transparent);
+}
+
+.v2wiz .wiz-name-hint {
+  color: var(--wiz-text-sub);
+}
+
+.v2wiz .wiz-name-hint.is-pulse {
+  color: var(--wiz-accent);
+}
+
+.v2wiz .wiz-budget-sticky {
+  background: var(--wiz-bg);
+  border-bottom-color: var(--wiz-border);
+}
+
+.v2wiz .wiz-switch-track {
+  background: var(--wiz-bg-softer);
+  border-color: var(--wiz-border);
+}
+
+.v2wiz .wiz-switch.on .wiz-switch-track {
+  background: var(--wiz-accent);
+  border-color: var(--wiz-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2wiz__progress-seg,
+  .v2wiz-btn {
+    transition: none;
+  }
+}

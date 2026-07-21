@@ -58,6 +58,13 @@ export default function ProfileMenu({
     setOpen(false);
   };
 
+  const profileSection = (title) => (
+    <div className="profile-menu__section">
+      <span>{title}</span>
+      <span className="profile-menu__section-bike">Bike type</span>
+    </div>
+  );
+
   const renderProfileItem = (p) => (
     <button
       key={p.id}
@@ -97,7 +104,7 @@ export default function ProfileMenu({
 
           {testMode ? (
             <>
-              <div className="profile-menu__section">Local profiles</div>
+              {profileSection('Local profiles')}
               {profiles.map(renderProfileItem)}
               <div className="profile-menu__divider" />
               <button
@@ -110,12 +117,12 @@ export default function ProfileMenu({
             </>
           ) : (
             <>
-              <div className="profile-menu__section">Riding styles</div>
+              {profileSection('Riding styles')}
               {systemProfiles.map(renderProfileItem)}
 
               {loggedIn && (
                 <>
-                  <div className="profile-menu__section">My profiles</div>
+                  {profileSection('My profiles')}
                   {customProfiles.length > 0
                     ? customProfiles.map(renderProfileItem)
                     : <div className="profile-menu__empty">No custom profiles yet.</div>}

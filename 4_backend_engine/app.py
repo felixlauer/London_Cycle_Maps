@@ -38,6 +38,8 @@ import pathfinding
 import edge_cost_arrays
 import graph_csr
 import pathfinding_numba
+import mapbox_usage
+import weather_proxy
 from barrier_clusters import (
     BARRIER_HARD_COST,
     barrier_additive_penalty,
@@ -62,6 +64,7 @@ import auth_admin
 import auth_middleware
 import auth_rate_limit
 import route_vias
+from cycleway_clusters import classify_cycleway_edge
 from auth_middleware import require_auth, assert_profile_access, extract_bearer_token
 from auth_rate_limit import client_ip_from_request
 
@@ -100,6 +103,8 @@ def _apply_early_cli_env():
     """Flags that must take effect before bootstrap (import-time)."""
     if "--no-live" in sys.argv:
         os.environ["SKIP_DISRUPTION_FETCH"] = "1"
+    if "--weather-test" in sys.argv:
+        os.environ["WEATHER_TEST_MODE"] = "1"
 
 
 _apply_early_cli_env()
@@ -998,9 +1003,12 @@ def apply_endpoint_stubs(coords, start_snap, end_snap):
 
 
 def _snap_meta(snap):
+    distance_m = round(snap.distance_m, 1)
     return {
-        "distance_m": round(snap.distance_m, 1),
+        "distance_m": distance_m,
         "anchor": str(snap.anchor_node),
+        # Soft warn: route still succeeds; client should prompt user to check accuracy.
+        "far": snap.distance_m > tfl_live.SNAP_SOFT_WARN_M,
     }
 
 # --- STATS ---
@@ -1196,6 +1204,317 @@ def get_disruption_sections(path_nodes):
         if live_disruptions.get_edge_disruption(u, v):
             out.append(extract_segment_geometry(u, v))
     return out
+
+
+def _edge_length_m(d):
+    try:
+        return float(d.get('length', 0.0) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _typed_chunk(path, kind, length_m, **extra):
+    """Typed overlay feature for v2 (legacy bare polylines remain separate)."""
+    feat = {"path": path, "kind": kind, "length_m": round(float(length_m or 0.0), 2)}
+    feat.update(extra)
+    return feat
+
+
+def _edge_attrs(u, v):
+    raw = G.get_edge_data(u, v) or {}
+    if G.is_multigraph():
+        return next(iter(raw.values())) if raw else {}
+    return raw or {}
+
+
+def _merge_path_coords(paths):
+    """Concatenate consecutive edge polylines, dropping duplicate joints."""
+    out = []
+    for path in paths:
+        if not path:
+            continue
+        if not out:
+            out.extend(path)
+            continue
+        # Drop first point if it duplicates the previous end
+        if _coords_close(out[-1], path[0]):
+            out.extend(path[1:])
+        else:
+            out.extend(path)
+    return out
+
+
+def _collapse_edge_runs(edge_feats):
+    """
+    Merge path-adjacent edges that share the same run_key into one feature.
+    Each edge_feat needs: {run_key, kind, path, length_m, edge_i, ...}.
+    Non-adjacent edges (gap in edge_i) never merge even with the same key.
+    O(n) in emitted edges.
+    """
+    if not edge_feats:
+        return []
+    runs = []
+    cur = None
+    paths_buf = []
+    last_i = None
+    for feat in edge_feats:
+        key = feat.get("run_key")
+        edge_i = feat.get("edge_i")
+        adjacent = last_i is not None and edge_i is not None and edge_i == last_i + 1
+        if cur is None or key != cur["run_key"] or not adjacent:
+            if cur is not None:
+                cur["path"] = _merge_path_coords(paths_buf)
+                cur["length_m"] = round(float(cur.get("length_m") or 0.0), 2)
+                if "elev_gain_m" in cur:
+                    cur["elev_gain_m"] = round(float(cur["elev_gain_m"] or 0.0), 1)
+                cur.pop("run_key", None)
+                cur.pop("edge_i", None)
+                runs.append(cur)
+            cur = {k: v for k, v in feat.items() if k not in ("path",)}
+            cur["length_m"] = float(feat.get("length_m") or 0.0)
+            if "elev_gain_m" in feat:
+                cur["elev_gain_m"] = float(feat.get("elev_gain_m") or 0.0)
+            paths_buf = [feat["path"]]
+        else:
+            cur["length_m"] = float(cur.get("length_m") or 0.0) + float(feat.get("length_m") or 0.0)
+            if "elev_gain_m" in feat:
+                cur["elev_gain_m"] = float(cur.get("elev_gain_m") or 0.0) + float(
+                    feat.get("elev_gain_m") or 0.0
+                )
+            for field in ("name", "label", "surface", "category", "description"):
+                if not cur.get(field) and feat.get(field):
+                    cur[field] = feat[field]
+            paths_buf.append(feat["path"])
+        last_i = edge_i
+    if cur is not None:
+        cur["path"] = _merge_path_coords(paths_buf)
+        cur["length_m"] = round(float(cur.get("length_m") or 0.0), 2)
+        if "elev_gain_m" in cur:
+            cur["elev_gain_m"] = round(float(cur["elev_gain_m"] or 0.0), 1)
+        cur.pop("run_key", None)
+        cur.pop("edge_i", None)
+        runs.append(cur)
+    for i, r in enumerate(runs):
+        r["run_id"] = f"{r.get('kind', 'x')}-{i}"
+    return runs
+
+
+def _attraction_label(d, kind):
+    name = str(d.get("attraction_name") or "").strip()
+    if name:
+        # Multiple names joined with ";" — take first
+        return name.split(";")[0].strip()
+    if kind == "river":
+        return "River"
+    if kind == "park":
+        return "Park"
+    if kind == "sight":
+        return "Attraction"
+    return kind
+
+
+def get_typed_green_sections(path_nodes):
+    """Park / river / sight runs (park wins). Connected same-name runs merged."""
+    edges = []
+    for i in range(len(path_nodes) - 1):
+        u, v = path_nodes[i], path_nodes[i + 1]
+        d = _edge_attrs(u, v)
+        kind = None
+        if _is_yes_attr(d.get("is_park")):
+            kind = "park"
+        elif _is_yes_attr(d.get("is_river")):
+            kind = "river"
+        elif _is_yes_attr(d.get("is_sight")):
+            kind = "sight"
+        if not kind:
+            continue
+        name = _attraction_label(d, kind)
+        edges.append({
+            "edge_i": i,
+            "run_key": (kind, name.lower()),
+            "kind": kind,
+            "name": name,
+            "label": name if kind != "river" else "River",
+            "path": extract_segment_geometry(u, v),
+            "length_m": _edge_length_m(d),
+        })
+    return _collapse_edge_runs(edges)
+
+
+def get_typed_cycle_sections(path_nodes):
+    """
+    Cycle infrastructure runs. Vehicular-free / OSM cycleway clusters win;
+    TfL only when the edge has no VF infrastructure.
+    """
+    edges = []
+    for i in range(len(path_nodes) - 1):
+        u, v = path_nodes[i], path_nodes[i + 1]
+        d = _edge_attrs(u, v)
+        kind = None
+        classified = classify_cycleway_edge(d)
+        if classified:
+            key = classified.get("cluster_key")
+            if key in ("segregated", "bus_shared", "car_shared"):
+                kind = key
+        if kind is None and is_vehicular_free(d):
+            kind = "segregated"
+        if kind is None and _is_tfl_network(d):
+            kind = "tfl"
+        if not kind:
+            continue
+        edges.append({
+            "edge_i": i,
+            "run_key": kind,
+            "kind": kind,
+            "path": extract_segment_geometry(u, v),
+            "length_m": _edge_length_m(d),
+        })
+    return _collapse_edge_runs(edges)
+
+
+def get_typed_surface_sections(path_nodes):
+    """Rough / unpaved runs, merged by surface type."""
+    edges = []
+    for i in range(len(path_nodes) - 1):
+        u, v = path_nodes[i], path_nodes[i + 1]
+        d = _edge_attrs(u, v)
+        if str(d.get("type") or "").strip().lower() == "steps":
+            continue
+        surface = str(d.get("surface") or "").strip().lower()
+        smoothness = str(d.get("smoothness") or "").strip().lower()
+        if surface not in BAD_SURFACES and smoothness not in BAD_SMOOTHNESS:
+            continue
+        surface_label = surface if surface in BAD_SURFACES else (smoothness or "rough")
+        edges.append({
+            "edge_i": i,
+            "run_key": ("rough", surface_label),
+            "kind": "rough",
+            "surface": surface_label,
+            "label": surface_label.replace("_", " "),
+            "path": extract_segment_geometry(u, v),
+            "length_m": _edge_length_m(d),
+        })
+    return _collapse_edge_runs(edges)
+
+
+def get_typed_hill_sections(path_nodes):
+    """Connected steep runs with cumulative |elevation| change (hm)."""
+    edges = []
+    for i in range(len(path_nodes) - 1):
+        u, v = path_nodes[i], path_nodes[i + 1]
+        d = _edge_attrs(u, v)
+        grade = float(d.get("grade", 0.0) or 0.0)
+        if not (grade > UP_THRESH or grade < DOWN_THRESH):
+            continue
+        length_m = _edge_length_m(d)
+        try:
+            ele_u = float(G.nodes[u].get("elevation", 0.0) or 0.0)
+            ele_v = float(G.nodes[v].get("elevation", 0.0) or 0.0)
+            elev_gain_m = abs(ele_v - ele_u)
+        except (TypeError, ValueError, KeyError):
+            elev_gain_m = abs(grade) * length_m
+        edges.append({
+            "edge_i": i,
+            "run_key": "steep",
+            "kind": "steep",
+            "path": extract_segment_geometry(u, v),
+            "length_m": length_m,
+            "elev_gain_m": elev_gain_m,
+            "grade": round(grade, 4),
+        })
+    return _collapse_edge_runs(edges)
+
+
+def get_typed_light_sections(path_nodes):
+    """Connected lit / unlit runs."""
+    edges = []
+    for i in range(len(path_nodes) - 1):
+        u, v = path_nodes[i], path_nodes[i + 1]
+        d = _edge_attrs(u, v)
+        kind = "lit" if is_lit(d) else "unlit"
+        edges.append({
+            "edge_i": i,
+            "run_key": kind,
+            "kind": kind,
+            "path": extract_segment_geometry(u, v),
+            "length_m": _edge_length_m(d),
+        })
+    return _collapse_edge_runs(edges)
+
+
+def get_typed_disruption_sections(path_nodes):
+    """Connected traffic runs — one feature (and one marker) per jam."""
+    edges = []
+    for i in range(len(path_nodes) - 1):
+        u, v = path_nodes[i], path_nodes[i + 1]
+        info = live_disruptions.get_edge_disruption(u, v)
+        if not info:
+            continue
+        d = _edge_attrs(u, v)
+        if not isinstance(info, dict):
+            info = {}
+        did = str(info.get("disruption_id") or "").strip()
+        edges.append({
+            "edge_i": i,
+            "run_key": ("traffic", did or "_adj"),
+            "kind": "traffic",
+            "path": extract_segment_geometry(u, v),
+            "length_m": _edge_length_m(d),
+            "source": info.get("source") or "live",
+            "severity": info.get("severity") or info.get("magnitudeOfDelay"),
+            "category": info.get("category") or info.get("iconCategory") or "Disruption",
+            "description": (info.get("description") or "")[:180],
+            "disruption_id": did,
+        })
+    return _collapse_edge_runs(edges)
+
+
+def build_v2_overlay_bundle(path_nodes, live_applied=False):
+    """Typed overlay payload for v2 mode rail (keeps legacy keys elsewhere)."""
+    return {
+        "green_typed": get_typed_green_sections(path_nodes),
+        "cycle_typed": get_typed_cycle_sections(path_nodes),
+        "surface_typed": get_typed_surface_sections(path_nodes),
+        "hill_typed": get_typed_hill_sections(path_nodes),
+        "light_typed": get_typed_light_sections(path_nodes),
+        "disruption_typed": get_typed_disruption_sections(path_nodes) if live_applied else [],
+    }
+
+
+ELEVATION_PROFILE_MAX_POINTS = 120
+
+
+def build_elevation_profile(path_nodes, max_points=ELEVATION_PROFILE_MAX_POINTS):
+    """
+    Distance-elevation samples along the optimized path (Dynamic Island chart).
+    Returns [{"d_m": metres_from_start, "elev_m": node_elevation}, ...],
+    downsampled to max_points keeping first and last samples.
+    """
+    if not path_nodes or len(path_nodes) < 2:
+        return []
+
+    def _node_elev(n, fallback=0.0):
+        try:
+            return float(G.nodes[n].get("elevation", fallback) or fallback)
+        except (TypeError, ValueError, KeyError):
+            return fallback
+
+    samples = [(0.0, _node_elev(path_nodes[0]))]
+    dist = 0.0
+    for i in range(len(path_nodes) - 1):
+        u, v = path_nodes[i], path_nodes[i + 1]
+        d = _edge_attrs(u, v)
+        dist += _edge_length_m(d)
+        samples.append((dist, _node_elev(v, samples[-1][1])))
+
+    if len(samples) > max_points:
+        step = (len(samples) - 1) / (max_points - 1)
+        picked = [samples[int(round(i * step))] for i in range(max_points)]
+        picked[0] = samples[0]
+        picked[-1] = samples[-1]
+        samples = picked
+
+    return [{"d_m": round(d, 1), "elev_m": round(e, 1)} for d, e in samples]
 
 
 def _edge_display_point(edge_data, lat_key, lon_key):
@@ -1557,6 +1876,15 @@ ROUTE_OVERLAY_CATALOG = {
 }
 
 
+@app.route('/night_status', methods=['GET'])
+def night_status():
+    """Whether London is currently dark for lighting overlay / light routing gate."""
+    return jsonify({
+        "is_dark": bool(night_time.is_dark()),
+        "forced_mode": night_time.get_forced_mode(),
+    })
+
+
 @app.route('/overlay_catalog', methods=['GET'])
 def get_overlay_catalog():
     """Metadata for main-app route overlay picker (display only; routing uses profile weights)."""
@@ -1613,6 +1941,56 @@ def create_profile():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/profiles/<profile_id>', methods=['PUT'])
+@require_auth
+def update_profile(profile_id):
+    try:
+        existing = g.profile_store.get_profile(profile_id, g.user_id)
+        err_resp, status = assert_profile_access(existing)
+        if err_resp is not None:
+            return err_resp, status
+        if existing.get("is_system"):
+            return jsonify({"error": "cannot edit system presets"}), 400
+        raw = request.get_json(silent=True) or {}
+        body = {k: v for k, v in raw.items() if k in ALLOWED_CREATE_FIELDS}
+        profile, err = g.profile_store.update_profile(
+            profile_id,
+            g.user_id,
+            body.get("name", ""),
+            body.get("weights", {}),
+            bike_type=body.get("bike_type"),
+            preset=body.get("preset"),
+            toggles=body.get("toggles"),
+        )
+        if err:
+            status = 401 if err == "authentication required" else (
+                404 if err == "profile not found" else 400
+            )
+            return jsonify({"error": err}), status
+        return jsonify(profile), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/profiles/<profile_id>', methods=['DELETE'])
+@require_auth
+def delete_profile(profile_id):
+    try:
+        profile = g.profile_store.get_profile(profile_id, g.user_id)
+        err_resp, status = assert_profile_access(profile)
+        if err_resp is not None:
+            return err_resp, status
+        if profile.get("is_system"):
+            return jsonify({"error": "cannot delete system presets"}), 400
+        ok, err = g.profile_store.delete_profile(profile_id, g.user_id)
+        if not ok:
+            status = 401 if err == "authentication required" else 404
+            return jsonify({"error": err or "profile not found"}), status
+        return jsonify({"ok": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # --- AUTH ACCOUNT ENDPOINTS (server-side Supabase; rate-limited) ---
 
 
@@ -1624,6 +2002,21 @@ def _rate_limited(result):
     resp.status_code = 429
     if result.retry_after_s:
         resp.headers["Retry-After"] = str(result.retry_after_s)
+    return resp
+
+
+def _quota_blocked(result):
+    """Return a 429 when mapbox_usage.QuotaResult.allowed is False."""
+    if result.allowed:
+        return None
+    resp = jsonify({
+        "error": result.message or "Mapbox quota exceeded",
+        "month": result.month,
+        "used": result.used,
+        "limit": result.limit,
+        "remaining": result.remaining,
+    })
+    resp.status_code = 429
     return resp
 
 
@@ -1841,6 +2234,9 @@ def geocode_suggest():
     blocked = _rate_limited(auth_rate_limit.check_geocode_allowed(ip))
     if blocked:
         return blocked
+    quota_block = _quota_blocked(mapbox_usage.check_search_session(session_token))
+    if quota_block:
+        return quota_block
     import urllib.parse
     import urllib.request
 
@@ -1859,6 +2255,7 @@ def geocode_suggest():
         with urllib.request.urlopen(url, timeout=10) as resp:
             import json
             data = json.loads(resp.read().decode("utf-8"))
+        mapbox_usage.record_search_session(session_token)
         return jsonify({"suggestions": data.get("suggestions") or []})
     except Exception as e:
         return jsonify({"error": str(e)}), 502
@@ -1876,6 +2273,9 @@ def geocode_retrieve(mapbox_id):
     blocked = _rate_limited(auth_rate_limit.check_geocode_allowed(ip))
     if blocked:
         return blocked
+    quota_block = _quota_blocked(mapbox_usage.check_search_session(session_token))
+    if quota_block:
+        return quota_block
     import urllib.parse
     import urllib.request
     import json
@@ -1902,9 +2302,56 @@ def geocode_retrieve(mapbox_id):
             or props.get("place_formatted")
             or f"{lat:.4f}, {lon:.4f}"
         )
+        mapbox_usage.record_search_session(session_token)
         return jsonify({"lat": lat, "lon": lon, "label": label})
     except Exception as e:
         return jsonify({"error": str(e)}), 502
+
+
+@app.route('/weather', methods=['GET'])
+def get_weather():
+    """
+    Open-Meteo proxy for the expanded island weather strip.
+    Query: lat, lon, optional at (ISO datetime — nearest hourly UTC slot).
+    """
+    try:
+        lat = float(request.args.get("lat"))
+        lon = float(request.args.get("lon"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "lat and lon required"}), 400
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return jsonify({"error": "lat/lon out of range"}), 400
+    at = (request.args.get("at") or "").strip() or None
+    try:
+        payload = weather_proxy.fetch_weather(lat, lon, at)
+        return jsonify(payload)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route('/mapbox/quota', methods=['GET'])
+def mapbox_quota():
+    """Monthly Mapbox usage vs hard cutoffs (file-backed)."""
+    return jsonify(mapbox_usage.snapshot())
+
+
+@app.route('/mapbox/map_load', methods=['POST'])
+def mapbox_map_load():
+    """
+    Reserve one GL JS map load before the client initializes Map.
+    Hard-cuts when MAPBOX_MAP_LOAD_LIMIT is reached (default 45k / mo).
+    """
+    result = mapbox_usage.try_consume_map_load()
+    blocked = _quota_blocked(result)
+    if blocked:
+        return blocked
+    return jsonify({
+        "ok": True,
+        "month": result.month,
+        "used": result.used,
+        "limit": result.limit,
+        "remaining": result.remaining,
+    })
 
 
 @app.route('/preset_config', methods=['GET'])
@@ -1976,9 +2423,12 @@ def get_route():
             w["vf_painted_lane"] = bool(vf_sel.get("painted_lane", False))
         else:
             w = user_profiles.build_weight_dict_from_request(request.args)
-            bt_arg = (request.args.get('bike_type') or '').strip().lower()
-            if bt_arg in user_profiles.BIKE_TYPES:
-                bike_type = bt_arg
+            toggles = {}
+
+        # Session bike override (does not mutate stored profile).
+        bt_arg = (request.args.get('bike_type') or '').strip().lower()
+        if bt_arg in user_profiles.BIKE_TYPES:
+            bike_type = bt_arg
 
         w["bike_type"] = bike_type
         speed_kmh = user_profiles.BIKE_SPEEDS_KMH.get(bike_type, 15.0)
@@ -1993,9 +2443,16 @@ def get_route():
         t_route = time.perf_counter()
         snaps = []
         for lat, lon in waypoints:
-            snap = tfl_live.snap_to_edge(lat, lon)
+            snap = tfl_live.snap_to_edge(
+                lat, lon, max_distance_m=tfl_live.SNAP_MAX_DISTANCE_M_ROUTE
+            )
             if not snap:
-                return jsonify({"error": "Could not snap to network"}), 400
+                return jsonify({
+                    "error": (
+                        "Could not snap to network — "
+                        "TUNE currently only supports Greater London"
+                    ),
+                }), 400
             snaps.append(snap)
         t_snap = time.perf_counter() - t_route
 
@@ -2190,6 +2647,8 @@ def get_route():
                 get_disruption_sections(path_optimized) if live_applied else []
             )
             node_highlights = get_node_highlights(path_optimized, w, overlay_mode=True)
+            overlay_typed = build_v2_overlay_bundle(path_optimized, live_applied=live_applied)
+            elevation_profile = build_elevation_profile(path_optimized)
 
             t_fast_total += t_fast
             t_opt_total += t_opt
@@ -2217,6 +2676,8 @@ def get_route():
                     "vehicular_free_chunks": vehicular_free_chunks,
                     "disruption_chunks": disruption_chunks,
                     "node_highlights": node_highlights,
+                    "elevation_profile": elevation_profile,
+                    **overlay_typed,
                 },
             })
 
@@ -2253,6 +2714,23 @@ def get_route():
             out = []
             for leg in legs_out:
                 out.extend(leg["safest"].get(key) or [])
+            return out
+
+        def _merge_elevation_profiles():
+            """Concatenate per-leg profiles, offsetting distances by prior legs."""
+            out = []
+            offset = 0.0
+            for leg in legs_out:
+                prof = leg["safest"].get("elevation_profile") or []
+                for i, p in enumerate(prof):
+                    if out and i == 0:
+                        continue  # joint point duplicates previous leg end
+                    out.append({
+                        "d_m": round(p["d_m"] + offset, 1),
+                        "elev_m": p["elev_m"],
+                    })
+                if prof:
+                    offset += prof[-1]["d_m"]
             return out
 
         return jsonify({
@@ -2314,6 +2792,13 @@ def get_route():
                 "vehicular_free_chunks": _merge_chunks("vehicular_free_chunks"),
                 "disruption_chunks": _merge_chunks("disruption_chunks"),
                 "node_highlights": _merge_chunks("node_highlights"),
+                "elevation_profile": _merge_elevation_profiles(),
+                "green_typed": _merge_chunks("green_typed"),
+                "cycle_typed": _merge_chunks("cycle_typed"),
+                "surface_typed": _merge_chunks("surface_typed"),
+                "hill_typed": _merge_chunks("hill_typed"),
+                "light_typed": _merge_chunks("light_typed"),
+                "disruption_typed": _merge_chunks("disruption_typed"),
             },
         })
 
@@ -2334,6 +2819,11 @@ if __name__ == '__main__':
         action="store_true",
         help="Skip TfL/TomTom fetch+poll (same as SKIP_DISRUPTION_FETCH=1 or LIVE_DISRUPTIONS=0)",
     )
+    parser.add_argument(
+        "--weather-test",
+        action="store_true",
+        help="Synthetic extreme weather on /weather — random scenario rotates every UTC minute",
+    )
     args = parser.parse_args()
 
     if args.day:
@@ -2341,5 +2831,11 @@ if __name__ == '__main__':
     elif args.night:
         night_time.set_forced_mode("night")
     # --no-live applied in _apply_early_cli_env() before bootstrap
+
+    if args.weather_test or weather_proxy.is_test_mode():
+        print(
+            "WEATHER TEST MODE: /weather returns synthetic extremes "
+            "(random scenario each UTC minute — expand island to preview)"
+        )
 
     app.run(debug=True, port=5000, use_reloader=USE_RELOADER)

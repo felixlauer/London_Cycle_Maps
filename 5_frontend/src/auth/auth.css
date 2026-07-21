@@ -1,4 +1,4 @@
-/* Auth modal — glassmorphism, matches ui.css design tokens. */
+/* Auth modal — solid panels, brand accent (v2 shell language). */
 
 .auth-overlay {
   position: fixed;
@@ -7,10 +7,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(10, 12, 16, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  animation: auth-fade-in 0.18s ease-out;
+  background: rgba(16, 24, 40, 0.35);
+  animation: auth-fade-in 0.18s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 @keyframes auth-fade-in {
@@ -20,37 +18,35 @@
 
 .auth-modal {
   --ui-bg: #ffffff;
-  --ui-bg-soft: #f6f7f9;
-  --ui-text: #23272d;
-  --ui-text-sub: #667085;
-  --ui-border: #e4e7ec;
-  --ui-accent: #d32f2f;
+  --ui-bg-soft: #f4f4f5;
+  --ui-text: #1c1c1e;
+  --ui-text-sub: #71717a;
+  --ui-border: #e5e7eb;
+  --ui-accent: #ff0061;
 
   width: min(380px, calc(100vw - 32px));
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid var(--ui-border);
-  background: color-mix(in srgb, var(--ui-bg) 88%, transparent);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 24px 64px rgba(16, 24, 40, 0.28);
+  background: var(--ui-bg);
+  box-shadow: 0 12px 36px rgba(16, 24, 40, 0.18);
   color: var(--ui-text);
   padding: 20px 22px 22px;
-  animation: auth-pop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
-  font-family: inherit;
+  animation: auth-pop 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
 }
 
 .auth-modal[data-theme='dark'] {
-  --ui-bg: #1d2025;
-  --ui-bg-soft: #24282e;
-  --ui-text: #e6e8eb;
-  --ui-text-sub: #9aa4b2;
-  --ui-border: #343a43;
-  --ui-accent: #40e0d0;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --ui-bg: #1c1c1e;
+  --ui-bg-soft: #2c2c2e;
+  --ui-text: #f4f4f5;
+  --ui-text-sub: #a1a1aa;
+  --ui-border: #3a3a3c;
+  --ui-accent: #ff0061;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
 }
 
 @keyframes auth-pop {
-  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
@@ -192,7 +188,7 @@
 }
 
 .auth-modal[data-theme='dark'] .auth-submit {
-  color: #10231f;
+  color: #fff;
 }
 
 .auth-submit:hover:not(:disabled) {
@@ -218,6 +214,45 @@
 
 .auth-link:hover {
   color: var(--ui-text);
+}
+
+/* Inline sidebar variant — same tokens as modal; sit inside sidebar stack */
+.auth-modal.auth-panel--inline {
+  width: 100%;
+  max-width: none;
+  border-radius: 11px;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  padding: 14px 14px 16px;
+  box-sizing: border-box;
+  box-shadow: none;
+  animation: none;
+}
+
+.auth-panel--inline .auth-modal__header {
+  margin-bottom: 10px;
+}
+
+.auth-panel--inline .auth-modal__brand {
+  color: var(--ui-text);
+}
+
+.auth-panel--inline .auth-modal__close {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ui-text-sub);
+}
+
+.auth-panel--inline .auth-modal__close:hover {
+  color: var(--ui-text);
+  background: var(--ui-bg-soft);
+}
+
+.auth-panel--inline .auth-field input {
+  background: var(--ui-bg-soft);
 }
 
 .auth-overlay--blocking {

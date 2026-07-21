@@ -4,12 +4,9 @@
  * When changing features or architecture, update 0_documentation/APP_MAIN.md
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, CircleMarker, Popup, useMapEvents, useMap, ZoomControl } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
 import './ui.css';
 
-import MapFlyTo from './MapFlyTo';
+import CycleMap from './map/CycleMap';
 import RouteOverlayPicker from './RouteOverlayPicker';
 import PresetWizard from './wizard/PresetWizard';
 import { emptyOverlayVisibility, defaultOverlayVisibility } from './routeOverlayCatalog';
@@ -35,14 +32,8 @@ import DepartAtControl, {
 import RoutePointsPanel, { MAX_VIAS } from './components/RoutePointsPanel';
 import LegAnalysisPager from './components/LegAnalysisPager';
 import { apiFetch, API_BASE } from './api/flaskClient';
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+import { pickInactiveLegIndex } from './map/RouteLayers';
 
-let DefaultIcon = L.icon({
-    iconUrl: icon, shadowUrl: iconShadow,
-    iconSize: [25, 41], iconAnchor: [12, 41]
-});
-L.Marker.prototype.options.icon = DefaultIcon;
 
 const R_MIN = 0.1;
 
@@ -314,162 +305,6 @@ const InspectorWindow = ({ data, position, onClose, theme }) => {
     );
 };
 
-function NodeHighlightMarkers({ nodeHighlights, showBarriers, showSignals, showJunctionDanger, showCalming, theme }) {
-  const map = useMap();
-  const [zoom, setZoom] = useState(() => map.getZoom());
-  useEffect(() => {
-    const onZoom = () => setZoom(map.getZoom());
-    map.on('zoomend', onZoom);
-    return () => map.off('zoomend', onZoom);
-  }, [map]);
-  const radiusScale = Math.pow(2, (zoom - 12) / 4);
-  const getRadius = (isJunctionDanger) => Math.max(1, Math.round((isJunctionDanger ? 1.5 : 1) * radiusScale));
-
-  const filtered = nodeHighlights.filter(h =>
-    (h.type === 'barrier' && showBarriers) ||
-    (h.type === 'signal' && showSignals) ||
-    ((h.type === 'junction' || h.type === 'junction_danger' || h.type === 'give_way' || h.type === 'stop_sign') && showJunctionDanger) ||
-    (h.type === 'calming' && showCalming)
-  );
-
-  const getFillColor = (type) => {
-    if (type === 'barrier') return theme.nodeBarrier;
-    if (type === 'signal') return theme.nodeSignal;
-    if (type === 'calming') return theme.nodeCalming;
-    return theme.nodeJunction;
-  };
-
-  return (
-    <>
-      {filtered.map((h, i) => (
-        <CircleMarker
-          key={`node-${i}-${h.lat}-${h.lon}`}
-          center={[h.lat, h.lon]}
-          radius={getRadius(h.type === 'junction_danger')}
-          pathOptions={{ fillColor: getFillColor(h.type), color: '#333', weight: 1.5, fillOpacity: 0.9 }}
-        >
-          <Popup>
-            <div style={{ fontSize: '12px', minWidth: '120px' }}>
-              <strong style={{ textTransform: 'capitalize' }}>{h.type.replace('_', ' ')}</strong>
-              {Object.entries(h.details || {}).map(([k, v]) => (
-                <div key={k}><span style={{ color: '#666' }}>{k}:</span> {String(v)}</div>
-              ))}
-            </div>
-          </Popup>
-        </CircleMarker>
-      ))}
-    </>
-  );
-}
-
-/**
- * Multi-leg map layers. react-leaflet v5 only reapplies stroke styles via `pathOptions`
- * (and create-time options) — changing top-level opacity props is ignored on update.
- * Remount keys + pathOptions so analysis paging actually swaps emphasis/overlays.
- */
-function MultiLegRouteLayers({
-  routeLegs,
-  activeLegIndex,
-  theme,
-  overlayVisibility,
-  lightingActive,
-}) {
-  const ordered = [
-    ...routeLegs.map((leg, i) => ({ leg, i })).filter(({ i }) => i !== activeLegIndex),
-    ...routeLegs.map((leg, i) => ({ leg, i })).filter(({ i }) => i === activeLegIndex),
-  ];
-
-  return ordered.map(({ leg, i }) => {
-    const active = i === activeLegIndex;
-    const fastestPath = leg?.fastest?.path;
-    const safest = leg?.safest || {};
-    const safestPath = safest.path;
-    return (
-      <React.Fragment key={`leg-${i}`}>
-        {fastestPath?.length > 1 && (
-          <Polyline
-            key={`fast-${i}-${active ? 'a' : 'i'}`}
-            positions={fastestPath}
-            pathOptions={{
-              color: theme.routeGrey,
-              weight: 6,
-              opacity: active ? 0.45 : 0.12,
-            }}
-          />
-        )}
-        {safestPath?.length > 1 && (
-          <Polyline
-            key={`safe-${i}-${active ? 'a' : 'i'}`}
-            positions={safestPath}
-            pathOptions={{
-              color: theme.routeOptimized,
-              // Inactive: same weight/opacity as the grey "fastest" underlay, keep optimized colour.
-              weight: active ? 5 : 6,
-              opacity: active ? 1.0 : 0.4,
-            }}
-          />
-        )}
-        {active && (
-          <React.Fragment key={`leg-overlays-${i}`}>
-            {overlayVisibility.lit && lightingActive && (safest.lit_chunks || []).map((s, j) => (
-              <Polyline
-                key={`lit-${i}-${j}`}
-                positions={s}
-                pathOptions={{ color: theme.litColor, weight: 4, opacity: 1.0 }}
-              />
-            ))}
-            {overlayVisibility.steep && !overlayVisibility.lit && (safest.steep_chunks || []).map((s, j) => (
-              <Polyline
-                key={`steep-${i}-${j}`}
-                positions={s}
-                pathOptions={{ color: theme.steepColor, weight: 5, opacity: 1.0 }}
-              />
-            ))}
-            {overlayVisibility.tflCycleway && (safest.tfl_cycleway_chunks || []).map((s, j) => (
-              <Polyline
-                key={`tfl-c-${i}-${j}`}
-                positions={s}
-                pathOptions={{ color: theme.tflCyclewayColor, weight: 4, opacity: 0.9 }}
-              />
-            ))}
-            {overlayVisibility.green && (safest.green_chunks || []).map((s, j) => (
-              <Polyline
-                key={`green-${i}-${j}`}
-                positions={s}
-                pathOptions={{ color: theme.greenColor, weight: 4, opacity: 0.9 }}
-              />
-            ))}
-            {overlayVisibility.vehicularFree && (safest.vehicular_free_chunks || []).map((s, j) => (
-              <Polyline
-                key={`vf-${i}-${j}`}
-                positions={s}
-                pathOptions={{ color: theme.vehicularFreeColor, weight: 4, opacity: 0.9 }}
-              />
-            ))}
-            {overlayVisibility.disruptions && (safest.disruption_chunks || []).map((s, j) => (
-              <Polyline
-                key={`dis-${i}-${j}`}
-                positions={s}
-                pathOptions={{ color: theme.disruptionColor, weight: 5, opacity: 0.9 }}
-              />
-            ))}
-            {(overlayVisibility.barriers || overlayVisibility.signals || overlayVisibility.junctionDanger || overlayVisibility.calming) && (
-              <NodeHighlightMarkers
-                nodeHighlights={safest.node_highlights || []}
-                showBarriers={overlayVisibility.barriers}
-                showSignals={overlayVisibility.signals}
-                showJunctionDanger={overlayVisibility.junctionDanger}
-                showCalming={overlayVisibility.calming}
-                theme={theme}
-              />
-            )}
-          </React.Fragment>
-        )}
-      </React.Fragment>
-    );
-  });
-}
-
 // --- MAIN APP ---
 
 function AppInner() {
@@ -566,7 +401,6 @@ function AppInner() {
       tflCyclewayColor: '#2196F3', greenColor: '#009688', vehicularFreeColor: '#7B1FA2',
       nodeBarrier: '#5D4037', nodeSignal: '#F57C00', nodeJunction: '#795548', nodeCalming: '#00838F',
       disruptionColor: '#FF0000',
-      tileFilter: 'invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%)'
   } : {
       mode: 'light', bg: 'white',
       textMain: '#333', textSub: '#666', border: '#f0f0f0', toggleInactive: '#ccc',
@@ -574,7 +408,6 @@ function AppInner() {
       tflCyclewayColor: '#1976D2', greenColor: '#00796B', vehicularFreeColor: '#7B1FA2',
       nodeBarrier: '#5D4037', nodeSignal: '#F57C00', nodeJunction: '#795548', nodeCalming: '#00838F',
       disruptionColor: '#FFD700',
-      tileFilter: 'none'
   };
 
   const toggleState = {
@@ -1257,90 +1090,99 @@ function AppInner() {
 
   const disruptionStatusLabel = [tflDisruptionStatus, tomtomDisruptionStatus].filter(Boolean).join(' · ');
 
-  function MapEvents() {
-    const disruptionActive = routeRevealed && overlayVisibility.disruptions;
+  const disruptionActive = routeRevealed && overlayVisibility.disruptions;
 
-    const doStartEndClick = (e) => {
-      const lat = e.latlng.lat;
-      const lon = e.latlng.lng;
-      const mapLabel = 'Map location';
-      if (!start) {
-        setStartPoint(lat, lon, mapLabel);
-        return;
-      }
-      const emptyViaIdx = vias.findIndex((v) => !v.coord);
-      if (emptyViaIdx >= 0) {
-        bumpRouteRequest();
-        setVias((prev) => prev.map((v, i) => (
-          i === emptyViaIdx ? { ...v, coord: [lat, lon], label: mapLabel } : v
-        )));
-        setRouteRevealed(false);
-        clearRouteData();
-        setStatus('Calculating route in background...');
-        return;
-      }
-      if (!end) {
-        setEndPoint(lat, lon, mapLabel);
-        return;
-      }
-      // Restart: new start, clear end + vias.
-      bumpRouteRequest();
+  const applyMapPoint = useCallback((lat, lon) => {
+    const mapLabel = 'Map location';
+    if (!start) {
       setStartPoint(lat, lon, mapLabel);
-      setEnd(null);
-      setEndLabel('');
-      setVias([]);
-      clearRouteData();
+      return;
+    }
+    const emptyViaIdx = vias.findIndex((v) => !v.coord);
+    if (emptyViaIdx >= 0) {
+      bumpRouteRequest();
+      setVias((prev) => prev.map((v, i) => (
+        i === emptyViaIdx ? { ...v, coord: [lat, lon], label: mapLabel } : v
+      )));
       setRouteRevealed(false);
-      setStatus('New Start.');
+      clearRouteData();
+      setStatus('Calculating route in background...');
+      return;
+    }
+    if (!end) {
+      setEndPoint(lat, lon, mapLabel);
+      return;
+    }
+    bumpRouteRequest();
+    setStartPoint(lat, lon, mapLabel);
+    setEnd(null);
+    setEndLabel('');
+    setVias([]);
+    clearRouteData();
+    setRouteRevealed(false);
+    setStatus('New Start.');
+  }, [start, end, vias]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleMapClick = useCallback((e) => {
+    if (inspectorData) {
+      setInspectorData(null);
+      setInspectorGeo(null);
+      return;
+    }
+    if (routeRevealed && routeLegs?.length > 1) {
+      const legIdx = pickInactiveLegIndex(e.target, e.point, routeLegs, activeLegIndex);
+      if (legIdx != null) {
+        setActiveLegIndex(legIdx);
+        return;
+      }
+    }
+    const lat = e.lngLat.lat;
+    const lon = e.lngLat.lng;
+    const pos = {
+      x: e.originalEvent?.clientX ?? e.point?.x,
+      y: e.originalEvent?.clientY ?? e.point?.y,
     };
 
-    useMapEvents({
-      click(e) {
-        if (inspectorData) {
-          setInspectorData(null);
-          setInspectorGeo(null);
-          return;
-        }
-        const lat = e.latlng.lat, lon = e.latlng.lng;
-        const pos = { x: e.originalEvent.clientX, y: e.originalEvent.clientY };
+    if (disruptionActive) {
+      const checkTfl = fetch(`${API_BASE}/tfl_disruption_at?lat=${lat}&lon=${lon}&tolerance=0.00025`).then((r) => r.json());
+      const checkTomtom = fetch(`${API_BASE}/tomtom_disruption_at?lat=${lat}&lon=${lon}&tolerance=0.00025`).then((r) => r.json());
+      Promise.all([checkTfl, checkTomtom]).then(([tflData, tomtomData]) => {
+        const tflHit = tflData?.disruptions?.length > 0;
+        const tomtomHit = tomtomData?.disruptions?.length > 0;
+        if (tflHit) setTflDisruptionDetail({ disruptions: tflData.disruptions, position: pos });
+        else setTflDisruptionDetail(null);
+        if (tomtomHit) setTomtomDisruptionDetail({ disruptions: tomtomData.disruptions, position: pos });
+        else setTomtomDisruptionDetail(null);
+        if (tflHit || tomtomHit) return;
+        applyMapPoint(lat, lon);
+      });
+      return;
+    }
+    applyMapPoint(lat, lon);
+  }, [inspectorData, disruptionActive, applyMapPoint, routeRevealed, routeLegs, activeLegIndex]);
 
-        if (disruptionActive) {
-          const checkTfl = fetch(`${API_BASE}/tfl_disruption_at?lat=${lat}&lon=${lon}&tolerance=0.00025`).then(r => r.json());
-          const checkTomtom = fetch(`${API_BASE}/tomtom_disruption_at?lat=${lat}&lon=${lon}&tolerance=0.00025`).then(r => r.json());
-          Promise.all([checkTfl, checkTomtom]).then(([tflData, tomtomData]) => {
-            const tflHit = tflData?.disruptions?.length > 0;
-            const tomtomHit = tomtomData?.disruptions?.length > 0;
-            if (tflHit) setTflDisruptionDetail({ disruptions: tflData.disruptions, position: pos });
-            else setTflDisruptionDetail(null);
-            if (tomtomHit) setTomtomDisruptionDetail({ disruptions: tomtomData.disruptions, position: pos });
-            else setTomtomDisruptionDetail(null);
-            if (tflHit || tomtomHit) return;
-            doStartEndClick(e);
+  const handleMapContextMenu = useCallback((e) => {
+    if (e.originalEvent?.preventDefault) e.originalEvent.preventDefault();
+    setTflDisruptionDetail(null);
+    setTomtomDisruptionDetail(null);
+    const lat = e.lngLat.lat;
+    const lon = e.lngLat.lng;
+    fetch(`${API_BASE}/inspect?lat=${lat}&lon=${lon}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.error) {
+          setInspectorData(data.tags);
+          setInspectorGeo(data.geometry);
+          setInspectorPos({
+            x: e.originalEvent?.clientX ?? e.point?.x,
+            y: e.originalEvent?.clientY ?? e.point?.y,
           });
-          return;
         }
-        doStartEndClick(e);
-      },
-      contextmenu(e) {
-        setTflDisruptionDetail(null);
-        setTomtomDisruptionDetail(null);
-        fetch(`${API_BASE}/inspect?lat=${e.latlng.lat}&lon=${e.latlng.lng}`)
-            .then(res => res.json())
-            .then(data => {
-                if (!data.error) {
-                    setInspectorData(data.tags);
-                    setInspectorGeo(data.geometry);
-                    setInspectorPos({ x: e.originalEvent.clientX, y: e.originalEvent.clientY });
-                }
-            });
-      }
-    });
-    return null;
-  }
+      });
+  }, []);
 
   return (
     <div className="app-root" data-theme={theme.mode} style={{ height: "100vh", position: "relative", fontFamily: "Segoe UI, Arial, sans-serif" }}>
-      <style>{`.leaflet-tile { filter: ${theme.tileFilter} !important; }`}</style>
 
       <TopBar
         status={status}
@@ -1493,28 +1335,32 @@ function AppInner() {
           position={tomtomDisruptionDetail.position} onClose={() => setTomtomDisruptionDetail(null)} theme={theme} />
       )}
 
-      <MapContainer center={[51.505, -0.09]} zoom={13} zoomControl={false} style={{ height: "100%", width: "100%", background: "#111" }}>
-        <ZoomControl position="bottomright" />
-        <MapFlyTo target={flyTarget} />
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
-        <MapEvents />
-        {start && <Marker position={start} />}
-        {end && <Marker position={end} />}
-        {vias.map((v) => (
-          v.coord ? (
-            <CircleMarker
-              key={v.id}
-              center={v.coord}
-              radius={7}
-              pathOptions={{
-                color: '#1a1a1a',
-                fillColor: '#ffffff',
-                fillOpacity: 1,
-                weight: 2,
-              }}
-            />
-          ) : null
-        ))}
+      <CycleMap
+        theme={theme}
+        flyTarget={flyTarget}
+        start={start}
+        end={end}
+        vias={vias}
+        onClick={handleMapClick}
+        onContextMenu={handleMapContextMenu}
+        routeRevealed={routeRevealed}
+        routeLegs={routeLegs}
+        activeLegIndex={activeLegIndex}
+        overlayVisibility={overlayVisibility}
+        lightingActive={!!lastRouteMeta?.lightingActive}
+        fastestPath={fastestData?.path}
+        safestPath={safestData?.path}
+        litSegments={litSegments}
+        steepSegments={steepSegments}
+        tflCyclewayChunks={tflCyclewayChunks}
+        greenChunks={greenChunks}
+        vehicularFreeChunks={vehicularFreeChunks}
+        disruptionChunks={disruptionChunks}
+        nodeHighlights={nodeHighlights}
+        walkStartPath={walkStartPath}
+        walkEndPath={walkEndPath}
+        inspectorGeo={inspectorGeo}
+      >
         {hireStep === 'dropoff' && pickupStation && (
           <SantanderStationsLayer
             stations={[pickupStation]}
@@ -1540,66 +1386,7 @@ function AppInner() {
             onExpand={(st) => setExpandedStationId((prev) => (prev === st.id ? null : st.id))}
           />
         )}
-        {walkStartPath && walkStartPath.length > 1 && (
-          <Polyline positions={walkStartPath} color="#4fc3f7" weight={5} opacity={0.95} dashArray="10 8" />
-        )}
-        {walkEndPath && walkEndPath.length > 1 && (
-          <Polyline positions={walkEndPath} color="#4fc3f7" weight={5} opacity={0.95} dashArray="10 8" />
-        )}
-        {inspectorGeo && <Polyline positions={inspectorGeo} color="red" weight={6} opacity={0.8} />}
-        {routeRevealed && routeLegs && routeLegs.length > 1 ? (
-          <MultiLegRouteLayers
-            routeLegs={routeLegs}
-            activeLegIndex={activeLegIndex}
-            theme={theme}
-            overlayVisibility={overlayVisibility}
-            lightingActive={!!lastRouteMeta?.lightingActive}
-          />
-        ) : (
-          <>
-            {routeRevealed && fastestData && (
-              <Polyline
-                positions={fastestData.path}
-                pathOptions={{ color: theme.routeGrey, weight: 6, opacity: 0.4 }}
-              />
-            )}
-            {routeRevealed && safestData && (
-              <Polyline
-                positions={safestData.path}
-                pathOptions={{ color: theme.routeOptimized, weight: 5, opacity: 1.0 }}
-              />
-            )}
-            {routeRevealed && overlayVisibility.lit && lastRouteMeta?.lightingActive && litSegments.map((s, i) => (
-              <Polyline key={`lit-${i}`} positions={s} pathOptions={{ color: theme.litColor, weight: 4, opacity: 1.0 }} />
-            ))}
-            {routeRevealed && overlayVisibility.steep && !overlayVisibility.lit && steepSegments.map((s, i) => (
-              <Polyline key={`steep-${i}`} positions={s} pathOptions={{ color: theme.steepColor, weight: 5, opacity: 1.0 }} />
-            ))}
-            {routeRevealed && overlayVisibility.tflCycleway && tflCyclewayChunks.map((s, i) => (
-              <Polyline key={`tfl-c-${i}`} positions={s} pathOptions={{ color: theme.tflCyclewayColor, weight: 4, opacity: 0.9 }} />
-            ))}
-            {routeRevealed && overlayVisibility.green && greenChunks.map((s, i) => (
-              <Polyline key={`green-${i}`} positions={s} pathOptions={{ color: theme.greenColor, weight: 4, opacity: 0.9 }} />
-            ))}
-            {routeRevealed && overlayVisibility.vehicularFree && vehicularFreeChunks.map((s, i) => (
-              <Polyline key={`vf-${i}`} positions={s} pathOptions={{ color: theme.vehicularFreeColor, weight: 4, opacity: 0.9 }} />
-            ))}
-            {routeRevealed && overlayVisibility.disruptions && disruptionChunks.map((s, i) => (
-              <Polyline key={`dis-${i}`} positions={s} pathOptions={{ color: theme.disruptionColor, weight: 5, opacity: 0.9 }} />
-            ))}
-            {routeRevealed && (overlayVisibility.barriers || overlayVisibility.signals || overlayVisibility.junctionDanger || overlayVisibility.calming) && (
-              <NodeHighlightMarkers
-                nodeHighlights={nodeHighlights}
-                showBarriers={overlayVisibility.barriers}
-                showSignals={overlayVisibility.signals}
-                showJunctionDanger={overlayVisibility.junctionDanger}
-                showCalming={overlayVisibility.calming}
-                theme={theme}
-              />
-            )}
-          </>
-        )}
-      </MapContainer>
+      </CycleMap>
 
       {/* TEST MODE PANEL — level 1: Supabase bypass; level 2 (nested): manual weights */}
       {testMode && (

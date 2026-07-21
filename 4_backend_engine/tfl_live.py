@@ -35,9 +35,14 @@ API_TIMEOUT_S = 15
 
 # Matching refinement (aligned with 3_pipeline/tag_tfl_routes.py)
 POINT_BUFFER_DEG = 0.0001          # ~11 m at London — only edges with BOTH endpoints within this (tighter)
-SNAP_MAX_DISTANCE_M_DEFAULT = 50.0
+# Soft accuracy threshold: snaps beyond this still succeed for routing, but clients warn.
+SNAP_SOFT_WARN_M = 50.0
+SNAP_MAX_DISTANCE_M_DEFAULT = SNAP_SOFT_WARN_M  # inspect / legacy default
+# Hard fail for /route: allow far geocodes (parks, riverside) to still find a node.
+SNAP_MAX_DISTANCE_M_ROUTE = 1000.0
 SNAP_QUERY_BUFFER_DEG = 0.00045    # ~50 m candidate search at London latitudes
 SNAP_QUERY_BUFFER_WIDE_DEG = 0.001 # ~111 m fallback if sparse local mesh
+_M_PER_DEG_LAT = 111_320.0         # STRtree buffers are in degrees; lat scale is conservative
 LINE_BUFFER_DEG = 0.0001           # ~10 m corridor for LineString/MultiLineString
 POLYGON_EDGE_BUFFER_DEG = 0.00005 # ~5 m tolerance for polygon boundary
 ALIGNMENT_THRESHOLD = 0.5          # >= 50% of edge length must lie in disruption zone (tag_tfl_routes)
@@ -144,6 +149,15 @@ def is_snap_ready():
     return _edge_tree is not None and _graph_ref is not None
 
 
+def _snap_query_buffers_deg(max_distance_m: float):
+    """Progressive STRtree buffers; final buffer covers max_distance_m with margin."""
+    buffers = [SNAP_QUERY_BUFFER_DEG, SNAP_QUERY_BUFFER_WIDE_DEG]
+    wide = (float(max_distance_m) * 1.15) / _M_PER_DEG_LAT
+    if wide > buffers[-1]:
+        buffers.append(wide)
+    return buffers
+
+
 def snap_to_edge(lat, lon, max_distance_m=SNAP_MAX_DISTANCE_M_DEFAULT):
     """
     Globally nearest point on any graph edge (STRtree + exact project).
@@ -157,7 +171,7 @@ def snap_to_edge(lat, lon, max_distance_m=SNAP_MAX_DISTANCE_M_DEFAULT):
     best_idx = None
     best_dist_deg = float("inf")
 
-    for buffer_deg in (SNAP_QUERY_BUFFER_DEG, SNAP_QUERY_BUFFER_WIDE_DEG):
+    for buffer_deg in _snap_query_buffers_deg(max_distance_m):
         candidate_idxs = _edge_tree.query(click.buffer(buffer_deg))
         if np.isscalar(candidate_idxs):
             candidate_idxs = [int(candidate_idxs)]
