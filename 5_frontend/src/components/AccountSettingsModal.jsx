@@ -1,13 +1,14 @@
 /**
- * Account settings: change password (verify current) and GDPR account deletion.
+ * Account settings: edit name, change password, GDPR account deletion.
  * Rendered at App root (not inside the top bar) so fixed overlay centers on viewport.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import '../auth/auth.css';
 
 export default function AccountSettingsModal({ onClose, themeMode }) {
-  const { user, changePassword, deleteAccount } = useAuth();
+  const { user, changePassword, updateDisplayName, deleteAccount } = useAuth();
+  const [displayName, setDisplayName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -16,6 +17,24 @@ export default function AccountSettingsModal({ onClose, themeMode }) {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setDisplayName(user?.display_name || '');
+  }, [user?.display_name]);
+
+  const handleUpdateName = async (e) => {
+    e.preventDefault();
+    setError('');
+    setNotice('');
+    setBusy(true);
+    try {
+      const { error: err } = await updateDisplayName(displayName);
+      if (err) setError(err);
+      else setNotice(displayName.trim() ? 'Name updated.' : 'Name cleared.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -64,6 +83,26 @@ export default function AccountSettingsModal({ onClose, themeMode }) {
         <p className="auth-settings__signed-in">
           Signed in as <strong>{user?.email}</strong>
         </p>
+
+        <section className="auth-settings__section">
+          <h5 className="auth-settings__title">Edit name</h5>
+          <form className="auth-form" onSubmit={handleUpdateName}>
+            <label className="auth-field">
+              <span>Name</span>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="What should we call you?"
+                autoComplete="name"
+                maxLength={80}
+              />
+            </label>
+            <button type="submit" className="auth-submit" disabled={busy}>
+              Update name
+            </button>
+          </form>
+        </section>
 
         <section className="auth-settings__section">
           <h5 className="auth-settings__title">Change password</h5>

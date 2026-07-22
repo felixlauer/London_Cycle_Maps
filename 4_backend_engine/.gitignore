@@ -1,7 +1,6 @@
 # Backend engine – do not commit secrets or generated data
 .env
 .env.*
-!.env.example
 graph-cache/
 run_command.txt
 user_profiles.json

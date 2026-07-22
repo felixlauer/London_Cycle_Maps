@@ -223,6 +223,10 @@
     flex-direction: column-reverse;
     align-items: flex-end;
     gap: 6px;
+    transition:
+      right 320ms var(--mc-ease),
+      top 360ms var(--mc-ease),
+      gap 280ms var(--mc-ease);
   }
 
   .map-shell.is-island-expanded .map-ctl {
@@ -235,17 +239,17 @@
 
   .map-ctl__nav,
   .map-ctl--compact .overlay-pill {
-    width: 44px;
+    width: 52px;
     box-sizing: border-box;
   }
 
   .map-ctl__nav {
-    border-radius: 14px;
+    border-radius: 16px;
   }
 
   /* Same outer width as nav: CSS ring replaces SVG stroke so sizes match */
   .map-ctl--compact .overlay-pill {
-    border-radius: 16px;
+    border-radius: 18px;
     box-shadow:
       var(--shell-shadow),
       0 0 0 1px var(--shell-border);
@@ -256,18 +260,18 @@
   }
 
   .map-ctl__nav-btn {
-    height: 36px;
-    min-height: 36px;
+    height: 42px;
+    min-height: 42px;
   }
 
   .map-ctl__nav-btn svg {
-    width: 15px;
-    height: 15px;
+    width: 18px;
+    height: 18px;
   }
 
   .map-ctl__north-icon {
-    width: 13px !important;
-    height: 13px !important;
+    width: 16px !important;
+    height: 16px !important;
   }
 }
 

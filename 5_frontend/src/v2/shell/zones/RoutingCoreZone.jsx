@@ -50,10 +50,12 @@ export default function RoutingCoreZone(props) {
     canGetRoute,
     onBlocked,
     startPlaceholder,
+    endPlaceholder,
     locationAsStart = false,
     routeStart = null,
     favouriteOrder,
     onEditFavourites,
+    onMapPickTargetChange,
   } = props;
 
   const isMobile = useIsMobile();
@@ -186,6 +188,8 @@ export default function RoutingCoreZone(props) {
               }}
               onFlyTo={onFlyTo}
               startPlaceholder={startPlaceholder}
+              endPlaceholder={endPlaceholder}
+              onMapPickTargetChange={onMapPickTargetChange}
               viasCollapsed={isMobile && viasCollapsed}
               onExpandVias={() => setViasCollapsed(false)}
             />

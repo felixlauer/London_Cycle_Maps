@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
-import { ChevronDown, KeyRound, Trash2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ChevronDown, KeyRound, Trash2, UserRound } from 'lucide-react';
 import { useAuth } from '../../../auth/AuthProvider';
 
 /**
  * Account section — same card language as routing waypoints (rc-wpcard).
+ * `expandedPanel` / `onExpandedPanelChange` let the parent collapse ride profiles.
  */
-export default function AccountManageSection() {
-  const { user, changePassword, deleteAccount } = useAuth();
-  const [openPwd, setOpenPwd] = useState(false);
-  const [openDel, setOpenDel] = useState(false);
+export default function AccountManageSection({
+  expandedPanel = null,
+  onExpandedPanelChange,
+}) {
+  const { user, changePassword, updateDisplayName, deleteAccount } = useAuth();
+  const [displayName, setDisplayName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -18,7 +21,33 @@ export default function AccountManageSection() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    setDisplayName(user?.display_name || '');
+  }, [user?.display_name]);
+
   if (!user) return null;
+
+  const openName = expandedPanel === 'name';
+  const openPwd = expandedPanel === 'pwd';
+  const openDel = expandedPanel === 'del';
+
+  const setPanel = (next) => {
+    onExpandedPanelChange?.(next);
+  };
+
+  const handleUpdateName = async (e) => {
+    e.preventDefault();
+    setError('');
+    setNotice('');
+    setBusy(true);
+    try {
+      const { error: err } = await updateDisplayName(displayName);
+      if (err) setError(err);
+      else setNotice(displayName.trim() ? 'Name updated.' : 'Name cleared.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -61,9 +90,44 @@ export default function AccountManageSection() {
       <div className="sb-card sb-card--actions">
         <button
           type="button"
+          className={`sb-card__row${openName ? ' is-open' : ''}`}
+          aria-expanded={openName}
+          onClick={() => setPanel(openName ? null : 'name')}
+        >
+          <span className="sb-card__icon" aria-hidden>
+            <UserRound size={16} strokeWidth={2.2} />
+          </span>
+          <span className="sb-card__label">Edit name</span>
+          <span className="sb-card__chevron" aria-hidden>
+            <ChevronDown size={14} strokeWidth={2} />
+          </span>
+        </button>
+        {openName && (
+          <form className="sb-card__panel" onSubmit={handleUpdateName}>
+            <label className="sb-field">
+              <span>Name</span>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="What should we call you?"
+                autoComplete="name"
+                maxLength={80}
+              />
+            </label>
+            <button type="submit" className="sb-btn" disabled={busy}>
+              Update name
+            </button>
+          </form>
+        )}
+
+        <div className="sb-card__divider" aria-hidden />
+
+        <button
+          type="button"
           className={`sb-card__row${openPwd ? ' is-open' : ''}`}
           aria-expanded={openPwd}
-          onClick={() => { setOpenPwd((v) => !v); setOpenDel(false); }}
+          onClick={() => setPanel(openPwd ? null : 'pwd')}
         >
           <span className="sb-card__icon" aria-hidden>
             <KeyRound size={16} strokeWidth={2.2} />
@@ -119,7 +183,7 @@ export default function AccountManageSection() {
           type="button"
           className={`sb-card__row${openDel ? ' is-open' : ''}`}
           aria-expanded={openDel}
-          onClick={() => { setOpenDel((v) => !v); setOpenPwd(false); }}
+          onClick={() => setPanel(openDel ? null : 'del')}
         >
           <span className="sb-card__icon" aria-hidden>
             <Trash2 size={16} strokeWidth={2.2} />

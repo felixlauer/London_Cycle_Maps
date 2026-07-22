@@ -32,6 +32,25 @@
   border: none !important;
 }
 
+/* Dark map: mute Mapbox/OSM attribution chrome (default is bright white) */
+.map-shell[data-theme='dark'] .mapboxgl-ctrl-attrib {
+  background-color: rgba(28, 28, 30, 0.78);
+  color: #a1a1aa;
+  box-shadow: none;
+}
+
+.map-shell[data-theme='dark'] .mapboxgl-ctrl-attrib a {
+  color: #d4d4d8;
+}
+
+.map-shell[data-theme='dark'] .mapboxgl-ctrl-attrib a:hover {
+  color: #f4f4f5;
+}
+
+.map-shell[data-theme='dark'] .mapboxgl-ctrl-attrib .mapboxgl-ctrl-icon {
+  filter: invert(1) brightness(0.85);
+}
+
 .mapboxgl-popup-content {
   padding: 10px 12px;
   border-radius: 8px;

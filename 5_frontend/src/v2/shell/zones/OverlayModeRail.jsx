@@ -33,6 +33,7 @@ export default function OverlayModeRail({
   inactive = true,
   onSelectMode,
   compact = false,
+  pulse = false,
 }) {
   const modes = availableOverlayModes(isDark);
   const m = useMemo(() => overlayPillMetrics(modes.length, { compact }), [modes.length, compact]);
@@ -149,7 +150,7 @@ export default function OverlayModeRail({
 
   return (
     <div
-      className={`overlay-pill${inactive ? ' is-inactive' : ''}`}
+      className={`overlay-pill${inactive ? ' is-inactive' : ''}${pulse ? ' is-pulse' : ''}`}
       role="toolbar"
       aria-label="Route overlay modes"
       aria-disabled={inactive || undefined}
@@ -198,6 +199,7 @@ export default function OverlayModeRail({
               key={mode.id}
               type="button"
               className={`overlay-pill__btn${selected ? ' is-active' : ''}`}
+              data-tutorial={mode.id === 'green' ? 'attractions' : undefined}
               style={{
                 height: m.btnH,
                 ...(selected ? { color: mode.hub } : null),

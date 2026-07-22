@@ -40,6 +40,8 @@ export default function DynamicIslandZone({
   viaCount = 0,
   startCoord = null,
   departAtIso = null,
+  onOverlayHintClick,
+  onIslandPageChange,
 }) {
   const zoneRef = useRef(null);
   const segRef = useRef(null);
@@ -172,6 +174,8 @@ export default function DynamicIslandZone({
               viaCount={viaCount}
               startCoord={startCoord}
               departAtIso={departAtIso}
+              onOverlayHintClick={onOverlayHintClick}
+              onPageChange={onIslandPageChange}
             />
           )}
         </div>

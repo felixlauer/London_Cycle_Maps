@@ -8,13 +8,18 @@
  * - Secret API keys never live in the frontend bundle.
  */
 import {
-  getAccessToken,
   getRefreshToken,
+  getSession,
   setSession,
   clearSession,
+  isAccessTokenExpired,
 } from '../auth/sessionStore';
 
-export const API_BASE = 'http://127.0.0.1:5000';
+/** Default: loopback. With `npm start -- --mobile`, use the page hostname (LAN IP). */
+export const API_BASE =
+  process.env.REACT_APP_MOBILE_DEBUG === '1' && typeof window !== 'undefined'
+    ? `http://${window.location.hostname}:5000`
+    : 'http://127.0.0.1:5000';
 
 const unauthorizedListeners = new Set();
 let refreshInFlight = null;
@@ -58,6 +63,30 @@ async function refreshAccessToken() {
 }
 
 /**
+ * Return a usable access token, refreshing when missing, expired, or forced.
+ * Clears the cached session when refresh is impossible/fails so UI cannot
+ * stay in a ghost signed-in state.
+ */
+export async function ensureValidAccessToken({ forceRefresh = false } = {}) {
+  const session = getSession();
+  if (!session) return null;
+
+  const needsRefresh = forceRefresh
+    || !session.access_token
+    || isAccessTokenExpired()
+    || !session.user;
+
+  if (!needsRefresh) return session.access_token;
+
+  if (!session.refresh_token) {
+    clearSession();
+    return null;
+  }
+
+  return refreshAccessToken();
+}
+
+/**
  * apiFetch('/profiles', { method, body, testMode })
  * body objects are JSON-encoded automatically. Returns the raw Response.
  */
@@ -67,10 +96,7 @@ export async function apiFetch(path, { method = 'GET', body, testMode = false, h
   if (testMode) {
     finalHeaders['X-Tuned-Test-Mode'] = '1';
   } else {
-    let token = getAccessToken();
-    if (!token && getRefreshToken()) {
-      token = await refreshAccessToken();
-    }
+    const token = await ensureValidAccessToken();
     if (token) finalHeaders['Authorization'] = `Bearer ${token}`;
   }
 

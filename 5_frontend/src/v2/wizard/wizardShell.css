@@ -23,10 +23,13 @@
 
   display: flex;
   flex-direction: column;
+  flex: 1;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
   color: var(--v2wiz-text);
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background: var(--wiz-bg);
 }
 
 .v2wiz[data-theme='dark'] {
@@ -49,20 +52,49 @@
   --v2wiz-line: var(--wiz-border);
 }
 
+/* Single scrollport — sticky progress strip covers scrolling content reliably. */
+.v2wiz__scroll {
+  --v2wiz-progress-sticky-h: 26px;
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: var(--wiz-bg);
+}
+
+.v2wiz__progress-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  width: 100%;
+  margin: 0;
+  padding: 12px 24px 10px;
+  box-sizing: border-box;
+  background: var(--wiz-bg);
+  box-shadow: 0 1px 0 var(--wiz-bg), 0 12px 16px -12px rgba(0, 0, 0, 0.2);
+  isolation: isolate;
+}
+
 .v2wiz__header {
-  flex-shrink: 0;
-  padding: 12px 24px 12px;
+  width: 100%;
+  margin: 0;
+  padding: 0 24px 4px;
+  box-sizing: border-box;
+  background: var(--wiz-bg);
+}
+
+.v2wiz__header-inner {
   max-width: 720px;
   width: 100%;
   margin: 0 auto;
-  box-sizing: border-box;
 }
 
 .v2wiz__progress {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
-  margin-bottom: 14px;
 }
 
 .v2wiz__progress-seg {
@@ -105,9 +137,6 @@
 }
 
 .v2wiz__body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   padding: 8px 24px 20px;
   max-width: 720px;
   width: 100%;
@@ -127,6 +156,9 @@
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
+  background: var(--wiz-bg);
+  position: relative;
+  z-index: 6;
 }
 
 .v2wiz-btn {
@@ -266,8 +298,19 @@
 }
 
 .v2wiz .wiz-budget-sticky {
+  position: sticky;
+  top: var(--v2wiz-progress-sticky-h, 30px);
+  z-index: 5;
+  margin-left: -24px;
+  margin-right: -24px;
+  padding: 8px 24px 12px;
   background: var(--wiz-bg);
-  border-bottom-color: var(--wiz-border);
+  border-bottom: 1px solid var(--wiz-border);
+  box-shadow: 0 10px 18px -12px rgba(0, 0, 0, 0.18);
+}
+
+.v2wiz .wiz-budget-sticky .wiz-panel {
+  background: var(--wiz-bg-soft);
 }
 
 .v2wiz .wiz-switch-track {

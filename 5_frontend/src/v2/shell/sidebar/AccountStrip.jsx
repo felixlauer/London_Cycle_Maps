@@ -34,6 +34,9 @@ export default function AccountStrip({ onSignIn, onSignUp }) {
 
   return (
     <div className="sb-account">
+      {user.display_name ? (
+        <p className="sb-account__name" title={user.display_name}>{user.display_name}</p>
+      ) : null}
       <p className="sb-account__email" title={user.email}>{user.email}</p>
       <div className="sb-account__actions">
         <button type="button" className="sb-btn sb-btn--ghost" onClick={() => signOut()}>

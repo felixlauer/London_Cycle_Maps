@@ -62,16 +62,36 @@ export default function WaypointFields({
   onRemoveVia,
   onFlyTo,
   startPlaceholder,
+  endPlaceholder,
   viasCollapsed = false,
   onExpandVias,
+  onMapPickTargetChange,
 }) {
   const [dragIndex, setDragIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
   const dragIndexRef = useRef(null);
+  const blurTimerRef = useRef(null);
 
   const list = toWaypointList(start, startLabel, vias, end, endLabel);
   const viaCount = (vias || []).length;
   const hideVias = viasCollapsed && viaCount > 0;
+
+  const setPickTarget = (role) => {
+    if (blurTimerRef.current) {
+      window.clearTimeout(blurTimerRef.current);
+      blurTimerRef.current = null;
+    }
+    onMapPickTargetChange?.(role);
+  };
+
+  const clearPickTargetSoon = () => {
+    if (blurTimerRef.current) window.clearTimeout(blurTimerRef.current);
+    // Delay so a map click after focusing an input still sees the target.
+    blurTimerRef.current = window.setTimeout(() => {
+      blurTimerRef.current = null;
+      onMapPickTargetChange?.(null);
+    }, 220);
+  };
 
   const applyReorder = (from, to) => {
     if (from == null || to == null || from === to) return;
@@ -91,10 +111,25 @@ export default function WaypointFields({
     onFlyTo?.([lat, lon]);
   };
 
+  const clearAt = (index) => {
+    const next = list.map((w, i) =>
+      i === index ? { ...w, coord: null, label: '' } : w,
+    );
+    onChangeWaypoints(fromWaypointList(next));
+  };
+
+  const pickTargetFor = (roleDisplay, index) => {
+    if (roleDisplay === 'start') return 'start';
+    if (roleDisplay === 'end') return 'end';
+    // Via index in the vias array (list index minus start).
+    return `via:${index - 1}`;
+  };
+
   const renderRow = (wp, index) => {
     const isVia = index > 0 && index < list.length - 1;
     const roleDisplay = index === 0 ? 'start' : index === list.length - 1 ? 'end' : 'via';
     const letter = letterAt(index);
+    const viaPlaceholder = `Stop ${letter} or click on the map`;
     return (
       <React.Fragment key={wp.id}>
         {index > 0 && <div className="rc-wpcard__divider" aria-hidden />}
@@ -123,13 +158,18 @@ export default function WaypointFields({
               value={wp.label}
               placeholder={
                 roleDisplay === 'start'
-                  ? (startPlaceholder || 'Search start')
+                  ? (startPlaceholder || 'Search start or click on the map')
                   : roleDisplay === 'end'
-                    ? 'Search destination'
-                    : `Stop ${letter}`
+                    ? (endPlaceholder || 'Search destination or click on the map')
+                    : viaPlaceholder
               }
               theme={theme}
               onSelect={({ lat, lon, label }) => updateAt(index, { lat, lon, label })}
+              onClear={() => clearAt(index)}
+              onFocusChange={(focused) => {
+                if (focused) setPickTarget(pickTargetFor(roleDisplay, index));
+                else clearPickTargetSoon();
+              }}
             />
           </div>
           {isVia && (

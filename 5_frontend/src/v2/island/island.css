@@ -149,6 +149,14 @@
   overflow: hidden;
 }
 
+.island-slot--elevation {
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  box-sizing: border-box;
+  padding-inline: 10px;
+}
+
 .island-slot__visual {
   display: flex;
   align-items: center;
@@ -156,12 +164,22 @@
   flex-shrink: 0;
   width: 56px;
   height: 56px;
+  box-sizing: border-box;
 }
 
-.island-slot__visual .island-spark {
-  width: 56px;
-  height: 56px;
-  max-width: none;
+.island-slot__visual--spark {
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  min-height: 22px;
+  flex: 0 0 auto;
+}
+
+.island-slot__visual--spark .island-spark {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  display: block;
 }
 
 .island-slot__caption {
@@ -254,10 +272,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 4px;
   height: 24px;
+  min-width: 104px;
   margin: 0;
-  padding: 0 6px;
+  padding: 0 14px;
   border: 1px solid var(--shell-border);
   border-bottom: none;
   border-radius: 10px 10px 0 0;
@@ -320,7 +339,8 @@
 }
 
 .island-metric.is-two-line .island-metric__delta {
-  line-height: 1.2;
+  line-height: 1.25;
+  white-space: normal;
 }
 
 .island-spark {
@@ -356,6 +376,40 @@
   overscroll-behavior: none;
 }
 
+.island-expanded__viewport {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  touch-action: pan-y;
+}
+
+.island-expanded__track {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  will-change: transform;
+  touch-action: pan-y;
+}
+
+.island-expanded__slide {
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.island-expanded__slide > * {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
 .island-expanded__progress {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -366,6 +420,20 @@
   margin-top: auto;
   padding: 16px 0 0;
   box-sizing: border-box;
+  position: relative;
+}
+
+.island-expanded__progress-thumb {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--shell-brand, #ff0061);
+  transition: left 320ms cubic-bezier(0.23, 1, 0.32, 1);
+  pointer-events: none;
+  z-index: 1;
+  will-change: left;
 }
 
 .island-expanded__progress-item {
@@ -384,7 +452,7 @@
 }
 
 .island-expanded__progress-label {
-  font-size: 8.5px;
+  font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1.15;
@@ -410,21 +478,32 @@
   padding: 0;
   background: var(--island-track);
   pointer-events: none;
-  transition: background-color 150ms var(--island-ease);
 }
 
-.island-expanded__progress-seg.is-active,
+/* Grey track always stays; accent thumb overlays the active segment. */
 .island-expanded__progress-item.is-active .island-expanded__progress-seg {
-  background: var(--shell-brand, #ff0061);
+  background: var(--island-track);
 }
 
 .island-expanded__page--metrics.is-santander {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 12px;
   width: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  align-items: stretch;
+}
+
+.island-expanded__page--metrics.is-santander .island-expanded__metrics {
+  height: auto;
+  min-height: 0;
+}
+
+.island-expanded__page--metrics.is-santander .island-expanded__hire {
+  min-width: 0;
+  min-height: 0;
 }
 
 @media (max-width: 767px) {
@@ -483,15 +562,38 @@
     align-items: center;
   }
 
-  .island-expanded.is-mobile .island-expanded__page--metrics.is-santander {
+  .island-expanded.is-mobile .island-expanded__page--metrics.is-santander .island-expanded__metrics,
+  .island-expanded.is-mobile .island-expanded__page--metrics.is-santander .island-expanded__metrics.is-stacked {
     flex-direction: column;
     justify-content: center;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .island-expanded.is-mobile .island-expanded__page--metrics.is-santander {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    flex-direction: unset;
+    justify-content: stretch;
+    align-items: stretch;
     gap: 10px;
+    height: 100%;
+    overflow: hidden;
   }
 
   .island-expanded.is-mobile .island-expanded__page--metrics.is-santander .island-expanded__metrics {
-    flex: 0 0 auto;
-    height: auto;
+    flex: 1;
+    height: 100%;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .island-expanded.is-mobile .island-expanded__page--metrics.is-santander .island-expanded__hire {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .island-expanded.is-mobile .island-expanded__chart {
@@ -519,6 +621,10 @@
     overflow: hidden;
     overscroll-behavior: none;
     padding: 0;
+    position: relative;
+    /* Reserve a fixed band for the overlay hint so chart count can't shift it. */
+    padding-top: 18px;
+    box-sizing: border-box;
   }
 
   .island-expanded__bars .island-bars {
@@ -532,33 +638,69 @@
   }
 
   .island-expanded.is-mobile .island-bars__note {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
     flex-shrink: 0;
-    margin: 0 0 6px;
-    font-size: 10.5px;
-    font-weight: 550;
-    line-height: 1.35;
+    margin: 0;
+    font-size: 9.5px;
+    font-weight: 450;
+    line-height: 1.3;
     color: var(--island-sub);
     text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .island-expanded.is-mobile .island-bars__note-link {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: 450;
+    color: var(--island-text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
   }
 
   .island-expanded.is-mobile .island-bars__heading {
-    font-size: 12px;
+    font-size: 11px;
+    margin: 0 0 2px;
   }
 
   .island-expanded.is-mobile .island-bar__label,
   .island-expanded.is-mobile .island-bar__label em {
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .island-expanded.is-mobile .island-bar__track {
-    height: 7px;
+    height: 6px;
   }
 
-  .island-expanded__page--metrics.is-santander {
-    overflow: hidden;
+  .island-expanded.is-mobile .island-bars {
+    gap: 6px;
+    justify-content: space-evenly;
+    padding-top: 0;
+  }
+
+  .island-expanded.is-mobile .island-bars__chart {
+    gap: 3px;
+  }
+
+  .island-expanded.is-mobile .island-bar {
+    gap: 6px;
+  }
+
+  .island-expanded.is-mobile .island-bar__label {
+    width: 96px;
   }
 }
-
 
 .island-collapsed__legs {
   position: absolute;
@@ -1133,7 +1275,54 @@
   position: relative;
   flex: 1;
   min-height: 0;
+  width: 100%;
+  height: 100%;
   cursor: crosshair;
+  touch-action: none;
+}
+
+.island-chart__gain {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--shell-bg, #fff);
+  border: 1px solid var(--shell-border, #e5e7eb);
+  box-shadow: 0 1px 4px rgba(16, 24, 40, 0.08);
+  font-size: 10.5px;
+  font-weight: 550;
+  color: var(--island-sub);
+  white-space: nowrap;
+  pointer-events: none;
+  max-width: calc(100% - 16px);
+}
+
+.island-chart__gain strong {
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 768px) {
+  .island-chart__gain {
+    top: 6px;
+    padding: 6px 14px;
+    font-size: 12.5px;
+    gap: 5px;
+  }
+
+  .island-chart__gain strong {
+    font-size: 13.5px;
+  }
+}
+
+.map-shell[data-theme='dark'] .island-chart__gain {
+  background: var(--shell-bg);
 }
 
 .island-chart__svg {
@@ -1161,8 +1350,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
   background: var(--shell-bg, #fff);
   border: 1px solid var(--island-axis);
@@ -1204,13 +1393,26 @@
   font-weight: 650;
   color: var(--island-text);
   white-space: nowrap;
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
   animation: island-tip-in 120ms var(--island-ease);
+}
+
+.island-chart__tip.is-below {
+  transform: translate(-50%, 0);
+  animation-name: island-tip-in-below;
 }
 
 @keyframes island-tip-in {
   from { opacity: 0; transform: translate(-50%, -90%); }
   to { opacity: 1; transform: translate(-50%, -100%); }
+}
+
+@keyframes island-tip-in-below {
+  from { opacity: 0; transform: translate(-50%, -10%); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 /* —— Bar charts —— */

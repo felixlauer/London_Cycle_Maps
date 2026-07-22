@@ -30,12 +30,16 @@ function sortCustoms(customs, order) {
 /**
  * Profiles — single-line rows; Santander-style status dot on the left = active.
  * Mobile: edit/delete icons only when a row is expanded by tap.
+ * When `stacked`, only the top profile stays visible; others sit behind it.
  */
 export default function ProfilesSection({
   profiles = [],
   activeProfileId,
   sectionRef,
   onDeleteProfile,
+  onSelectProfile,
+  stacked = false,
+  onStackedActivate,
 }) {
   const { user, isLoading } = useAuth();
   const { favouriteOrder, setFavouriteOrder, openWizard, openAuthPanel } = useSidebar();
@@ -121,6 +125,39 @@ export default function ProfilesSection({
         <>
           {customs.length === 0 ? (
             <p className="sb-empty">No custom profiles yet.</p>
+          ) : stacked ? (
+            <button
+              type="button"
+              className="sb-profile-stack"
+              aria-label="Expand riding profiles"
+              onClick={() => onStackedActivate?.()}
+            >
+              {customs.slice(0, Math.min(3, customs.length)).map((p, i) => {
+                const active = p.id === activeProfileId;
+                return (
+                  <span
+                    key={p.id}
+                    className={`sb-profile-stack__card${i === 0 ? ' is-front' : ''}${active ? ' is-active' : ''}`}
+                    style={{
+                      zIndex: 3 - i,
+                      transform: `translateY(${i * 7}px) scale(${1 - i * 0.04})`,
+                    }}
+                    aria-hidden={i > 0}
+                  >
+                    {i === 0 && (
+                      <>
+                        <span className="sb-profile-row__lead" aria-hidden>
+                          <span className={`sb-profile-row__dot${active ? ' is-on' : ''}`} />
+                          <span className="sb-badge">C1</span>
+                        </span>
+                        <span className="sb-profile-row__name">{p.name}</span>
+                        <span className="sb-profile-row__bike">{bikeLabel(p.bike_type)}</span>
+                      </>
+                    )}
+                  </span>
+                );
+              })}
+            </button>
           ) : (
             <>
               {customs.length > 3 && (
@@ -168,9 +205,18 @@ export default function ProfilesSection({
                         tabIndex={0}
                         aria-expanded={expanded}
                       >
-                        <span className="sb-profile-row__lead" aria-hidden>
-                          <span
+                        <span className="sb-profile-row__lead" aria-hidden={false}>
+                          <button
+                            type="button"
                             className={`sb-profile-row__dot${active ? ' is-on' : ''}`}
+                            title={active ? 'Active profile' : `Use ${p.name} for routing`}
+                            aria-label={active ? `${p.name} is active` : `Select ${p.name}`}
+                            aria-pressed={active}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              onSelectProfile?.(p.id);
+                            }}
                           />
                           {quick ? (
                             <span className="sb-badge">{`C${index + 1}`}</span>
@@ -222,18 +268,20 @@ export default function ProfilesSection({
             </>
           )}
 
-          <div className="sb-card sb-create-card">
-            <button
-              type="button"
-              className="sb-card__row sb-create-profile"
-              onClick={() => openWizard()}
-            >
-              <span className="sb-create-profile__icon" aria-hidden>
-                <Plus size={15} strokeWidth={2.4} />
-              </span>
-              <span className="sb-card__label">Create profile</span>
-            </button>
-          </div>
+          {!stacked && (
+            <div className="sb-card sb-create-card">
+              <button
+                type="button"
+                className="sb-card__row sb-create-profile"
+                onClick={() => openWizard()}
+              >
+                <span className="sb-create-profile__icon" aria-hidden>
+                  <Plus size={15} strokeWidth={2.4} />
+                </span>
+                <span className="sb-card__label">Create profile</span>
+              </button>
+            </div>
+          )}
         </>
       )}
     </section>

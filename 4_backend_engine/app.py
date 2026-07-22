@@ -1878,10 +1878,17 @@ ROUTE_OVERLAY_CATALOG = {
 
 @app.route('/night_status', methods=['GET'])
 def night_status():
-    """Whether London is currently dark for lighting overlay / light routing gate."""
+    """Whether London is dark for lighting overlay / light routing gate.
+
+    Optional `at` / `depart_at` (ISO) evaluates darkness at that instant so
+    depart-at planning can preview night routing, overlays, and charts.
+    """
+    raw = (request.args.get("at") or request.args.get("depart_at") or "").strip()
+    at_time = parse_depart_at_arg(raw or None) if raw else None
     return jsonify({
-        "is_dark": bool(night_time.is_dark()),
+        "is_dark": bool(night_time.is_dark(at_time)),
         "forced_mode": night_time.get_forced_mode(),
+        "at": at_time.isoformat() if at_time is not None else None,
     })
 
 
@@ -2051,16 +2058,44 @@ def auth_signup():
     body = request.get_json(silent=True) or {}
     email = (body.get("email") or "").strip()
     password = body.get("password") or ""
+    display_name = body.get("display_name")
+    if display_name is None:
+        display_name = body.get("name")
     if not email or "@" not in email or not password:
         return jsonify({"error": "email and password required"}), 400
     ip = client_ip_from_request(request)
     blocked = _rate_limited(auth_rate_limit.check_signup_allowed(ip))
     if blocked:
         return blocked
-    session, err, needs_confirm = auth_admin.sign_up(email, password)
+    session, err, needs_confirm = auth_admin.sign_up(email, password, display_name)
     if err:
         return jsonify({"error": err}), 400
     return jsonify({"session": session, "needs_confirm": needs_confirm}), 201
+
+
+@app.route('/auth/account', methods=['PATCH'])
+@require_auth
+def auth_update_account():
+    """Update account profile fields (currently display_name only)."""
+    if g.test_mode:
+        return jsonify({"error": "account update is not available in test mode"}), 400
+    if not g.user_id:
+        return jsonify({"error": "authentication required"}), 401
+    if not auth_admin.configured():
+        return jsonify({"error": "auth not configured"}), 503
+    body = request.get_json(silent=True) or {}
+    if "display_name" not in body and "name" not in body:
+        return jsonify({"error": "display_name required"}), 400
+    display_name = body.get("display_name")
+    if display_name is None:
+        display_name = body.get("name")
+    blocked = _rate_limited(auth_rate_limit.check_user_sensitive_allowed(g.user_id))
+    if blocked:
+        return blocked
+    name, err = auth_admin.update_display_name(g.user_id, display_name)
+    if err:
+        return jsonify({"error": err}), 400
+    return jsonify({"status": "updated", "display_name": name})
 
 
 @app.route('/auth/password-reset', methods=['POST'])
@@ -2396,6 +2431,11 @@ def get_route():
         preset = None
         translation_clamps = []
         light_gated_off = False
+        # Parse depart time before light gating so night simulation follows depart_at.
+        depart_at_raw = (request.args.get("depart_at") or "").strip()
+        at_time = parse_depart_at_arg(depart_at_raw or None)
+        depart_mode = "depart_at" if depart_at_raw else "now"
+        is_dark_at = bool(night_time.is_dark(at_time))
 
         if profile_id:
             profile = g.profile_store.get_profile(profile_id, g.user_id)
@@ -2412,7 +2452,8 @@ def get_route():
 
             w, translation_clamps = translation_layer.apply_preset_clamps(w, preset)
 
-            if not night_time.is_dark():
+            # Gate lit-road preference on darkness at depart time (or now).
+            if not is_dark_at:
                 if w.get("light_weight", 0.0) > 0:
                     light_gated_off = True
                 w["light_weight"] = 0.0
@@ -2456,9 +2497,6 @@ def get_route():
             snaps.append(snap)
         t_snap = time.perf_counter() - t_route
 
-        depart_at_raw = (request.args.get("depart_at") or "").strip()
-        at_time = parse_depart_at_arg(depart_at_raw or None)
-        depart_mode = "depart_at" if depart_at_raw else "now"
         live_applied = not is_future_depart_at(at_time)
         if not live_applied:
             w = dict(w)
@@ -2750,6 +2788,7 @@ def get_route():
                 "speed_kmh": speed_kmh,
                 "translation_clamps": translation_clamps,
                 "light_gated_off": light_gated_off,
+                "is_dark": is_dark_at,
                 "leg_count": len(legs_out),
                 "purpose": purpose,
                 "timing_ms": {
@@ -2824,6 +2863,11 @@ if __name__ == '__main__':
         action="store_true",
         help="Synthetic extreme weather on /weather — random scenario rotates every UTC minute",
     )
+    parser.add_argument(
+        "--mobile",
+        action="store_true",
+        help="Bind to 0.0.0.0 so phones on the LAN can reach the API (default is localhost only)",
+    )
     args = parser.parse_args()
 
     if args.day:
@@ -2838,4 +2882,11 @@ if __name__ == '__main__':
             "(random scenario each UTC minute — expand island to preview)"
         )
 
-    app.run(debug=True, port=5000, use_reloader=USE_RELOADER)
+    bind_host = "0.0.0.0" if args.mobile else "127.0.0.1"
+    if args.mobile:
+        print(
+            "MOBILE DEBUG: listening on 0.0.0.0:5000 — "
+            "pair with npm start -- --v2 --mobile and open http://<PC_LAN_IP>:3000"
+        )
+
+    app.run(debug=True, host=bind_host, port=5000, use_reloader=USE_RELOADER)

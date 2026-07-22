@@ -155,8 +155,8 @@ export function NodeHighlightLayer({
             'circle-opacity': 0.9,
             'circle-radius': [
               'interpolate', ['linear'], ['zoom'],
-              11, ['case', ['==', ['get', 'isDanger'], 1], 3, 2],
-              16, ['case', ['==', ['get', 'isDanger'], 1], 10, 7],
+              11, ['case', ['==', ['get', 'isDanger'], 1], 4, 3],
+              16, ['case', ['==', ['get', 'isDanger'], 1], 12, 9],
             ],
           }}
         />

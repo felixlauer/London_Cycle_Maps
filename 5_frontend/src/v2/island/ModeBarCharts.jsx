@@ -69,6 +69,7 @@ export default function ModeBarCharts({
   onHoverChange,
   maxKindsPerChart = Infinity,
   showOverlayHint = false,
+  onOverlayHintClick,
 }) {
   const list = Array.isArray(modes) ? modes : [];
   if (list.length === 0) {
@@ -83,7 +84,19 @@ export default function ModeBarCharts({
     <div className="island-bars">
       {showOverlayHint && (
         <p className="island-bars__note">
-          Mode breakdowns for this route. Switch the map overlay to change which charts appear here.
+          Detailed analysis.{' '}
+          <button
+            type="button"
+            className="island-bars__note-link"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOverlayHintClick?.();
+            }}
+          >
+            Switch map overlay
+          </button>
+          {' '}
+          to change charts.
         </p>
       )}
       {list.map((m) => (

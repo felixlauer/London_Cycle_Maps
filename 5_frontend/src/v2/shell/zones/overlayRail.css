@@ -127,4 +127,27 @@
   .overlay-pill__btn:active:not([aria-disabled='true']) {
     transform: none;
   }
+
+  .overlay-pill.is-pulse,
+  .map-ctl.is-overlay-pulse .overlay-pill {
+    animation: none;
+  }
+}
+
+.overlay-pill.is-pulse,
+.map-ctl.is-overlay-pulse .overlay-pill {
+  animation: overlay-pill-pulse 700ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes overlay-pill-pulse {
+  0% {
+    box-shadow:
+      var(--shell-shadow, 0 4px 14px rgba(0, 0, 0, 0.08)),
+      0 0 0 0 color-mix(in srgb, var(--shell-brand, #ff0061) 38%, transparent);
+  }
+  100% {
+    box-shadow:
+      var(--shell-shadow, 0 4px 14px rgba(0, 0, 0, 0.08)),
+      0 0 0 10px transparent;
+  }
 }

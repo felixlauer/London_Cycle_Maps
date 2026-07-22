@@ -8,6 +8,8 @@ import { apiFetch } from '../api/flaskClient';
 import PasswordRecoveryModal from '../auth/PasswordRecoveryModal';
 import MapShell from './shell/MapShell';
 import { SidebarProvider, useSidebar } from './shell/SidebarContext';
+import { OnboardingProvider, useOnboarding } from './onboarding/OnboardingContext';
+import OnboardingLayer from './onboarding/OnboardingLayer';
 import { themeForMode } from './map/theme';
 import { useAlertPill } from './alerts/useAlertPill';
 import { bikeLabel, coerceBikeForSantander, MAX_VIAS, BLOCKED } from './routing/constants';
@@ -25,22 +27,35 @@ import {
 } from './map/overlayModes';
 import { profileWantsLight } from './island/resolveIslandSlots';
 import { pickInactiveLegIndex } from '../map/RouteLayers';
+import { DEFAULT_VIEW } from '../map/styles';
 import './tailwind.css';
 import './alerts/alertPill.css';
 import './shell/shell.css';
 
 function AppV2Inner({ mapApiRef, isDarkOutside }) {
-  const { user, isLoading: authLoading, passwordRecoveryPending } = useAuth();
+  const { user, isLoading: authLoading, passwordRecoveryPending, authNotice } = useAuth();
   const {
     themeMode,
     units,
     favouriteOrder,
     setFavouriteOrder,
     openSidebar,
+    openAuthPanel,
+    open: sidebarOpen,
   } = useSidebar();
-  const theme = useMemo(() => themeForMode(themeMode), [themeMode]);
+  const { markMapReady, markProfilesReady, phase, onboardingTheme } = useOnboarding();
+  /** Map + shell follow light during onboarding/tutorial so the walkthrough stays readable. */
+  const shellThemeMode = phase !== 'done' ? onboardingTheme : themeMode;
+  const theme = useMemo(() => themeForMode(shellThemeMode), [shellThemeMode]);
+  const tutorialPhaseRef = useRef(phase);
   const { alert, push: pushAlert, dismiss: dismissAlert } = useAlertPill();
   const lastFlownLocationKey = useRef(null);
+
+  useEffect(() => {
+    if (!authNotice) return;
+    pushAlert({ type: 'warning', message: authNotice });
+    openAuthPanel?.('login');
+  }, [authNotice, pushAlert, openAuthPanel]);
 
   const geo = useGeolocation({
     onError: (message) => pushAlert({ type: 'warning', message }),
@@ -82,6 +97,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
   const [activeProfile, setActiveProfile] = useState(null);
   const [sessionBikeType, setSessionBikeType] = useState('standard');
   const [bikePulse, setBikePulse] = useState(false);
+  const [overlayPulse, setOverlayPulse] = useState(false);
   const sessionBikeTypeRef = useRef(sessionBikeType);
   useEffect(() => { sessionBikeTypeRef.current = sessionBikeType; }, [sessionBikeType]);
   /** User profile switch — alert only when load applies a different bike. */
@@ -103,6 +119,9 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
 
   const [departMode, setDepartMode] = useState('now');
   const [departAtIso, setDepartAtIso] = useState(null);
+  /** 'start' | 'end' | null — map click only places a point while a field is focused. */
+  const [mapPickTarget, setMapPickTarget] = useState(null);
+  const [departIsDark, setDepartIsDark] = useState(null);
 
   const [routeRevealed, setRouteRevealed] = useState(false);
   /** True only while a user-initiated Get Route (or hire start) is in flight. */
@@ -119,6 +138,8 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
   const [islandExpanded, setIslandExpanded] = useState(false);
   /** Shared map↔island hover: { source, modeId, kind, runId(s), point }. */
   const [routeHover, setRouteHover] = useState(null);
+  /** Mobile expanded island page index (for tutorial gating). */
+  const [islandPage, setIslandPage] = useState(1);
 
   useEffect(() => {
     if (!routeRevealed) {
@@ -137,12 +158,6 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     routeRequestIdRef.current += 1;
     return routeRequestIdRef.current;
   }, []);
-
-  useEffect(() => {
-    if (overlayMode == null) return;
-    const allowed = availableOverlayModes(isDarkOutside).map((m) => m.id);
-    if (!allowed.includes(overlayMode)) setOverlayMode(null);
-  }, [isDarkOutside, overlayMode]);
 
   const activeSafest = useMemo(() => {
     if (routeLegs && routeLegs.length > 1) {
@@ -234,14 +249,91 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     jamAlertKeyRef.current = null;
   }, []);
 
-  // At night, riders who want lit roads land on the light overlay by default
-  // (until they pick a mode themselves) — the island then leads with it too.
+  /** Clear planning chrome so the tutorial always starts from a clean default map. */
+  const resetPlanningForTutorial = useCallback(() => {
+    bumpRouteRequest();
+    setStart(null);
+    setEnd(null);
+    setStartLabel('');
+    setEndLabel('');
+    setVias([]);
+    setRouteRevealed(false);
+    clearRouteData();
+    overlayTouchedRef.current = false;
+    setOverlayMode(DEFAULT_OVERLAY_MODE);
+    setSantanderMode(false);
+    setDepartMode('now');
+    setDepartAtIso(null);
+    setMapPickTarget(null);
+    setIslandPage(1);
+    setExpandedStationId(null);
+    pendingUnsuitableRef.current = null;
+    setHireStep('idle');
+    setHireStations([]);
+    setPickupStation(null);
+    setDropoffStation(null);
+    dismissAlert(['santander_guide', 'confirm']);
+    const bike = activeProfile?.bike_type || 'standard';
+    setSessionBikeType(bike);
+    setFlyTarget({
+      center: [DEFAULT_VIEW.latitude, DEFAULT_VIEW.longitude],
+      zoom: DEFAULT_VIEW.zoom,
+      duration: 0.85,
+    });
+    window.setTimeout(() => {
+      mapApiRef.current?.resetNorth?.();
+    }, 50);
+  }, [bumpRouteRequest, clearRouteData, dismissAlert, activeProfile?.bike_type, mapApiRef]);
+
+  useEffect(() => {
+    const prev = tutorialPhaseRef.current;
+    tutorialPhaseRef.current = phase;
+    if (phase === 'tutorial' && prev !== 'tutorial') {
+      resetPlanningForTutorial();
+    }
+  }, [phase, resetPlanningForTutorial]);
+
+  // Darkness for light overlay / island charts: wall-clock, or depart_at when set.
+  useEffect(() => {
+    let cancelled = false;
+    if (departMode !== 'depart_at' || !departAtIso) {
+      setDepartIsDark(null);
+      return undefined;
+    }
+    const load = async () => {
+      try {
+        const params = new URLSearchParams({ at: departAtIso });
+        const res = await apiFetch(`/night_status?${params}`, { testMode: false });
+        const data = await res.json();
+        if (!cancelled && res.ok) setDepartIsDark(Boolean(data.is_dark));
+      } catch {
+        if (!cancelled) setDepartIsDark(null);
+      }
+    };
+    load();
+    const t = setInterval(load, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [departMode, departAtIso]);
+
+  const isDarkForRouting = departIsDark != null ? departIsDark : isDarkOutside;
+
+  useEffect(() => {
+    if (overlayMode == null) return;
+    const allowed = availableOverlayModes(isDarkForRouting).map((m) => m.id);
+    if (!allowed.includes(overlayMode)) setOverlayMode(null);
+  }, [isDarkForRouting, overlayMode]);
+
+  // At night (or simulated night via depart_at), riders who want lit roads
+  // land on the light overlay by default (until they pick a mode themselves).
   useEffect(() => {
     if (!routeRevealed || overlayTouchedRef.current) return;
-    if (isDarkOutside && profileWantsLight(activeProfile)) {
+    if (isDarkForRouting && profileWantsLight(activeProfile)) {
       setOverlayMode('light');
     }
-  }, [routeRevealed, isDarkOutside, activeProfile]);
+  }, [routeRevealed, isDarkForRouting, activeProfile]);
 
   const resetHireState = useCallback(() => {
     dismissAlert(['santander_guide', 'confirm']);
@@ -261,6 +353,54 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     window.setTimeout(() => setBikePulse(false), 600);
   }, []);
 
+  const triggerOverlayPulse = useCallback(() => {
+    setOverlayPulse(true);
+    window.setTimeout(() => setOverlayPulse(false), 900);
+  }, []);
+
+  /** Fit viewport so anchor + all hire candidate stations are visible. */
+  const fitHireStations = useCallback((anchor, stations, { duration = 0.9 } = {}) => {
+    const pts = [];
+    if (Array.isArray(anchor) && Number.isFinite(anchor[0]) && Number.isFinite(anchor[1])) {
+      pts.push({ lat: Number(anchor[0]), lon: Number(anchor[1]) });
+    }
+    (stations || []).forEach((s) => {
+      const lat = Number(s.lat);
+      const lon = Number(s.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) pts.push({ lat, lon });
+    });
+    if (pts.length === 0) return;
+    if (pts.length === 1) {
+      setFlyTarget({ center: [pts[0].lat, pts[0].lon], zoom: 15.5, duration });
+      return;
+    }
+    let minLat = pts[0].lat;
+    let maxLat = pts[0].lat;
+    let minLon = pts[0].lon;
+    let maxLon = pts[0].lon;
+    pts.forEach((p) => {
+      minLat = Math.min(minLat, p.lat);
+      maxLat = Math.max(maxLat, p.lat);
+      minLon = Math.min(minLon, p.lon);
+      maxLon = Math.max(maxLon, p.lon);
+    });
+    // Slight pad so markers aren't flush to the edge
+    const latPad = Math.max(0.0012, (maxLat - minLat) * 0.12);
+    const lonPad = Math.max(0.0012, (maxLon - minLon) * 0.12);
+    const mobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    setFlyTarget({
+      bounds: [
+        [minLon - lonPad, minLat - latPad],
+        [maxLon + lonPad, maxLat + latPad],
+      ],
+      padding: mobile
+        ? { top: 88, bottom: 220, left: 36, right: 36 }
+        : { top: 100, bottom: 160, left: 48, right: 56 },
+      maxZoom: 15.2,
+      duration,
+    });
+  }, []);
+
   /* —— Profiles —— */
   const authReady = !authLoading;
 
@@ -271,8 +411,10 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
       setProfiles(data.profiles || []);
     } catch {
       pushAlert({ type: 'error', message: 'Could not load profiles' });
+    } finally {
+      markProfilesReady();
     }
-  }, [pushAlert]);
+  }, [pushAlert, markProfilesReady]);
 
   const loadActiveProfile = useCallback(async (profileId) => {
     try {
@@ -457,36 +599,82 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     clearRouteData();
   }, [bumpRouteRequest, clearRouteData]);
 
-  const applyMapPoint = useCallback((lat, lon) => {
+  /** Fit viewport so the full route path (+ optional walk legs) is visible. */
+  const fitRouteBounds = useCallback((paths, { duration = 1.05 } = {}) => {
+    const pts = [];
+    const addPath = (path) => {
+      if (!Array.isArray(path) || path.length === 0) return;
+      const step = Math.max(1, Math.floor(path.length / 250));
+      for (let i = 0; i < path.length; i += step) {
+        const p = path[i];
+        if (Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])) {
+          pts.push({ lat: Number(p[0]), lon: Number(p[1]) });
+        }
+      }
+      const last = path[path.length - 1];
+      if (Array.isArray(last) && Number.isFinite(last[0]) && Number.isFinite(last[1])) {
+        pts.push({ lat: Number(last[0]), lon: Number(last[1]) });
+      }
+    };
+    (Array.isArray(paths) ? paths : [paths]).forEach(addPath);
+    if (pts.length === 0) return;
+    if (pts.length === 1) {
+      setFlyTarget({ center: [pts[0].lat, pts[0].lon], zoom: 15, duration });
+      return;
+    }
+    let minLat = pts[0].lat;
+    let maxLat = pts[0].lat;
+    let minLon = pts[0].lon;
+    let maxLon = pts[0].lon;
+    pts.forEach((p) => {
+      minLat = Math.min(minLat, p.lat);
+      maxLat = Math.max(maxLat, p.lat);
+      minLon = Math.min(minLon, p.lon);
+      maxLon = Math.max(maxLon, p.lon);
+    });
+    const latPad = Math.max(0.0012, (maxLat - minLat) * 0.12);
+    const lonPad = Math.max(0.0012, (maxLon - minLon) * 0.12);
+    const mobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    setFlyTarget({
+      bounds: [
+        [minLon - lonPad, minLat - latPad],
+        [maxLon + lonPad, maxLat + latPad],
+      ],
+      padding: mobile
+        ? { top: 100, bottom: 220, left: 36, right: 36 }
+        : { top: 110, bottom: 180, left: 80, right: 80 },
+      maxZoom: 15,
+      duration,
+    });
+  }, []);
+
+  const applyMapPoint = useCallback((lat, lon, target) => {
+    if (!target) return;
+    const viaMatch = typeof target === 'string' && target.startsWith('via:')
+      ? Number(target.slice(4))
+      : null;
+    const isVia = Number.isInteger(viaMatch) && viaMatch >= 0;
+    if (target !== 'start' && target !== 'end' && !isVia) return;
+
     bumpRouteRequest();
     setRouteRevealed(false);
     clearRouteData();
     resetHireState();
-    if (!start) {
+    const label = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    if (target === 'start') {
       setStart([lat, lon]);
-      setStartLabel(`${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+      setStartLabel(label);
       return;
     }
-    const emptyVia = vias.findIndex((v) => !v.coord);
-    if (emptyVia >= 0) {
-      setVias((prev) => prev.map((v, i) => (
-        i === emptyVia
-          ? { ...v, coord: [lat, lon], label: `${lat.toFixed(4)}, ${lon.toFixed(4)}` }
-          : v
-      )));
-      return;
-    }
-    if (!end) {
+    if (target === 'end') {
       setEnd([lat, lon]);
-      setEndLabel(`${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+      setEndLabel(label);
       return;
     }
-    setStart([lat, lon]);
-    setStartLabel(`${lat.toFixed(4)}, ${lon.toFixed(4)}`);
-    setEnd(null);
-    setEndLabel('');
-    setVias([]);
-  }, [start, end, vias, bumpRouteRequest, clearRouteData, resetHireState]);
+    setVias((prev) => prev.map((v, i) => (
+      i === viaMatch ? { ...v, coord: [lat, lon], label } : v
+    )));
+  }, [bumpRouteRequest, clearRouteData, resetHireState]);
 
   const handleMapClick = useCallback((e) => {
     if (hireStep === 'pickup' || hireStep === 'dropoff') {
@@ -500,11 +688,15 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
         return;
       }
     }
+    const validTarget = mapPickTarget === 'start'
+      || mapPickTarget === 'end'
+      || (typeof mapPickTarget === 'string' && mapPickTarget.startsWith('via:'));
+    if (!validTarget) return;
     const { lng, lat } = e.lngLat;
-    applyMapPoint(lat, lng);
+    applyMapPoint(lat, lng, mapPickTarget);
   }, [
     hireStep, applyMapPoint, pushAlert,
-    routeRevealed, routeLegs, activeLegIndex,
+    routeRevealed, routeLegs, activeLegIndex, mapPickTarget,
   ]);
 
   /* —— Route fetch —— */
@@ -553,6 +745,9 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
         const legs = Array.isArray(data.legs) && data.legs.length ? data.legs : null;
         setRouteLegs(legs);
         setActiveLegIndex(0);
+        if (typeof data.meta?.is_dark === 'boolean' && departMode === 'depart_at') {
+          setDepartIsDark(data.meta.is_dark);
+        }
         if (purpose === 'commit') {
           setRouteRevealed(true);
           setOverlayMode(DEFAULT_OVERLAY_MODE);
@@ -561,6 +756,10 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           if (departMode === 'depart_at' && isFutureDepartAt(departAtIso)) {
             pushAlert({ type: 'warning', message: 'Live traffic not applied for future departures' });
           }
+          fitRouteBounds([
+            data.safest?.path,
+            ...(Array.isArray(data.legs) ? data.legs.map((l) => l?.safest?.path || l?.path) : []),
+          ].filter(Boolean));
         }
       } else {
         pushAlert({ type: 'error', message: data.error || 'Route failed' });
@@ -573,6 +772,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
   }, [
     start, end, vias, activeProfileId, sessionBikeType, departMode, departAtIso,
     bumpRouteRequest, encodeViasParam, pushAlert, maybeAlertTraffic, maybeAlertFarSnap,
+    fitRouteBounds,
   ]);
 
   useEffect(() => {
@@ -644,14 +844,16 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     setExpandedStationId(null);
     setHireStep('pickup');
     pushAlert({ type: 'santander_guide', message: 'Select a pick-up station' });
-    setFlyTarget({ center: startCoord, zoom: 16, duration: 0.9 });
+    setFlyTarget({ center: startCoord, zoom: 15, duration: 0.7 });
     try {
-      await fetchHireCandidates(startCoord[0], startCoord[1], 'bikes');
+      const data = await fetchHireCandidates(startCoord[0], startCoord[1], 'bikes');
+      const shown = data?.shown || data?.stations || [];
+      fitHireStations(startCoord, shown, { duration: 0.95 });
     } catch (e) {
       pushAlert({ type: 'error', message: e.message || 'Could not load stations' });
       setHireStations([]);
     }
-  }, [start, end, clearRouteData, fetchHireCandidates, pushAlert]);
+  }, [start, end, clearRouteData, fetchHireCandidates, pushAlert, fitHireStations]);
 
   const fetchWalkLeg = useCallback(async (from, to) => {
     try {
@@ -684,14 +886,16 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     setExpandedStationId(null);
     setPickupStation(station);
     setHireStep('dropoff');
-    setFlyTarget({ center: end, zoom: 16, duration: 0.9 });
+    setFlyTarget({ center: end, zoom: 15, duration: 0.7 });
     try {
-      await fetchHireCandidates(end[0], end[1], 'docks');
+      const data = await fetchHireCandidates(end[0], end[1], 'docks');
+      const shown = data?.shown || data?.stations || [];
+      fitHireStations(end, shown, { duration: 0.95 });
     } catch (e) {
       pushAlert({ type: 'error', message: e.message || 'Could not load stations' });
       setHireStations([]);
     }
-  }, [sessionBikeType, end, fetchHireCandidates, pushAlert, dismissAlert]);
+  }, [sessionBikeType, end, fetchHireCandidates, pushAlert, dismissAlert, fitHireStations]);
 
   const commitDropoff = useCallback(async (station) => {
     if (!start || !end || !pickupStation) return;
@@ -746,14 +950,11 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
         maybeAlertTraffic(data.safest);
         maybeAlertFarSnap(data.meta);
         setHireStep('done');
-        setFlyTarget({
-          center: [
-            (pickupStation.lat + station.lat) / 2,
-            (pickupStation.lon + station.lon) / 2,
-          ],
-          zoom: 13,
-          duration: 1.0,
-        });
+        fitRouteBounds([
+          walkA?.path || [start, [pickupStation.lat, pickupStation.lon]],
+          data.safest?.path,
+          walkB?.path || [[station.lat, station.lon], end],
+        ].filter(Boolean), { duration: 1.0 });
       } else {
         pushAlert({ type: 'error', message: data.error || 'Route failed' });
         setHireStep('dropoff');
@@ -762,15 +963,23 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
       pushAlert({ type: 'error', message: 'Backend error' });
       setHireStep('dropoff');
     }
-  }, [start, end, pickupStation, activeProfileId, sessionBikeType, fetchWalkLeg, pushAlert, dismissAlert, maybeAlertTraffic, maybeAlertFarSnap]);
+  }, [start, end, pickupStation, activeProfileId, sessionBikeType, fetchWalkLeg, pushAlert, dismissAlert, maybeAlertTraffic, maybeAlertFarSnap, fitRouteBounds]);
 
   const handleStationExpand = useCallback((station) => {
     if (hireStep !== 'pickup' && hireStep !== 'dropoff') return;
     // Switching stations clears the unsuitable sticky confirm.
     dismissAlert('confirm');
     pendingUnsuitableRef.current = null;
-    setExpandedStationId((prev) => (prev === station.id ? null : station.id));
-  }, [hireStep, dismissAlert]);
+    setExpandedStationId((prev) => {
+      const next = prev === station.id ? null : station.id;
+      if (next) {
+        const anchor = hireStep === 'pickup' ? start : end;
+        const others = (hireStations || []).filter((s) => s.id !== station.id).slice(0, 6);
+        fitHireStations(anchor, [station, ...others], { duration: 0.75 });
+      }
+      return next;
+    });
+  }, [hireStep, dismissAlert, start, end, hireStations, fitHireStations]);
 
   const handleStationConfirm = useCallback((station) => {
     if (hireStep !== 'pickup' && hireStep !== 'dropoff') return;
@@ -859,21 +1068,42 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
   const showCalculating = commitPending || hireStep === 'routing';
   const startPlaceholder = (geo.active && geo.location && !start)
     ? (geo.location.label || 'Current location')
-    : 'Search start';
+    : 'Search start or click on the map';
+  const endPlaceholder = 'Search destination or click on the map';
 
   const hireNeed = hireStep === 'dropoff' ? 'docks' : 'bikes';
+
+  const tutorialSignals = useMemo(() => ({
+    routeRevealed,
+    overlayMode,
+    islandExpanded,
+    islandPage,
+    start,
+    end,
+    activeProfileId,
+    sessionBikeType,
+    sidebarOpen,
+    safestPath: safestData?.path || null,
+    mapApiRef,
+  }), [
+    routeRevealed, overlayMode, islandExpanded, islandPage,
+    start, end, activeProfileId, sessionBikeType, sidebarOpen,
+    safestData?.path, mapApiRef,
+  ]);
 
   return (
     <>
       <MapShell
-        themeMode={themeMode}
+        themeMode={shellThemeMode}
         alert={alert}
         onAlertAction={handleAlertAction}
         sidebarProfiles={profiles}
         activeProfileId={activeProfileId}
+        onSelectProfile={handleSelectProfile}
         onDeleteProfile={handleDeleteProfile}
         onProfileCreated={handleProfileCreated}
         onProfileUpdated={handleProfileUpdated}
+        onMapReady={markMapReady}
         routingProps={{
           theme,
           profiles,
@@ -900,6 +1130,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
             setDepartMode(mode);
             setDepartAtIso(iso);
             setRouteRevealed(false);
+            overlayTouchedRef.current = false;
           },
           onGetRoute: handleGetRoute,
           isCalculating: showCalculating,
@@ -907,6 +1138,8 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           onBlocked: handleBlocked,
           onEditFavourites: () => openSidebar({ focus: 'profiles' }),
           startPlaceholder,
+          endPlaceholder,
+          onMapPickTargetChange: setMapPickTarget,
           locationAsStart: Boolean(!start && geo.active && geo.location),
           routeStart,
         }}
@@ -947,7 +1180,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           fastest: activeFastest || fastestData,
           overlayMode,
           bikeType: sessionBikeType,
-          isDarkOutside,
+          isDarkOutside: isDarkForRouting,
           profile: activeProfile,
           units,
           expanded: islandExpanded,
@@ -964,6 +1197,8 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           viaCount,
           startCoord: start || null,
           departAtIso: departMode === 'depart_at' ? departAtIso : null,
+          onOverlayHintClick: triggerOverlayPulse,
+          onIslandPageChange: setIslandPage,
         }}
         mapControlsProps={{
           onZoomIn: () => mapApiRef.current?.zoomIn?.(),
@@ -975,8 +1210,9 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           onResetNorth: () => mapApiRef.current?.resetNorth?.(),
           routeRevealed,
           overlayMode,
-          isDark: isDarkOutside,
+          isDark: isDarkForRouting,
           onSelectOverlayMode: handleSelectOverlayMode,
+          overlayPulse,
         }}
         weatherControlProps={{
           visible: Boolean(routeRevealed && safestData),
@@ -990,6 +1226,10 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
             });
           },
         }}
+      />
+      <OnboardingLayer
+        tutorialSignals={tutorialSignals}
+        onProfileCreated={handleProfileCreated}
       />
       {passwordRecoveryPending && <PasswordRecoveryModal themeMode={themeMode} />}
     </>
@@ -1024,7 +1264,9 @@ function AppV2Root() {
 
   return (
     <SidebarProvider isDarkOutside={isDarkOutside}>
-      <AppV2Inner mapApiRef={mapApiRef} isDarkOutside={isDarkOutside} />
+      <OnboardingProvider>
+        <AppV2Inner mapApiRef={mapApiRef} isDarkOutside={isDarkOutside} />
+      </OnboardingProvider>
     </SidebarProvider>
   );
 }

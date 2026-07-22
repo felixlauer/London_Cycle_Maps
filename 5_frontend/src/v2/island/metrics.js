@@ -29,10 +29,11 @@ export function formatDistanceParts(metres, units = 'metric') {
 const COMPARE_LABEL = {
   shortest: 'shortest',
   'non-tuned': 'non-tuned route',
+  'non-optimised': 'non-optimised',
 };
 
-function compareSuffix(compare = 'shortest') {
-  return COMPARE_LABEL[compare] || COMPARE_LABEL.shortest;
+function compareSuffix(compare = 'non-optimised') {
+  return COMPARE_LABEL[compare] || COMPARE_LABEL['non-optimised'];
 }
 
 function signedDelta(sign, magnitude, compare) {
@@ -43,8 +44,8 @@ function signedDelta(sign, magnitude, compare) {
   return `${sign}${magnitude} vs ${vs}`;
 }
 
-/** Signed comparison vs fastest route — desktop: "vs shortest"; mobile expanded: "vs non-tuned route". */
-export function formatTimeDelta(safestMin, fastestMin, { compare = 'shortest' } = {}) {
+/** Signed comparison vs fastest route — desktop/tablet: "vs non-optimised"; mobile: "vs non-tuned route". */
+export function formatTimeDelta(safestMin, fastestMin, { compare = 'non-optimised' } = {}) {
   const a = Number(safestMin);
   const b = Number(fastestMin);
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
@@ -56,7 +57,7 @@ export function formatTimeDelta(safestMin, fastestMin, { compare = 'shortest' } 
 }
 
 /** Signed distance comparison vs fastest route. */
-export function formatDistanceDelta(safestM, fastestM, units = 'metric', { compare = 'shortest' } = {}) {
+export function formatDistanceDelta(safestM, fastestM, units = 'metric', { compare = 'non-optimised' } = {}) {
   const a = Number(safestM);
   const b = Number(fastestM);
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;

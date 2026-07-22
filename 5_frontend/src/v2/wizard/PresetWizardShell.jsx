@@ -250,29 +250,38 @@ export default function PresetWizardShell({
 
   return (
     <div className="v2wiz" data-theme={themeMode}>
-      <header className="v2wiz__header">
-        <div className="v2wiz__progress" aria-hidden>
-          {STEPS.map((label, i) => (
-            <div
-              key={label}
-              className={`v2wiz__progress-seg${i <= step ? ' is-done' : ''}${i === step ? ' is-current' : ''}`}
-            />
-          ))}
+      <div className="v2wiz__scroll">
+        <div className="v2wiz__progress-sticky" aria-hidden>
+          <div className="v2wiz__header-inner">
+            <div className="v2wiz__progress">
+              {STEPS.map((label, i) => (
+                <div
+                  key={label}
+                  className={`v2wiz__progress-seg${i <= step ? ' is-done' : ''}${i === step ? ' is-current' : ''}`}
+                />
+              ))}
+            </div>
+          </div>
         </div>
-        <p className="v2wiz__step-label">
-          Step {step + 1} of {STEPS.length} — {STEPS[step]}
-        </p>
-        <h1 className="v2wiz__title">
-          {isEditing ? 'Edit riding profile' : 'New riding profile'}
-        </h1>
-        {isEditing && (
-          <p className="v2wiz__blurb">
-            Your current bike, style, and preferences are preselected. Walk through the steps to adjust anything, then save.
-          </p>
-        )}
-      </header>
 
-      <div className="v2wiz__body">{body()}</div>
+        <header className="v2wiz__header">
+          <div className="v2wiz__header-inner">
+            <p className="v2wiz__step-label">
+              Step {step + 1} of {STEPS.length} — {STEPS[step]}
+            </p>
+            <h1 className="v2wiz__title">
+              {isEditing ? 'Edit riding profile' : 'New riding profile'}
+            </h1>
+            {isEditing && (
+              <p className="v2wiz__blurb">
+                Your current bike, style, and preferences are preselected. Walk through the steps to adjust anything, then save.
+              </p>
+            )}
+          </div>
+        </header>
+
+        <div className="v2wiz__body">{body()}</div>
+      </div>
 
       <footer className="v2wiz__footer">
         {step > 0 ? (

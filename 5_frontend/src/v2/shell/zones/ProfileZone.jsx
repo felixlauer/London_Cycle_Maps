@@ -6,7 +6,7 @@ import { useSidebar } from '../SidebarContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import {
   avatarStyleForEmail,
-  initialsFromEmail,
+  initialsFromUser,
 } from '../avatar';
 
 /**
@@ -27,7 +27,7 @@ export default function ProfileZone() {
   } = useSidebar();
   const isMobile = useIsMobile();
 
-  const initials = initialsFromEmail(user?.email);
+  const initials = initialsFromUser(user);
   const avatarStyle = user ? avatarStyleForEmail(user.email) : undefined;
 
   const handleAuthLink = (e) => {
@@ -94,8 +94,13 @@ export default function ProfileZone() {
             {isLoading ? (
               <span className="profile-pill__email">…</span>
             ) : (
-              <span className="profile-pill__email" title={user?.email || undefined}>
-                {user ? user.email : 'Not signed in'}
+              <span
+                className="profile-pill__email"
+                title={user?.email || undefined}
+              >
+                {user
+                  ? (user.display_name || user.email)
+                  : 'Not signed in'}
               </span>
             )}
             {!isLoading && (

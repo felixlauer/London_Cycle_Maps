@@ -1,0 +1,495 @@
+/* Onboarding surfaces — match v2 shell tokens (BRIEF: solid, no glass) */
+
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap');
+
+:root {
+  --onb-z: 2000;
+  --onb-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --onb-brand: #ff0061;
+}
+
+.onb-screen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--onb-z);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  padding: 24px;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background: #f4f4f5;
+  color: #18181b;
+  pointer-events: auto;
+}
+
+.onb-screen[data-theme='dark'] {
+  background: #0a0a0a;
+  color: #fafafa;
+}
+
+.onb-screen--boot {
+  transition:
+    opacity 360ms var(--onb-ease),
+    transform 360ms var(--onb-ease);
+}
+
+.onb-screen--boot.is-exiting {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
+.onb-boot__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  text-align: center;
+  max-width: 28rem;
+}
+
+.onb-boot__logo-wrap {
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 48px;
+  animation: onb-logo-pulse 900ms ease-in-out infinite alternate;
+}
+
+.onb-boot__logo {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--onb-brand) 28%, transparent));
+}
+
+.onb-boot__title,
+.onb-boot__sub {
+  margin: 0;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.onb-boot__title {
+  font-size: 48px;
+  font-weight: 600;
+  
+}
+
+.onb-boot__name {
+  font-weight: 600;
+  font-size: inherit;
+  letter-spacing: 0.03em;
+  font-style: italic;
+}
+
+.onb-boot__sub {
+  margin-top: 12px;
+  font-size: 18px;
+  font-weight: 550;
+  color: #71717a;
+}
+
+.onb-screen[data-theme='dark'] .onb-boot__sub {
+  color: #a1a1aa;
+}
+
+@keyframes onb-logo-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  to {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onb-boot__logo-wrap {
+    animation: onb-logo-breathe 2400ms ease-in-out infinite alternate;
+  }
+
+  .onb-screen--boot {
+    transition: opacity 200ms ease;
+  }
+
+  .onb-screen--boot.is-exiting {
+    transform: none;
+  }
+}
+
+@keyframes onb-logo-breathe {
+  from { opacity: 0.75; }
+  to { opacity: 1; }
+}
+
+/* —— Shared skip + card —— */
+
+.onb-skip {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  margin: 0;
+  padding: 8px 4px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  color: #71717a;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  line-height: 1.2;
+  z-index: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .onb-skip:hover {
+    color: #18181b;
+  }
+}
+
+.onb-screen[data-theme='dark'] .onb-skip {
+  color: #a1a1aa;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .onb-screen[data-theme='dark'] .onb-skip:hover {
+    color: #f4f4f5;
+  }
+}
+
+.onb-card {
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 24px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  animation: onb-card-in 240ms var(--onb-ease) both;
+}
+
+.onb-screen[data-theme='dark'] .onb-card {
+  background: #1c1c1e;
+  border-color: #3a3a3c;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+}
+
+.onb-card__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  animation: onb-fade-up 240ms var(--onb-ease) 40ms both;
+}
+
+.onb-card__body {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #71717a;
+  animation: onb-fade-up 240ms var(--onb-ease) 80ms both;
+}
+
+.onb-screen[data-theme='dark'] .onb-card__body {
+  color: #a1a1aa;
+}
+
+.onb-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  animation: onb-fade-up 240ms var(--onb-ease) 120ms both;
+}
+
+.onb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    transform 160ms var(--onb-ease),
+    filter 150ms var(--onb-ease),
+    background-color 150ms var(--onb-ease),
+    color 150ms var(--onb-ease);
+}
+
+.onb-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.onb-btn--primary {
+  background: var(--onb-brand);
+  border-color: var(--onb-brand);
+  color: #ffffff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .onb-btn--primary:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
+}
+
+.onb-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: #71717a;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .onb-btn--ghost:hover {
+    color: #18181b;
+  }
+}
+
+.onb-screen[data-theme='dark'] .onb-btn--ghost {
+  color: #a1a1aa;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .onb-screen[data-theme='dark'] .onb-btn--ghost:hover {
+    color: #f4f4f5;
+  }
+}
+
+.onb-flat__alt {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.45;
+  color: #71717a;
+}
+
+.onb-screen[data-theme='dark'] .onb-flat__alt {
+  color: #a1a1aa;
+}
+
+.onb-text-link {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 650;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .onb-text-link:hover {
+    color: #18181b;
+  }
+
+  .onb-screen[data-theme='dark'] .onb-text-link:hover {
+    color: #f4f4f5;
+  }
+}
+
+@keyframes onb-card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes onb-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onb-card,
+  .onb-card__title,
+  .onb-card__body,
+  .onb-card__actions {
+    animation: none;
+  }
+}
+
+/* —— Flat welcome / signup (no card chrome) —— */
+
+.onb-flat {
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  text-align: left;
+}
+
+.onb-flat__title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+.onb-flat__body {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: #71717a;
+}
+
+.onb-screen[data-theme='dark'] .onb-flat__body {
+  color: #a1a1aa;
+}
+
+.onb-flat__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.onb-signup {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: onb-fade-up 240ms var(--onb-ease) both;
+}
+
+.onb-signup .auth-panel--inline,
+.onb-signup .auth-modal {
+  width: 100%;
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.onb-signup .auth-modal__header {
+  display: none;
+}
+
+.onb-signup .auth-tabs {
+  display: none;
+}
+
+.onb-signup .auth-form {
+  gap: 12px;
+}
+
+/* —— Wizard host (flat panels) —— */
+
+.onb-wizard {
+  position: fixed;
+  inset: 0;
+  z-index: var(--onb-z);
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  pointer-events: auto;
+}
+
+.onb-wizard[data-theme='dark'] {
+  background: #1c1c1e;
+}
+
+.onb-wizard__intro {
+  flex-shrink: 0;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 52px 24px 0;
+  box-sizing: border-box;
+  background: inherit;
+  position: relative;
+  z-index: 2;
+}
+
+.onb-wizard__intro-text {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 550;
+  line-height: 1.5;
+  color: #71717a;
+}
+
+.onb-wizard[data-theme='dark'] .onb-wizard__intro-text {
+  color: #a1a1aa;
+}
+
+.onb-wizard__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Strip decorative boxes inside the first-run wizard */
+.onb-wizard .wiz-panel {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Sticky budget must stay opaque even when panels are flattened */
+.onb-wizard .wiz-budget-sticky {
+  background: var(--wiz-bg, #ffffff);
+}
+
+.onb-wizard .wiz-budget-sticky .wiz-panel {
+  background: var(--wiz-bg, #ffffff);
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.onb-wizard .wiz-card {
+  background: transparent;
+  box-shadow: none;
+}
+
+.onb-wizard .wiz-card:hover {
+  background: color-mix(in srgb, var(--wiz-accent, #ff0061) 6%, transparent);
+}
+
+.onb-wizard .wiz-card.selected {
+  background: color-mix(in srgb, var(--wiz-accent, #ff0061) 10%, transparent);
+}

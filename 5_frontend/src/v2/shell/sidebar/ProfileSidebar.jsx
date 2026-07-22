@@ -11,12 +11,14 @@ import AuthPanel from '../../../auth/AuthPanel';
 import PresetWizardShell from '../../wizard/PresetWizardShell';
 import { useSidebar, SIDEBAR_WIDTH_PX } from '../SidebarContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { useOnboarding } from '../../onboarding/OnboardingContext';
 import ProfilesSection from './ProfilesSection';
 import AccountManageSection from './AccountManageSection';
 import SystemFooter from './SystemFooter';
 import './sidebar.css';
 
 const TWEEN = { type: 'tween', duration: 0.48, ease: [0.23, 1, 0.32, 1] };
+const SWIPE_CLOSE_PX = 72;
 
 function useViewport() {
   const [dims, setDims] = useState(() => ({
@@ -35,11 +37,12 @@ function useViewport() {
 
 /**
  * Overlay drawer — morphs to fullscreen wizard via transform (not width).
- * Mobile: full-width overlay; no chrome push.
+ * Mobile: full-width overlay; no chrome push. Swipe right to dismiss.
  */
 export default function ProfileSidebar({
   profiles,
   activeProfileId,
+  onSelectProfile,
   onDeleteProfile,
   onProfileCreated,
   onProfileUpdated,
@@ -57,12 +60,16 @@ export default function ProfileSidebar({
     profilesSectionRef,
     sidebarWidth,
   } = useSidebar();
+  const { replayTutorial } = useOnboarding();
   const isMobile = useIsMobile();
   const reduceMotion = useReducedMotion();
   const widthMv = useMotionValue(0);
   const morphMv = useMotionValue(0);
   const wasOpen = useRef(false);
+  const swipeStart = useRef(null);
   const [wizardMounted, setWizardMounted] = useState(false);
+  const [accountPanel, setAccountPanel] = useState(null);
+  const [dragOffset, setDragOffset] = useState(0);
   const { w: vw } = useViewport();
 
   const isWizard = view === 'wizard';
@@ -70,6 +77,14 @@ export default function ProfileSidebar({
   const showWizard = isWizard || wizardMounted;
   const mobileDrawerW = vw;
   const drawerTarget = isMobile ? mobileDrawerW : (sidebarWidth || SIDEBAR_WIDTH_PX);
+  const profilesStacked = Boolean(accountPanel);
+
+  useEffect(() => {
+    if (!open) {
+      setAccountPanel(null);
+      setDragOffset(0);
+    }
+  }, [open]);
 
   useEffect(() => {
     const target = open ? drawerTarget : 0;
@@ -153,6 +168,44 @@ export default function ProfileSidebar({
     closeWizard();
   };
 
+  const onSwipeStart = (e) => {
+    if (!isMobile || !open || showWizard) return;
+    if (e.target?.closest?.('input, textarea, select, button, a')) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    swipeStart.current = { x: t.clientX, y: t.clientY };
+  };
+
+  const onSwipeMove = (e) => {
+    if (!swipeStart.current) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    const dx = t.clientX - swipeStart.current.x;
+    const dy = t.clientY - swipeStart.current.y;
+    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 18) {
+      swipeStart.current = null;
+      setDragOffset(0);
+      return;
+    }
+    // Right-edge drawer: swipe right to dismiss.
+    setDragOffset(Math.max(0, dx));
+  };
+
+  const onSwipeEnd = (e) => {
+    if (!swipeStart.current) {
+      setDragOffset(0);
+      return;
+    }
+    const t = e.changedTouches?.[0];
+    const dx = t ? t.clientX - swipeStart.current.x : dragOffset;
+    swipeStart.current = null;
+    setDragOffset(0);
+    if (dx > SWIPE_CLOSE_PX) {
+      if (isAuth) closeAuthPanel();
+      else closeSidebar();
+    }
+  };
+
   return (
     <aside
       className={[
@@ -162,9 +215,16 @@ export default function ProfileSidebar({
         isAuth ? 'is-auth' : '',
         isMobile ? 'is-mobile' : '',
       ].filter(Boolean).join(' ')}
-      style={isMobile && open ? { width: `${drawerTarget}px` } : undefined}
+      style={isMobile && open ? {
+        width: `${drawerTarget}px`,
+        transform: dragOffset ? `translateX(${dragOffset}px)` : undefined,
+        transition: dragOffset ? 'none' : undefined,
+      } : undefined}
       aria-hidden={!open}
       aria-label="Profile and settings"
+      onTouchStart={onSwipeStart}
+      onTouchMove={onSwipeMove}
+      onTouchEnd={onSwipeEnd}
     >
       {!showWizard && !isMobile && (
         <button
@@ -238,12 +298,28 @@ export default function ProfileSidebar({
                   activeProfileId={activeProfileId}
                   sectionRef={profilesSectionRef}
                   onDeleteProfile={onDeleteProfile}
+                  onSelectProfile={onSelectProfile}
+                  stacked={profilesStacked}
+                  onStackedActivate={() => setAccountPanel(null)}
                 />
               </div>
 
               <div className="profile-sidebar__bottom">
-                <AccountManageSection />
+                <AccountManageSection
+                  expandedPanel={accountPanel}
+                  onExpandedPanelChange={setAccountPanel}
+                />
                 <SystemFooter />
+                <button
+                  type="button"
+                  className="sb-revisit-tutorial"
+                  onClick={() => {
+                    closeSidebar();
+                    window.setTimeout(() => replayTutorial(), 320);
+                  }}
+                >
+                  Revisit tutorial?
+                </button>
               </div>
             </>
           )}

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { OVERLAY_KIND_META } from '../map/overlayModes';
 import MetricCell from './MetricCell';
@@ -72,11 +72,22 @@ export default function ExpandedIsland({
   viaCount = 0,
   startCoord = null,
   departAtIso = null,
+  onOverlayHintClick,
+  onPageChange,
 }) {
   const isMobile = useIsMobile();
   const [sheetHover, setSheetHover] = useState(null);
   const [page, setPage] = useState(PAGE_CHART);
+  const [dragX, setDragX] = useState(0);
+  const [swiping, setSwiping] = useState(false);
   const touchStart = useRef(null);
+  const viewportRef = useRef(null);
+  const SWIPE_EASE = '320ms cubic-bezier(0.23, 1, 0.32, 1)';
+
+  useEffect(() => {
+    onPageChange?.(page);
+  }, [page, onPageChange]);
+
   const sStats = safest?.stats || {};
   const fStats = fastest?.stats || {};
   const totalM = index?.totalM || Number(sStats.length_m) || 0;
@@ -145,7 +156,7 @@ export default function ExpandedIsland({
 
   const showExtremeSlot = !isMobile && Boolean(extremeWarning);
   const metricsStacked = santander || showExtremeSlot;
-  const deltaCompare = isMobile ? 'non-tuned' : 'shortest';
+  const deltaCompare = isMobile ? 'non-tuned' : 'non-optimised';
 
   const metricsBlock = (
     <div className={`island-expanded__metrics${metricsStacked ? ' is-stacked' : ''}`}>
@@ -155,6 +166,7 @@ export default function ExpandedIsland({
           ariaLabel="Trip time"
           parts={formatDurationParts(sStats.duration_min)}
           delta={formatTimeDelta(sStats.duration_min, fStats.duration_min, { compare: deltaCompare })}
+          twoLineDelta={!isMobile}
         />
       </div>
       <div className="island-expanded__metric-block">
@@ -163,6 +175,7 @@ export default function ExpandedIsland({
           ariaLabel="Trip distance"
           parts={formatDistanceParts(sStats.length_m, units)}
           delta={formatDistanceDelta(sStats.length_m, fStats.length_m, units, { compare: deltaCompare })}
+          twoLineDelta={!isMobile}
         />
       </div>
     </div>
@@ -211,8 +224,9 @@ export default function ExpandedIsland({
         modes={barModes || []}
         externalHover={chartHover}
         onHoverChange={handleHover}
-        maxKindsPerChart={isMobile ? 4 : Infinity}
+        maxKindsPerChart={isMobile ? 3 : Infinity}
         showOverlayHint={isMobile}
+        onOverlayHintClick={onOverlayHintClick}
       />
     </div>
   );
@@ -232,20 +246,71 @@ export default function ExpandedIsland({
 
   const pages = [metricsPage, chartPage, barsPage];
 
+  useEffect(() => {
+    setDragX(0);
+    setSwiping(false);
+  }, [page]);
+
   const onTouchStart = (e) => {
+    const t = e.touches?.[0];
+    if (!t) return;
     touchStart.current = {
-      x: e.changedTouches[0].clientX,
-      y: e.changedTouches[0].clientY,
+      x: t.clientX,
+      y: t.clientY,
+      // Chart owns scrub; only steal once horizontal intent is clear.
+      fromChart: Boolean(e.target?.closest?.('.island-chart')),
+      locked: null, // 'page' | 'chart' | 'collapse'
     };
+  };
+
+  const onTouchMove = (e) => {
+    if (!touchStart.current) return;
+    const t = e.touches?.[0];
+    if (!t) return;
+    const dx = t.clientX - touchStart.current.x;
+    const dy = t.clientY - touchStart.current.y;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+
+    if (!touchStart.current.locked) {
+      if (absX < 8 && absY < 8) return;
+      if (touchStart.current.fromChart) {
+        // Prefer chart scrub unless the gesture is clearly horizontal.
+        if (absX > absY * 1.15 && absX > 18) {
+          touchStart.current.locked = 'page';
+        } else {
+          touchStart.current.locked = 'chart';
+          touchStart.current = null;
+          setSwiping(false);
+          setDragX(0);
+          return;
+        }
+      } else if (absY > absX && absY > 16) {
+        touchStart.current.locked = 'collapse';
+      } else {
+        touchStart.current.locked = 'page';
+      }
+    }
+
+    if (touchStart.current.locked === 'chart') return;
+    if (touchStart.current.locked === 'collapse') return;
+    setSwiping(true);
+    setDragX(dx);
   };
 
   const onTouchEnd = (e) => {
     if (!touchStart.current) return;
-    const dx = e.changedTouches[0].clientX - touchStart.current.x;
-    const dy = e.changedTouches[0].clientY - touchStart.current.y;
+    const t = e.changedTouches?.[0];
+    const dx = t ? t.clientX - touchStart.current.x : dragX;
+    const dy = t ? t.clientY - touchStart.current.y : 0;
+    const locked = touchStart.current.locked;
     touchStart.current = null;
-    if (Math.abs(dy) > Math.abs(dx) && dy > 50) {
-      onCollapse?.();
+    setSwiping(false);
+    setDragX(0);
+
+    if (locked === 'chart') return;
+    if ((locked === 'collapse' || (Math.abs(dy) > Math.abs(dx) && dy > 50))) {
+      if (dy > 50) onCollapse?.();
       return;
     }
     if (Math.abs(dx) < 40) return;
@@ -253,10 +318,23 @@ export default function ExpandedIsland({
     else setPage((p) => Math.max(PAGE_METRICS, p - 1));
   };
 
+  // Content swipe left (dx < 0) → next page → thumb moves right. Match by
+  // converting finger delta to a fraction of the viewport width.
+  const vw = viewportRef.current?.offsetWidth || 1;
+  const thumbPage = page + (swiping ? (-dragX / vw) : 0);
+
+  const trackStyle = isMobile
+    ? {
+      transform: `translateX(calc(${-page * 100}% + ${dragX}px))`,
+      transition: swiping ? 'none' : `transform ${SWIPE_EASE}`,
+    }
+    : undefined;
+
   return (
     <div
       className={`island-expanded${santander ? ' is-santander' : ''}${isMobile ? ' is-mobile' : ''}`}
       onTouchStart={isMobile ? onTouchStart : undefined}
+      onTouchMove={isMobile ? onTouchMove : undefined}
       onTouchEnd={isMobile ? onTouchEnd : undefined}
     >
       <button
@@ -270,10 +348,29 @@ export default function ExpandedIsland({
 
       {isMobile ? (
         <>
-          <div className="island-expanded__pages" data-page={page}>
-            {pages[page]}
+          <div className="island-expanded__viewport" ref={viewportRef}>
+            <div className="island-expanded__track" style={trackStyle}>
+              {pages.map((p, i) => (
+                <div
+                  key={PAGE_LABELS[i]}
+                  className={`island-expanded__slide${i === page ? ' is-active' : ''}`}
+                  aria-hidden={i !== page}
+                >
+                  {p}
+                </div>
+              ))}
+            </div>
           </div>
           <div className="island-expanded__progress" role="tablist" aria-label="Island panels">
+            <span
+              className="island-expanded__progress-thumb"
+              style={{
+                width: 'calc((100% - 16px) / 3)',
+                left: `calc(${thumbPage} * ((100% - 16px) / 3 + 8px))`,
+                transition: swiping ? 'none' : `left ${SWIPE_EASE}`,
+              }}
+              aria-hidden
+            />
             {[PAGE_METRICS, PAGE_CHART, PAGE_BARS].map((i) => (
               <button
                 key={i}
@@ -286,10 +383,7 @@ export default function ExpandedIsland({
                 <span className="island-expanded__progress-label">
                   {PAGE_LABELS[i]}
                 </span>
-                <span
-                  className={`island-expanded__progress-seg${page === i ? ' is-active' : ''}`}
-                  aria-hidden
-                />
+                <span className="island-expanded__progress-seg" aria-hidden />
               </button>
             ))}
           </div>

@@ -18,10 +18,26 @@ _service = None
 _anon = None
 
 MIN_PASSWORD_LEN = 6
+MAX_DISPLAY_NAME_LEN = 80
 
 
 def _env(name: str) -> str:
     return (os.environ.get(name) or "").strip()
+
+
+def normalize_display_name(value: Any) -> tuple[str | None, str | None]:
+    """
+    Returns (normalized_or_None, error).
+    Empty / whitespace → None (allowed; existing accounts stay nameless).
+    """
+    if value is None:
+        return None, None
+    name = str(value).strip()
+    if not name:
+        return None, None
+    if len(name) > MAX_DISPLAY_NAME_LEN:
+        return None, f"Name must be at most {MAX_DISPLAY_NAME_LEN} characters."
+    return name, None
 
 
 def configured() -> bool:
@@ -83,6 +99,25 @@ def _user_id(user: Any) -> str | None:
     return getattr(user, "id", None)
 
 
+def _user_metadata(user: Any) -> dict:
+    if user is None:
+        return {}
+    if isinstance(user, dict):
+        meta = user.get("user_metadata") or user.get("raw_user_meta_data") or {}
+    else:
+        meta = getattr(user, "user_metadata", None) or getattr(user, "raw_user_meta_data", None) or {}
+    return meta if isinstance(meta, dict) else {}
+
+
+def _user_display_name(user: Any) -> str | None:
+    meta = _user_metadata(user)
+    raw = meta.get("display_name")
+    if raw is None:
+        return None
+    name = str(raw).strip()
+    return name or None
+
+
 def _session_dict(session: Any, user: Any = None) -> dict[str, Any] | None:
     if session is None:
         return None
@@ -108,6 +143,7 @@ def _session_dict(session: Any, user: Any = None) -> dict[str, Any] | None:
         "user": {
             "id": _user_id(u),
             "email": _user_email(u),
+            "display_name": _user_display_name(u),
         },
     }
 
@@ -173,14 +209,25 @@ def sign_in(email: str, password: str) -> tuple[dict | None, str | None]:
     return payload, None
 
 
-def sign_up(email: str, password: str) -> tuple[dict | None, str | None, bool]:
+def sign_up(
+    email: str,
+    password: str,
+    display_name: str | None = None,
+) -> tuple[dict | None, str | None, bool]:
     """Returns (session_or_none, error, needs_email_confirm)."""
     if len(password) < MIN_PASSWORD_LEN:
         return None, f"Password must be at least {MIN_PASSWORD_LEN} characters.", False
+    name, name_err = normalize_display_name(display_name)
+    if name_err:
+        return None, name_err, False
+    payload_in: dict[str, Any] = {
+        "email": email.strip(),
+        "password": password,
+    }
+    if name is not None:
+        payload_in["options"] = {"data": {"display_name": name}}
     try:
-        resp = _anon_client().auth.sign_up(
-            {"email": email.strip(), "password": password}
-        )
+        resp = _anon_client().auth.sign_up(payload_in)
     except Exception as e:
         return None, str(e), False
     session = getattr(resp, "session", None) or (resp.get("session") if isinstance(resp, dict) else None)
@@ -192,6 +239,28 @@ def sign_up(email: str, password: str) -> tuple[dict | None, str | None, bool]:
     payload = _session_dict(session, user)
     needs_confirm = payload is None
     return payload, None, needs_confirm
+
+
+def update_display_name(user_id: str, display_name: Any) -> tuple[str | None, str | None]:
+    """
+    Set or clear display_name in auth user_metadata.
+    Returns (normalized_display_name_or_None, error).
+    """
+    name, err = normalize_display_name(display_name)
+    if err:
+        return None, err
+    uid = (user_id or "").strip()
+    if not uid:
+        return None, "authentication required."
+    try:
+        # Empty string clears the field for existing test accounts that set a name later.
+        _service_client().auth.admin.update_user_by_id(
+            uid,
+            {"user_metadata": {"display_name": name or ""}},
+        )
+    except Exception as e:
+        return None, str(e) or "Could not update name."
+    return name, None
 
 
 def send_password_reset(email: str, redirect_to: str) -> str | None:

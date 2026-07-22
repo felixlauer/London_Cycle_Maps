@@ -2,10 +2,9 @@
 # London Cycle Maps – root .gitignore (safe for GitHub publish)
 # =============================================================================
 
-# --- Sensitive: never commit API keys or secrets ---
+# --- Sensitive: never commit API keys, secrets, or env templates ---
 .env
 .env.*
-!.env.example
 
 # --- Documentation: only APP_MAIN, APP_DEBUG, GRAPH on GitHub ---
 0_documentation/*

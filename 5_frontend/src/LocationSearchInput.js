@@ -9,13 +9,20 @@ import {
 const DEBOUNCE_MS = 300;
 const MIN_QUERY_LEN = 2;
 
+/** Map-picked labels look like "51.5074, -0.1278" — never send those to suggest. */
+export function looksLikeCoordinates(text) {
+  return /^-?\d{1,3}(?:\.\d+)?\s*,\s*-?\d{1,3}(?:\.\d+)?$/.test(String(text || '').trim());
+}
+
 export default function LocationSearchInput({
   label,
   value,
   placeholder,
   theme,
   onSelect,
+  onClear,
   disabled = false,
+  onFocusChange,
 }) {
   const [query, setQuery] = useState(value || '');
   const [suggestions, setSuggestions] = useState([]);
@@ -25,6 +32,7 @@ export default function LocationSearchInput({
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const sessionTokenRef = useRef(null);
   const containerRef = useRef(null);
+  const inputRef = useRef(null);
   const debounceRef = useRef(null);
   const requestIdRef = useRef(0);
 
@@ -45,7 +53,7 @@ export default function LocationSearchInput({
   }, []);
 
   const runSuggest = useCallback(async (text, sessionToken) => {
-    if (!sessionToken || text.length < MIN_QUERY_LEN) {
+    if (!sessionToken || text.length < MIN_QUERY_LEN || looksLikeCoordinates(text)) {
       setSuggestions([]);
       setLoading(false);
       return;
@@ -71,8 +79,25 @@ export default function LocationSearchInput({
     }
   }, []);
 
-  const handleFocus = () => {
+  const clearField = useCallback(() => {
+    setQuery('');
+    setSuggestions([]);
+    setOpen(false);
+    setError('');
+    setLoading(false);
+    onClear?.();
+  }, [onClear]);
+
+  const handleFocus = (e) => {
     sessionTokenRef.current = createSessionToken();
+    onFocusChange?.(true);
+    if (looksLikeCoordinates(query)) {
+      // Edit-in-place: highlight coords, never geocode them.
+      requestAnimationFrame(() => {
+        try { e.target.select(); } catch { /* ignore */ }
+      });
+      return;
+    }
     if (query.length >= MIN_QUERY_LEN) {
       runSuggest(query, sessionTokenRef.current);
     }
@@ -80,6 +105,7 @@ export default function LocationSearchInput({
 
   const handleBlur = () => {
     sessionTokenRef.current = null;
+    onFocusChange?.(false);
   };
 
   const handleChange = (e) => {
@@ -87,7 +113,23 @@ export default function LocationSearchInput({
     setQuery(text);
     setError('');
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!sessionTokenRef.current) return;
+
+    if (!text.trim()) {
+      setSuggestions([]);
+      setOpen(false);
+      onClear?.();
+      return;
+    }
+
+    if (looksLikeCoordinates(text)) {
+      setSuggestions([]);
+      setOpen(false);
+      return;
+    }
+
+    if (!sessionTokenRef.current) {
+      sessionTokenRef.current = createSessionToken();
+    }
     if (text.length < MIN_QUERY_LEN) {
       setSuggestions([]);
       setOpen(false);
@@ -119,6 +161,11 @@ export default function LocationSearchInput({
   };
 
   const handleKeyDown = (e) => {
+    if (looksLikeCoordinates(query) && (e.key === 'Backspace' || e.key === 'Delete')) {
+      e.preventDefault();
+      clearField();
+      return;
+    }
     if (!open || !suggestions.length) {
       if (e.key === 'Escape') setOpen(false);
       return;
@@ -151,6 +198,7 @@ export default function LocationSearchInput({
       </label>
       ) : null}
       <input
+        ref={inputRef}
         type="text"
         value={query}
         onChange={handleChange}
@@ -191,7 +239,7 @@ export default function LocationSearchInput({
             border: `1px solid ${theme.border}`,
             borderRadius: '4px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: 2000,
+            zIndex: 2500,
             maxHeight: '180px',
             overflowY: 'auto',
           }}
@@ -223,7 +271,8 @@ export default function LocationSearchInput({
           ))}
         </ul>
       )}
-      {open && !loading && query.length >= MIN_QUERY_LEN && suggestions.length === 0 && !error && (
+      {open && !loading && query.length >= MIN_QUERY_LEN && suggestions.length === 0 && !error
+        && !looksLikeCoordinates(query) && (
         <div
           style={{
             position: 'absolute',

@@ -20,10 +20,11 @@ export default function MapControlsZone({
   isDark = false,
   onSelectOverlayMode,
   compact = false,
+  overlayPulse = false,
 }) {
   return (
     <section
-      className={`map-ctl${compact ? ' map-ctl--compact' : ''}`}
+      className={`map-ctl${compact ? ' map-ctl--compact' : ''}${overlayPulse ? ' is-overlay-pulse' : ''}`}
       aria-label="Map controls"
       data-zone="map-controls"
     >
@@ -33,6 +34,7 @@ export default function MapControlsZone({
         inactive={!routeRevealed}
         onSelectMode={onSelectOverlayMode}
         compact={compact}
+        pulse={overlayPulse}
       />
 
       <div className="map-ctl__zoom" role="group" aria-label="Zoom">

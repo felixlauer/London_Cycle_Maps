@@ -8,6 +8,7 @@ import {
   ROUTE_OVERLAY_POINT,
   countActiveOverlays,
 } from './routeOverlayCatalog';
+import { API_BASE } from './api/flaskClient';
 
 const sectionStyle = {
   fontSize: '10px',
@@ -58,7 +59,7 @@ export default function RouteOverlayPicker({
   lightingActive = false,
   onRefreshDisruptions,
   disruptionStatus,
-  apiBase = 'http://127.0.0.1:5000',
+  apiBase = API_BASE,
 }) {
   const [open, setOpen] = useState(false);
   const [catalogVersion, setCatalogVersion] = useState(null);

@@ -3,6 +3,7 @@ import { ChevronUp } from 'lucide-react';
 import ElevationSparkline from './ElevationSparkline';
 import ModeDonut from './ModeDonut';
 import MetricCell from './MetricCell';
+import useMeasure from './useMeasure';
 import { islandModeMeta } from './modeData';
 import { OVERLAY_KIND_META } from '../map/overlayModes';
 import { useIsMobile } from '../hooks/useMediaQuery';
@@ -25,8 +26,15 @@ function donutSegmentCaption(modeId, kind) {
   return OVERLAY_KIND_META[kind]?.label || kind;
 }
 
+const DONUT = 56;
+/** Landscape sparkline — width fills the cell; height tracks width. */
+const SPARK_ASPECT = 0.42;
+const SPARK_SIDE_PAD = 10;
+const SPARK_FALLBACK_W = 72;
+
 function ContentSlot({ slot, safest, externalHover, onHoverChange }) {
   const [localKind, setLocalKind] = useState(null);
+  const [slotRef, { width: slotW }] = useMeasure();
   const modeId = slot?.modeId;
   const meta = modeId ? islandModeMeta(modeId) : null;
   const activeKind = localKind
@@ -38,17 +46,18 @@ function ContentSlot({ slot, safest, externalHover, onHoverChange }) {
     ? donutSegmentCaption(modeId, activeKind)
     : (meta?.label || modeId);
 
-  const DONUT = 56;
-
   if (!slot) return null;
   if (slot.type === 'elevation') {
+    const available = slotW > 0 ? slotW : SPARK_FALLBACK_W;
+    const plotW = Math.max(40, Math.floor(available - SPARK_SIDE_PAD * 2));
+    const plotH = Math.max(22, Math.round(plotW * SPARK_ASPECT));
     return (
-      <div className="island-slot">
-        <div className="island-slot__visual" style={{ width: DONUT, height: DONUT }}>
+      <div className="island-slot island-slot--elevation" ref={slotRef}>
+        <div className="island-slot__visual island-slot__visual--spark">
           <ElevationSparkline
             profile={safest?.elevation_profile}
-            width={DONUT}
-            height={DONUT}
+            width={plotW}
+            height={plotH}
           />
         </div>
         <span className="island-slot__caption">Elevation</span>
@@ -133,14 +142,16 @@ export default function CollapsedIsland({
           <MetricCell
             ariaLabel="Trip time"
             parts={formatDurationParts(sStats.duration_min)}
-            delta={isMobile ? null : formatTimeDelta(sStats.duration_min, fStats.duration_min)}
+            delta={isMobile ? null : formatTimeDelta(sStats.duration_min, fStats.duration_min, { compare: 'non-optimised' })}
+            twoLineDelta={!isMobile}
           />
         </div>
         <div className="island-collapsed__cell">
           <MetricCell
             ariaLabel="Trip distance"
             parts={formatDistanceParts(sStats.length_m, units)}
-            delta={isMobile ? null : formatDistanceDelta(sStats.length_m, fStats.length_m, units)}
+            delta={isMobile ? null : formatDistanceDelta(sStats.length_m, fStats.length_m, units, { compare: 'non-optimised' })}
+            twoLineDelta={!isMobile}
           />
         </div>
         <div className="island-collapsed__cell">
@@ -164,6 +175,7 @@ export default function CollapsedIsland({
       <button
         type="button"
         className="island-collapsed__chevron-btn"
+        data-tutorial="island-expand"
         aria-label="Expand route analysis"
         onClick={(e) => {
           e.stopPropagation();

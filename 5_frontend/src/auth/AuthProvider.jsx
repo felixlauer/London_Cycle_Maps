@@ -9,7 +9,7 @@
  * isLoading — never the "Guest" state — to avoid the flash-of-Guest on load.
  */
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { apiFetch, API_BASE, onUnauthorized } from '../api/flaskClient';
+import { apiFetch, API_BASE, onUnauthorized, ensureValidAccessToken } from '../api/flaskClient';
 import {
   getSession,
   setSession,
@@ -33,6 +33,7 @@ const AuthContext = createContext({
   resetPassword: async () => ({ error: 'Auth not ready' }),
   completePasswordRecovery: async () => ({ error: 'Auth not ready' }),
   changePassword: async () => ({ error: 'Auth not ready' }),
+  updateDisplayName: async () => ({ error: 'Auth not ready' }),
   deleteAccount: async () => ({ error: 'Auth not ready' }),
 });
 
@@ -52,22 +53,45 @@ export function AuthProvider({ children }) {
   const [passwordRecoveryPending, setPasswordRecoveryPending] = useState(false);
 
   useEffect(() => {
-    const fromHash = consumeAuthHash();
-    if (fromHash) {
-      setSession(fromHash);
-      if (fromHash.type === 'recovery') {
-        setPasswordRecoveryPending(true);
-      }
-    } else {
-      const existing = getSession();
-      if (existing) setSession(existing);
-    }
-    setSessionState(getSession());
-    setIsLoading(false);
-
-    return onSessionChange((next) => {
-      setSessionState(next);
+    let cancelled = false;
+    const unsub = onSessionChange((next) => {
+      if (!cancelled) setSessionState(next);
     });
+
+    (async () => {
+      try {
+        const fromHash = consumeAuthHash();
+        if (fromHash) {
+          setSession(fromHash);
+          if (fromHash.type === 'recovery') {
+            setPasswordRecoveryPending(true);
+          }
+        } else {
+          const existing = getSession();
+          if (existing) setSession(existing);
+        }
+
+        const current = getSession();
+        // Returning devices often still have a cached user blob after the
+        // access token expired. Refresh (or clear) before revealing signed-in UI.
+        if (current?.refresh_token && current.type !== 'recovery') {
+          const token = await ensureValidAccessToken({ forceRefresh: true });
+          if (!token && !cancelled) {
+            setAuthNotice('Your session expired — please log in again.');
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setSessionState(getSession());
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, []);
 
   useEffect(() => onUnauthorized(() => {
@@ -88,11 +112,15 @@ export function AuthProvider({ children }) {
     return { error: null };
   }, []);
 
-  const signUp = useCallback(async (email, password) => {
+  const signUp = useCallback(async (email, password, displayName = '') => {
     const res = await fetch(`${API_BASE}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.trim(), password }),
+      body: JSON.stringify({
+        email: email.trim(),
+        password,
+        display_name: String(displayName || '').trim(),
+      }),
     });
     if (!res.ok) return { error: await readError(res) };
     const data = await res.json();
@@ -157,6 +185,30 @@ export function AuthProvider({ children }) {
     return { error: null };
   }, []);
 
+  const updateDisplayName = useCallback(async (displayName) => {
+    const trimmed = String(displayName || '').trim();
+    if (trimmed.length > 80) {
+      return { error: 'Name must be at most 80 characters.' };
+    }
+    const res = await apiFetch('/auth/account', {
+      method: 'PATCH',
+      body: { display_name: trimmed },
+    });
+    if (!res.ok) return { error: await readError(res) };
+    const data = await res.json().catch(() => ({}));
+    const current = getSession();
+    if (current?.user) {
+      setSession({
+        ...current,
+        user: {
+          ...current.user,
+          display_name: data.display_name ?? null,
+        },
+      });
+    }
+    return { error: null, displayName: data.display_name ?? null };
+  }, []);
+
   const deleteAccount = useCallback(async (currentPassword) => {
     // Re-verify password via change-password style login check first.
     const email = getSession()?.user?.email;
@@ -189,6 +241,7 @@ export function AuthProvider({ children }) {
     resetPassword,
     completePasswordRecovery,
     changePassword,
+    updateDisplayName,
     deleteAccount,
   };
 

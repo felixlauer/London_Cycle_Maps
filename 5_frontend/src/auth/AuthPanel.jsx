@@ -13,6 +13,7 @@ const TABS = [
 ];
 
 const INITIAL_FORM = {
+  displayName: '',
   email: '',
   password: '',
   error: '',
@@ -26,9 +27,14 @@ export default function AuthPanel({
   initialTab = 'login',
   visible = true,
   onClose,
+  /** Hide login / forgot tabs and force signup (onboarding). */
+  signupOnly = false,
+  /** Called on successful login/signup (before or instead of onClose). */
+  onSuccess,
 }) {
   const { signIn, signUp, resetPassword } = useAuth();
-  const [tab, setTab] = useState(initialTab);
+  const [tab, setTab] = useState(signupOnly ? 'signup' : initialTab);
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -36,13 +42,14 @@ export default function AuthPanel({
   const [busy, setBusy] = useState(false);
 
   const resetForm = useCallback(() => {
-    setTab(initialTab);
+    setTab(signupOnly ? 'signup' : initialTab);
+    setDisplayName(INITIAL_FORM.displayName);
     setEmail(INITIAL_FORM.email);
     setPassword(INITIAL_FORM.password);
     setError(INITIAL_FORM.error);
     setNotice(INITIAL_FORM.notice);
     setBusy(INITIAL_FORM.busy);
-  }, [initialTab]);
+  }, [initialTab, signupOnly]);
 
   const handleDismiss = useCallback(() => {
     resetForm();
@@ -56,10 +63,11 @@ export default function AuthPanel({
   useEffect(() => () => resetForm(), [resetForm]);
 
   useEffect(() => {
-    setTab(initialTab);
-  }, [initialTab]);
+    setTab(signupOnly ? 'signup' : initialTab);
+  }, [initialTab, signupOnly]);
 
   const switchTab = (id) => {
+    if (signupOnly) return;
     setTab(id);
     setError('');
     setNotice('');
@@ -74,12 +82,26 @@ export default function AuthPanel({
       if (tab === 'login') {
         const { error: err } = await signIn(email.trim(), password);
         if (err) setError(err);
-        else handleDismiss();
+        else {
+          onSuccess?.({ tab: 'login' });
+          handleDismiss();
+        }
       } else if (tab === 'signup') {
-        const { error: err, needsConfirm } = await signUp(email.trim(), password);
+        const name = displayName.trim();
+        const { error: err, needsConfirm } = await signUp(
+          email.trim(),
+          password,
+          name,
+        );
         if (err) setError(err);
-        else if (needsConfirm) setNotice('Check your inbox to confirm your email, then log in.');
-        else handleDismiss();
+        else if (needsConfirm && !signupOnly) {
+          setNotice('Check your inbox to confirm your email, then log in.');
+        } else {
+          // Onboarding treats needsConfirm as success so the tour can continue.
+          onSuccess?.({ tab: 'signup', displayName: name, needsConfirm: !!needsConfirm });
+          if (signupOnly) return;
+          handleDismiss();
+        }
       } else {
         const { error: err } = await resetPassword(email.trim());
         if (err) setError(err);
@@ -90,8 +112,9 @@ export default function AuthPanel({
     }
   };
 
-  const submitLabel = tab === 'login' ? 'Log in' : tab === 'signup' ? 'Create account' : 'Send reset link';
-  const heading = tab === 'login' ? 'Log in' : tab === 'signup' ? 'Sign up' : 'Reset password';
+  const activeTab = signupOnly ? 'signup' : tab;
+  const submitLabel = activeTab === 'login' ? 'Log in' : activeTab === 'signup' ? 'Create account' : 'Send reset link';
+  const heading = signupOnly ? 'Sign up' : (activeTab === 'login' ? 'Log in' : activeTab === 'signup' ? 'Sign up' : 'Reset password');
   const isInline = variant === 'inline';
 
   const form = (
@@ -101,7 +124,7 @@ export default function AuthPanel({
     >
       <div className="auth-modal__header">
         <span className="auth-modal__brand">{heading}</span>
-        {isInline ? (
+        {!signupOnly && (isInline ? (
           <button type="button" className="auth-modal__close" onClick={handleDismiss}>
             Cancel
           </button>
@@ -109,25 +132,41 @@ export default function AuthPanel({
           <button type="button" className="auth-modal__close" onClick={handleDismiss} aria-label="Close">
             ✕
           </button>
-        )}
-      </div>
-
-      <div className="auth-tabs" role="tablist">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            className={`auth-tab${tab === t.id ? ' active' : ''}`}
-            onClick={() => switchTab(t.id)}
-          >
-            {t.label}
-          </button>
         ))}
       </div>
 
+      {!signupOnly && (
+        <div className="auth-tabs" role="tablist">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === t.id}
+              className={`auth-tab${activeTab === t.id ? ' active' : ''}`}
+              onClick={() => switchTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <form className="auth-form" onSubmit={handleSubmit}>
+        {activeTab === 'signup' && (
+          <label className="auth-field">
+            <span>Name</span>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="What should we call you?"
+              autoComplete="name"
+              maxLength={80}
+            />
+          </label>
+        )}
+
         <label className="auth-field">
           <span>Email</span>
           <input
@@ -140,15 +179,15 @@ export default function AuthPanel({
           />
         </label>
 
-        {tab !== 'reset' && (
+        {activeTab !== 'reset' && (
           <label className="auth-field">
             <span>Password</span>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={tab === 'signup' ? 'At least 6 characters' : 'Your password'}
-              autoComplete={tab === 'signup' ? 'new-password' : 'current-password'}
+              placeholder={activeTab === 'signup' ? 'At least 6 characters' : 'Your password'}
+              autoComplete={activeTab === 'signup' ? 'new-password' : 'current-password'}
               minLength={6}
               required
             />
@@ -162,7 +201,7 @@ export default function AuthPanel({
           {busy ? 'Please wait…' : submitLabel}
         </button>
 
-        {tab === 'login' && (
+        {!signupOnly && activeTab === 'login' && (
           <button type="button" className="auth-link" onClick={() => switchTab('reset')}>
             Forgot your password?
           </button>

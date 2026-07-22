@@ -42,6 +42,7 @@ export default function PlanningMap({
   units = 'metric',
   routeHover = null,
   onRouteHoverChange = noop,
+  onMapReady = noop,
 }) {
   const theme = useMemo(() => themeForMode(themeMode), [themeMode]);
   const overlayVisibility = useMemo(() => emptyOverlayVisibility(), []);
@@ -84,7 +85,7 @@ export default function PlanningMap({
       inspectorGeo={null}
       showNavigationControl={false}
     >
-      <MapApiBridge apiRef={mapApiRef} onNorthUpChange={onNorthUpChange} />
+      <MapApiBridge apiRef={mapApiRef} onNorthUpChange={onNorthUpChange} onMapReady={onMapReady} />
       {userLocation && <UserLocationMarker location={userLocation} />}
       {routeRevealed && activeSafest && (
         <V2OverlayLayers

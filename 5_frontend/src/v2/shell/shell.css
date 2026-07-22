@@ -458,7 +458,7 @@
   }
 
   .shell-zone--island {
-    width: 80vw;
+    width: calc(100vw - var(--shell-inset) * 2);
     left: 50%;
   }
 
@@ -474,10 +474,15 @@
     align-items: flex-end;
   }
 
-  /* Only pack controls horizontally when overlay collides with expanded island */
-  .map-shell.is-ctl-colliding .map-ctl {
+  /*
+   * Expanded island: always pack locate/north beside the overlay rail.
+   * Top-align so the shorter nav stack lines up with the top of the pill
+   * (not the bottom). Avoid overlap-detection — packing shortens the stack
+   * and cleared the hit test, which flickered the layout every frame.
+   */
+  .map-shell.is-island-expanded .map-ctl {
     flex-direction: row-reverse;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: 6px;
   }
 }

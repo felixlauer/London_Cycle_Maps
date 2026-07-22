@@ -18,7 +18,7 @@ export function readStoredAppearance() {
   } catch {
     /* ignore */
   }
-  return 'light';
+  return 'auto';
 }
 
 export function writeStoredAppearance(pref) {

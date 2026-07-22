@@ -34,6 +34,19 @@ export function initialsFromEmail(email) {
   return local.slice(0, 2).toUpperCase() || '?';
 }
 
+/** Initials from display name, falling back to email local-part. */
+export function initialsFromUser(user) {
+  const name = String(user?.display_name || '').trim();
+  if (name) {
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
+  return initialsFromEmail(user?.email);
+}
+
 /** Display name from email local-part (e.g. jon.alishon → Jon Alishon). */
 export function displayNameFromEmail(email) {
   if (!email) return 'Guest';
@@ -43,6 +56,13 @@ export function displayNameFromEmail(email) {
   return parts
     .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
     .join(' ');
+}
+
+/** Prefer saved display_name; otherwise email heuristic. */
+export function displayNameFromUser(user) {
+  const name = String(user?.display_name || '').trim();
+  if (name) return name;
+  return displayNameFromEmail(user?.email);
 }
 
 export function avatarStyleForEmail(email) {

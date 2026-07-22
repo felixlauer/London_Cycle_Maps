@@ -1,0 +1,189 @@
+/* Spotlight tutorial — SVG evenodd dim mask + rounded cutout rings */
+
+.tut-root {
+  position: fixed;
+  inset: 0;
+  z-index: var(--onb-z, 2000);
+  pointer-events: none;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+.tut-mask {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* Visual only — clicks handled by .tut-catcher so holes stay interactive */
+.tut-mask__dim {
+  fill: rgba(0, 0, 0, 0.72);
+  pointer-events: none;
+  transition: fill 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.tut-root[data-theme='dark'] .tut-mask__dim {
+  fill: rgba(0, 0, 0, 0.8);
+}
+
+.tut-catcher {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  z-index: 0;
+  cursor: default;
+}
+
+.tut-ring {
+  position: absolute;
+  box-sizing: border-box;
+  box-shadow: 0 0 0 2px #ff0061;
+  pointer-events: none;
+  z-index: 1;
+  transition:
+    top 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    left 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    width 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    height 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    border-radius 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.tut-ring--light {
+  box-shadow: 0 0 0 2px #ffffff;
+}
+
+.tut-tooltip {
+  position: absolute;
+  z-index: calc(var(--onb-z, 2000) + 1);
+  width: min(320px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+  animation: tut-tip-in 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.tut-root[data-theme='dark'] .tut-tooltip {
+  background: #1c1c1e;
+  border-color: #3a3a3c;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  color: #fafafa;
+}
+
+.tut-tooltip__title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #18181b;
+}
+
+.tut-root[data-theme='dark'] .tut-tooltip__title {
+  color: #fafafa;
+}
+
+.tut-tooltip__body {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #71717a;
+}
+
+.tut-root[data-theme='dark'] .tut-tooltip__body {
+  color: #a1a1aa;
+}
+
+.tut-tooltip__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.tut-tooltip__next {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: #ff0061;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1), filter 150ms ease;
+}
+
+.tut-tooltip__next:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.tut-tooltip__next:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tut-tooltip__next:not(:disabled):hover {
+    filter: brightness(1.06);
+  }
+}
+
+.tut-skip {
+  position: absolute;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: calc(var(--onb-z, 2000) + 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 14px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  color: #52525b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.tut-skip:active {
+  transform: translateX(-50%) scale(0.97);
+}
+
+.tut-root[data-theme='dark'] .tut-skip {
+  background: rgba(28, 28, 30, 0.94);
+  border-color: #3a3a3c;
+  color: #a1a1aa;
+}
+
+@keyframes tut-tip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tut-ring {
+    transition: none;
+  }
+
+  .tut-tooltip {
+    animation: none;
+  }
+}

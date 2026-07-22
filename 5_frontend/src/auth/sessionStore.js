@@ -43,6 +43,24 @@ export function getRefreshToken() {
   return getSession()?.refresh_token ?? null;
 }
 
+/** True when access token is missing or past expires_at (with skew). */
+export function isAccessTokenExpired(skewSeconds = 60) {
+  const session = getSession();
+  if (!session?.access_token) return true;
+  const exp = session.expires_at;
+  if (exp == null || exp === '') return false;
+  let expMs;
+  if (typeof exp === 'number') {
+    // Supabase uses unix seconds; tolerate ms just in case.
+    expMs = exp < 1e12 ? exp * 1000 : exp;
+  } else {
+    const parsed = Date.parse(String(exp));
+    if (!Number.isFinite(parsed)) return false;
+    expMs = parsed;
+  }
+  return Date.now() >= expMs - skewSeconds * 1000;
+}
+
 export function setSession(session) {
   memorySession = session
     ? {
@@ -51,6 +69,7 @@ export function setSession(session) {
         expires_at: session.expires_at ?? null,
         expires_in: session.expires_in ?? null,
         user: session.user ?? null,
+        type: session.type ?? null,
       }
     : null;
   writeStorage(memorySession);

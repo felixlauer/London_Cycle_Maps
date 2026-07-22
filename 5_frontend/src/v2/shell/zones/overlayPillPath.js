@@ -172,19 +172,19 @@ export function buildOverlayPillPath({
 }
 
 export function overlayPillMetrics(count, { compact = false } = {}) {
-  // Keep spine width identical to .map-ctl__nav (44px) so right edges match.
-  const spineW = 44;
+  // Keep spine width identical to .map-ctl__nav so right edges match.
+  const spineW = compact ? 52 : 44;
   const pad = compact ? 3 : 4;
-  const btnH = compact ? 34 : 36;
+  const btnH = compact ? 40 : 36;
   const gap = 2;
   const spineH = pad * 2 + count * btnH + Math.max(0, count - 1) * gap;
   const armH = btnH;
-  const filletR = compact ? 11 : 12;
+  const filletR = compact ? 13 : 12;
   const maxArmExtent = 120;
-  const cornerR = compact ? 15 : 16;
+  const cornerR = compact ? 17 : 16;
   return {
     spineW, pad, btnH, gap, spineH, armH, filletR, maxArmExtent, cornerR,
-    iconSize: compact ? 15 : 18,
+    iconSize: compact ? 18 : 18,
   };
 }
 
