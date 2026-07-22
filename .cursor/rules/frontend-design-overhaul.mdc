@@ -1,23 +1,24 @@
 ---
-description: Frontend complete UI overhaul — design hub + Taste/Emil skills; preserve logic, replace chrome.
+description: Frontend complete UI overhaul — design hub + Taste/Emil skills; preserve logic, extend v2 chrome.
 globs: 5_frontend/**/*.{js,jsx,css,html}
 alwaysApply: false
 ---
 
-# Frontend design overhaul (complete swap)
+# Frontend design overhaul (v2)
 
 When editing UI under `5_frontend/`:
 
-1. Read **`0_documentation/design/README.md`**.
-2. Read **`0_documentation/design/BRIEF.md`**, **`ARCHITECTURE_DIRECTION.md`**, and **`competitor_benchmarks/`**.
-3. **Do not rebuild UI** until the user provides per-element build specs (see design hub status).
+1. Read **`0_documentation/development_protocols/V2_FRONTEND_REMODEL.md`** (locked decisions).
+2. Read **`0_documentation/design/README.md`**, **`BRIEF.md`**, **`WORKING_NOTES_JUL2026.md`**, and **`FUNCTIONALITY_CHECKLIST.md`**.
+3. **Product work goes in `src/v2/`** (`npm start -- --v2`). Do not rebuild legacy `App.js` chrome unless explicitly asked (Test Mode / inspector live there).
 4. Primary skills under **`.agents/skills/`**:
    - `design-taste-frontend`
    - `high-end-visual-design`
    - `emil-design-eng`
    - Motion as needed: `improve-animations`, `review-animations`, `apple-design`
-   - **`redesign-existing-projects` is optional only** — do not use it as the lead for a greenfield visual rebuild.
-5. **Preserve functioning:** routing state, Flask `/route` + auth + geocode, overlays, vias, Santander, Depart at, map module behaviour.
-6. **Replace visuals freely:** new layout/components/CSS; do not feel bound to current panel structure or `ui.css` look.
-7. **Icons:** `lucide-react` (best-guess per `ARCHITECTURE_DIRECTION.md`). **Logo:** `logo_assets/logo_transparent_bg_noshadow.svg`.
-8. Do not mix conflicting Taste dialects (e.g. brutalist vs soft) against `BRIEF.md`.
+   - **`redesign-existing-projects` is optional only** — not the lead for greenfield chrome.
+5. **Preserve functioning:** routing state, Flask `/route` + auth + geocode, typed overlays, vias, Santander, Depart at, map module behaviour.
+6. **Extend visuals** in v2; respect locked tokens (fuchsia `#FF0061`, overlay palette in BRIEF). No glassmorphism. Overlay rail = SVG path morph only.
+7. **Desktop layout is sacred** during mobile/Tailwind work — protect with `lg:` / desktop CSS.
+8. **Icons:** `lucide-react`. **Logo:** `logo_assets/logo_transparent_bg_noshadow.svg`.
+9. After meaningful UI changes: update checklist ticks, append WORKING_NOTES, and revise the protocol if a decision locks or reopens. Update `APP_MAIN.md` for API/UX contracts.

@@ -1,9 +1,8 @@
-# v2 — Visual rebuild (parallel frontend)
+# v2 — Customer-facing frontend (Tuned Cycling)
 
-Legacy app remains at `src/App.js`. This folder is the **greenfield UI shell**; shared infrastructure is imported from parent `src/`:
+Parallel UI under `5_frontend/src/v2/`. Legacy `src/App.js` remains for Test Mode / inspector.
 
-- `map/CycleMap.jsx` — Mapbox GL (until v2 owns a thinner wrapper)
-- `api/flaskClient.js`, `auth/`, `mapboxGeocoding.js`, etc. — reuse as logic is ported
+**Docs:** protocol [`0_documentation/development_protocols/V2_FRONTEND_REMODEL.md`](../../../0_documentation/development_protocols/V2_FRONTEND_REMODEL.md) · working notes [`WORKING_NOTES_JUL2026.md`](../../../0_documentation/design/WORKING_NOTES_JUL2026.md) · checklist [`FUNCTIONALITY_CHECKLIST.md`](../../../0_documentation/design/FUNCTIONALITY_CHECKLIST.md) · APP [`APP_MAIN.md`](../../../0_documentation/APP_MAIN.md)
 
 ## Run
 
@@ -12,7 +11,7 @@ cd c:\London_Cycle_Maps\5_frontend
 npm start -- --v2
 ```
 
-Or set `REACT_APP_UI_VERSION=v2` in `.env`.
+Or `REACT_APP_UI_VERSION=v2` in `.env`. Optional: `--day` / `--night` → `REACT_APP_FORCE_MODE`.
 
 Default `npm start` still loads **legacy** `App.js`.
 
@@ -20,26 +19,35 @@ Default `npm start` still loads **legacy** `App.js`.
 
 ```text
 v2/
-  App.jsx                 # v2 root — map + shell only (for now)
-  README.md
-  map/
-    PlanningMap.jsx       # Bare CycleMap wrapper (no routes/markers)
-    theme.js              # Light/dark theme tokens for map
-  shell/
-    MapShell.jsx          # Full-viewport layout over map
-    shell.css             # Design tokens + zone positioning
-    zones/
-      RoutingCoreZone.jsx   # Top-left
-      ProfileZone.jsx       # Top-right
-      AlertPillZone.jsx     # Top-center
-      DynamicIslandZone.jsx # Bottom-center
+  App.jsx                 # Root state — waypoints, route, hire, overlays, island
+  units.js                # metric / imperial formatting
+  tailwind.css            # Tailwind layers (preflight OFF)
+  hooks/useMediaQuery.js  # useIsMobile (≤767px)
+  theme/resolveAppearance.js
+  alerts/                 # Priority alert pill
+  routing/                # Mode·bike·Santander, waypoints, depart, Get Route
+  map/                    # PlanningMap, V2 overlays, geolocation, theme
+  island/                 # Collapsed / expanded analysis + weather/
+  shell/                  # MapShell, SidebarContext, zones/, sidebar/
+  wizard/                 # PresetWizardShell (shared steps in src/wizard/)
+  assets/                 # Logo + icons
 ```
 
-## Checklist
+Shared (imported from parent `src/`): `map/CycleMap.jsx`, `RouteLayers.jsx`, `auth/`, `api/flaskClient.js`, `wizard/*` steps, `components/santander/SantanderStationsLayer.jsx`, geocode.
 
-Track every legacy feature: [`0_documentation/design/FUNCTIONALITY_CHECKLIST.md`](../../../0_documentation/design/FUNCTIONALITY_CHECKLIST.md)
+## Zones
+
+| Zone | Component |
+|------|-----------|
+| Top-left | `RoutingCoreZone` |
+| Top-center | `AlertPillZone` |
+| Top-right | `ProfileZone` → `ProfileSidebar` |
+| Bottom-center | `DynamicIslandZone` |
+| Bottom-right | `MapControlsZone` + `OverlayModeRail` |
+| Mobile weather | `WeatherControlZone` (extremes only) |
 
 ## Design refs
 
-- [`0_documentation/design/BRIEF.md`](../../../0_documentation/design/BRIEF.md)
-- [`0_documentation/design/ARCHITECTURE_DIRECTION.md`](../../../0_documentation/design/ARCHITECTURE_DIRECTION.md)
+- [`BRIEF.md`](../../../0_documentation/design/BRIEF.md)
+- [`ARCHITECTURE_DIRECTION.md`](../../../0_documentation/design/ARCHITECTURE_DIRECTION.md)
+- Skills: `design-taste-frontend`, `emil-design-eng`, `high-end-visual-design`

@@ -1,9 +1,11 @@
 import React from 'react';
+import { Diamond, CornerUpRight } from 'lucide-react';
 import { useLongRouteButtonLabel } from './useLongRouteButtonLabel';
 
 /**
- * Primary route commit control — short "Calculating" for hops under 10 km;
- * staged verb copy + dot pulse for longer routes (v1 threshold, no overlay).
+ * Primary route commit control.
+ * variant="full" — desktop text button.
+ * variant="icon" — mobile vertical pill with Diamond + CornerUpRight.
  */
 export default function GetRouteButton({
   start,
@@ -11,9 +13,43 @@ export default function GetRouteButton({
   isCalculating,
   canGetRoute,
   onClick,
+  variant = 'full',
 }) {
   const copy = useLongRouteButtonLabel(isCalculating, start, end);
   const disabled = !canGetRoute || isCalculating;
+
+  if (variant === 'icon') {
+    return (
+      <button
+        type="button"
+        className={
+          `rc-route-pill` +
+          (disabled ? ' is-disabled' : '') +
+          (isCalculating ? ' is-busy' : '')
+        }
+        aria-disabled={disabled}
+        aria-busy={isCalculating}
+        aria-label={isCalculating ? copy.ariaLabel : 'Get route'}
+        onClick={onClick}
+      >
+        <span className={`rc-route-pill__icons${isCalculating ? ' is-pulse' : ''}`}>
+          <Diamond
+            size={24}
+            strokeWidth={2.25}
+            fill="currentColor"
+            className="rc-route-pill__diamond"
+            aria-hidden
+          />
+          <CornerUpRight
+            size={13}
+            strokeWidth={2.5}
+            className="rc-route-pill__arrow"
+            aria-hidden
+          />
+        </span>
+      </button>
+    );
+  }
 
   return (
     <button

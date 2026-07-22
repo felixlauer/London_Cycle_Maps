@@ -228,6 +228,8 @@ export function useDepartAtControl({
     setOpen((v) => !v);
   };
 
+  const collapse = () => setOpen(false);
+
   return {
     open,
     disabled,
@@ -238,6 +240,7 @@ export function useDepartAtControl({
     hour,
     minute,
     toggleOpen,
+    collapse,
     onChange,
     emitDepartAt,
     nudgeDay,

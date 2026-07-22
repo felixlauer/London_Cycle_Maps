@@ -5,6 +5,10 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
+  left: 0;
+  right: 0;
+  margin-left: auto;
+  margin-right: auto;
   min-height: 0 !important;
   height: auto;
   padding: 0;
@@ -15,7 +19,7 @@
   background: transparent;
   pointer-events: none;
   opacity: 0;
-  transform: translateX(-50%) translateY(-6px) scale(0.97);
+  transform: translateY(-6px) scale(0.97);
   transition:
     opacity 260ms cubic-bezier(0.23, 1, 0.32, 1),
     transform 260ms cubic-bezier(0.23, 1, 0.32, 1);
@@ -24,7 +28,7 @@
 .shell-zone--alert.alert-pill.is-visible {
   pointer-events: auto;
   opacity: 1;
-  transform: translateX(-50%) translateY(0) scale(1);
+  transform: translateY(0) scale(1);
   padding: 8px 10px 8px 16px;
   min-height: 40px;
   background: var(--shell-bg);
@@ -133,14 +137,24 @@
   background: #3a3a3c;
 }
 
+@media (max-width: 767px) {
+  .shell-zone--alert.alert-pill {
+    max-width: min(420px, calc(100vw - var(--shell-inset) * 2 - 80px));
+  }
+
+  .shell-zone--alert.alert-pill.is-visible {
+    transform: translateY(0) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shell-zone--alert.alert-pill {
-    transform: translateX(-50%);
+    transform: none;
     transition: opacity 200ms ease;
   }
 
   .shell-zone--alert.alert-pill.is-visible {
-    transform: translateX(-50%);
+    transform: none;
   }
 
   .alert-pill__btn:active {

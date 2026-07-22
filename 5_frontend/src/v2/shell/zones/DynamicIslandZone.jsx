@@ -6,8 +6,10 @@ import React, {
 } from 'react';
 import CollapsedIsland from '../../island/CollapsedIsland';
 import ExpandedIsland from '../../island/ExpandedIsland';
+import IslandLegLatch, { formatLegLabel } from '../../island/IslandLegPager';
 import { resolveIslandSlots } from '../../island/resolveIslandSlots';
 import { buildDistanceIndex, lngLatAtDistance } from '../../island/routeGeometry';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import '../../island/island.css';
 
 /**
@@ -42,10 +44,20 @@ export default function DynamicIslandZone({
   const zoneRef = useRef(null);
   const segRef = useRef(null);
   const pointRef = useRef(null);
+  const isMobile = useIsMobile();
 
   const slots = useMemo(
-    () => resolveIslandSlots({ safest, overlayMode, bikeType, isDarkOutside, profile }),
-    [safest, overlayMode, bikeType, isDarkOutside, profile],
+    () => resolveIslandSlots({
+      safest,
+      overlayMode,
+      bikeType,
+      isDarkOutside,
+      profile,
+      // Mobile expanded page has less vertical room — keep charts scannable.
+      maxBarCharts: isMobile ? 2 : undefined,
+      barBudget: isMobile ? 5 : undefined,
+    }),
+    [safest, overlayMode, bikeType, isDarkOutside, profile, isMobile],
   );
 
   const index = useMemo(
@@ -90,13 +102,11 @@ export default function DynamicIslandZone({
       pushHover();
       return;
     }
-    // Clear stuck highlights when expanding / collapsing.
     segRef.current = null;
     pointRef.current = null;
     pushHover();
   }, [visible, expanded, pushHover]);
 
-  // Clear hover when the active leg changes so scrub/highlight don't stick.
   useEffect(() => {
     segRef.current = null;
     pointRef.current = null;
@@ -105,53 +115,66 @@ export default function DynamicIslandZone({
 
   if (!visible || !safest) return null;
 
+  const multi = legCount > 1;
+
   return (
     <section
       ref={zoneRef}
-      className={`shell-zone shell-zone--island${expanded ? ' is-expanded' : ''}${santander ? ' is-santander' : ''}${legCount > 1 ? ' is-multi' : ''}`}
+      className={`shell-zone shell-zone--island${expanded ? ' is-expanded' : ''}${santander ? ' is-santander' : ''}${multi ? ' is-multi' : ''}`}
       aria-label="Route analysis"
       data-zone="dynamic-island"
     >
-      <div className="island-layer island-layer--collapsed" aria-hidden={expanded}>
-        <CollapsedIsland
-          safest={safest}
-          fastest={fastest}
-          slots={slots}
-          units={units}
-          onExpand={() => onExpandedChange?.(true)}
-          legCount={legCount}
-          activeLegIndex={activeLegIndex}
-          onChangeLeg={onChangeLeg}
-          viaCount={viaCount}
-          externalHover={mapHover}
-          onSegmentHover={handleSegmentHover}
-        />
-      </div>
-      <div className="island-layer island-layer--expanded" aria-hidden={!expanded}>
-        {expanded && (
-          <ExpandedIsland
-            safest={safest}
-            fastest={fastest}
-            units={units}
-            overlayMode={overlayMode}
-            barModes={slots.bars}
-            index={index}
-            externalHover={mapHover}
-            onSegmentHover={handleSegmentHover}
-            onScrub={handleScrub}
-            onCollapse={() => onExpandedChange?.(false)}
-            santander={santander}
-            pickupStation={pickupStation}
-            dropoffStation={dropoffStation}
-            walkStats={walkStats}
+      {multi && (
+        <>
+          <IslandLegLatch
             legCount={legCount}
             activeLegIndex={activeLegIndex}
             onChangeLeg={onChangeLeg}
-            viaCount={viaCount}
-            startCoord={startCoord}
-            departAtIso={departAtIso}
           />
-        )}
+          <span className="sr-only">{formatLegLabel(activeLegIndex, legCount, viaCount)}</span>
+        </>
+      )}
+      <div className="island-body">
+        <div className="island-layer island-layer--collapsed" aria-hidden={expanded}>
+          <CollapsedIsland
+            safest={safest}
+            fastest={fastest}
+            slots={slots}
+            units={units}
+            onExpand={() => onExpandedChange?.(true)}
+            legCount={legCount}
+            activeLegIndex={activeLegIndex}
+            onChangeLeg={onChangeLeg}
+            externalHover={mapHover}
+            onSegmentHover={handleSegmentHover}
+          />
+        </div>
+        <div className="island-layer island-layer--expanded" aria-hidden={!expanded}>
+          {expanded && (
+            <ExpandedIsland
+              safest={safest}
+              fastest={fastest}
+              units={units}
+              overlayMode={overlayMode}
+              barModes={slots.bars}
+              index={index}
+              externalHover={mapHover}
+              onSegmentHover={handleSegmentHover}
+              onScrub={handleScrub}
+              onCollapse={() => onExpandedChange?.(false)}
+              santander={santander}
+              pickupStation={pickupStation}
+              dropoffStation={dropoffStation}
+              walkStats={walkStats}
+              legCount={legCount}
+              activeLegIndex={activeLegIndex}
+              onChangeLeg={onChangeLeg}
+              viaCount={viaCount}
+              startCoord={startCoord}
+              departAtIso={departAtIso}
+            />
+          )}
+        </div>
       </div>
     </section>
   );

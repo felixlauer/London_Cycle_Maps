@@ -32,9 +32,10 @@ export default function OverlayModeRail({
   isDark = false,
   inactive = true,
   onSelectMode,
+  compact = false,
 }) {
   const modes = availableOverlayModes(isDark);
-  const m = useMemo(() => overlayPillMetrics(modes.length), [modes.length]);
+  const m = useMemo(() => overlayPillMetrics(modes.length, { compact }), [modes.length, compact]);
   const reduceMotion = useReducedMotion();
   const instant = { duration: 0.01 };
 
@@ -169,8 +170,8 @@ export default function OverlayModeRail({
           className="overlay-pill__path"
           d={pathD}
           fill="var(--shell-bg)"
-          stroke="var(--shell-border)"
-          strokeWidth={1}
+          stroke={compact ? 'none' : 'var(--shell-border)'}
+          strokeWidth={compact ? 0 : 1}
           strokeLinejoin="round"
         />
       </svg>
@@ -206,7 +207,7 @@ export default function OverlayModeRail({
               aria-disabled={inactive || undefined}
               onClick={() => handleClick(mode.id)}
             >
-              <Icon size={18} strokeWidth={2.25} aria-hidden />
+              <Icon size={m.iconSize || 18} strokeWidth={2.25} aria-hidden />
             </button>
           );
         })}

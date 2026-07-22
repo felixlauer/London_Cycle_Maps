@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Hover gating helper — touch devices must not stick in :hover */
+@layer utilities {
+  @media (hover: hover) and (pointer: fine) {
+    .hover-fine\:brightness-106:hover {
+      filter: brightness(1.06);
+    }
+  }
+}

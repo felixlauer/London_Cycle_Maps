@@ -12,21 +12,25 @@ function ModeBarChart({
   modeId,
   externalHover,
   onHoverChange,
+  maxKinds = Infinity,
 }) {
   const agg = useMemo(() => modeKindAggregates(safest, modeId), [safest, modeId]);
   if (!agg) return null;
 
-  const maxPct = Math.max(1, ...agg.kinds.map((k) => k.pct));
+  const kinds = [...agg.kinds]
+    .sort((a, b) => b.pct - a.pct)
+    .slice(0, Number.isFinite(maxKinds) ? Math.max(1, maxKinds) : undefined);
+  const maxPct = Math.max(1, ...kinds.map((k) => k.pct));
 
   return (
     <div className="island-bars__chart">
       <h3 className="island-bars__heading">{agg.meta.label}</h3>
-      {agg.kinds.length === 0 ? (
+      {kinds.length === 0 ? (
         <p className="island-bars__empty">
           {modeId === 'surface' ? 'No rough surfaces on this route' : 'None on this route'}
         </p>
       ) : (
-        agg.kinds.map((k) => {
+        kinds.map((k) => {
           const active = barMatchesHover(modeId, k.kind, externalHover);
           return (
             <div
@@ -63,16 +67,33 @@ export default function ModeBarCharts({
   modes,
   externalHover,
   onHoverChange,
+  maxKindsPerChart = Infinity,
+  showOverlayHint = false,
 }) {
+  const list = Array.isArray(modes) ? modes : [];
+  if (list.length === 0) {
+    return (
+      <div className="island-bars">
+        <p className="island-bars__empty">No mode charts for this route</p>
+      </div>
+    );
+  }
+
   return (
     <div className="island-bars">
-      {modes.map((m) => (
+      {showOverlayHint && (
+        <p className="island-bars__note">
+          Mode breakdowns for this route. Switch the map overlay to change which charts appear here.
+        </p>
+      )}
+      {list.map((m) => (
         <ModeBarChart
           key={m}
           safest={safest}
           modeId={m}
           externalHover={externalHover}
           onHoverChange={onHoverChange}
+          maxKinds={maxKindsPerChart}
         />
       ))}
     </div>

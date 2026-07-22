@@ -10,12 +10,13 @@ import { ArrowLeft, PanelRightClose } from 'lucide-react';
 import AuthPanel from '../../../auth/AuthPanel';
 import PresetWizardShell from '../../wizard/PresetWizardShell';
 import { useSidebar, SIDEBAR_WIDTH_PX } from '../SidebarContext';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import ProfilesSection from './ProfilesSection';
 import AccountManageSection from './AccountManageSection';
 import SystemFooter from './SystemFooter';
 import './sidebar.css';
 
-const TWEEN = { type: 'tween', duration: 0.32, ease: [0.23, 1, 0.32, 1] };
+const TWEEN = { type: 'tween', duration: 0.48, ease: [0.23, 1, 0.32, 1] };
 
 function useViewport() {
   const [dims, setDims] = useState(() => ({
@@ -34,6 +35,7 @@ function useViewport() {
 
 /**
  * Overlay drawer — morphs to fullscreen wizard via transform (not width).
+ * Mobile: full-width overlay; no chrome push.
  */
 export default function ProfileSidebar({
   profiles,
@@ -55,6 +57,7 @@ export default function ProfileSidebar({
     profilesSectionRef,
     sidebarWidth,
   } = useSidebar();
+  const isMobile = useIsMobile();
   const reduceMotion = useReducedMotion();
   const widthMv = useMotionValue(0);
   const morphMv = useMotionValue(0);
@@ -65,24 +68,37 @@ export default function ProfileSidebar({
   const isWizard = view === 'wizard';
   const isAuth = view === 'auth';
   const showWizard = isWizard || wizardMounted;
+  const mobileDrawerW = vw;
+  const drawerTarget = isMobile ? mobileDrawerW : (sidebarWidth || SIDEBAR_WIDTH_PX);
 
   useEffect(() => {
-    const target = open ? (sidebarWidth || SIDEBAR_WIDTH_PX) : 0;
+    const target = open ? drawerTarget : 0;
     const tween = reduceMotion ? { duration: 0.01 } : TWEEN;
     const ctrl = animate(widthMv, target, {
       ...tween,
       onUpdate: (v) => {
         const el = shellRef.current;
-        if (el) el.style.setProperty('--shell-sidebar-w', `${Math.round(v)}px`);
+        if (!el) return;
+        // Mobile: overlay only — never push island/controls via --shell-sidebar-w
+        if (isMobile) {
+          el.style.setProperty('--shell-sidebar-w', '0px');
+        } else {
+          el.style.setProperty('--shell-sidebar-w', `${Math.round(v)}px`);
+        }
       },
       onComplete: () => {
         const el = shellRef.current;
-        if (el) el.style.setProperty('--shell-sidebar-w', `${target}px`);
+        if (!el) return;
+        if (isMobile) {
+          el.style.setProperty('--shell-sidebar-w', '0px');
+        } else {
+          el.style.setProperty('--shell-sidebar-w', `${target}px`);
+        }
         wasOpen.current = open;
       },
     });
     return () => ctrl.stop();
-  }, [open, reduceMotion, sidebarWidth, widthMv, shellRef]);
+  }, [open, reduceMotion, drawerTarget, widthMv, shellRef, isMobile]);
 
   useEffect(() => {
     if (isWizard) setWizardMounted(true);
@@ -102,7 +118,8 @@ export default function ProfileSidebar({
 
   const morphScaleX = useTransform(morphMv, (p) => {
     if (p <= 0) return 1;
-    const from = SIDEBAR_WIDTH_PX / Math.max(vw, 1);
+    const fromW = isMobile ? mobileDrawerW : SIDEBAR_WIDTH_PX;
+    const from = fromW / Math.max(vw, 1);
     return from + (1 - from) * p;
   });
 
@@ -143,11 +160,13 @@ export default function ProfileSidebar({
         open ? 'is-open' : '',
         showWizard ? 'is-wizard' : '',
         isAuth ? 'is-auth' : '',
+        isMobile ? 'is-mobile' : '',
       ].filter(Boolean).join(' ')}
+      style={isMobile && open ? { width: `${drawerTarget}px` } : undefined}
       aria-hidden={!open}
       aria-label="Profile and settings"
     >
-      {!showWizard && (
+      {!showWizard && !isMobile && (
         <button
           type="button"
           className="profile-sidebar__collapse"
@@ -163,24 +182,30 @@ export default function ProfileSidebar({
       <div className="profile-sidebar__clip">
         <motion.div
           className="profile-sidebar__frame"
-          style={showWizard ? {
-            transformOrigin: 'top right',
-            scaleX: morphScaleX,
-            opacity: morphOpacity,
-          } : undefined}
+          style={{
+            ...(isMobile && !showWizard ? { width: drawerTarget } : {}),
+            ...(showWizard ? {
+              transformOrigin: 'top right',
+              scaleX: morphScaleX,
+              opacity: morphOpacity,
+            } : {}),
+          }}
         >
           {showWizard ? (
             <>
-              <div className="profile-sidebar__wizard-chrome">
-                <button
-                  type="button"
-                  className="profile-sidebar__return"
-                  onClick={handleReturnToMap}
-                >
-                  <ArrowLeft size={15} strokeWidth={2.2} aria-hidden />
-                  <span>Return to map</span>
-                </button>
-              </div>
+              {!isMobile && (
+                <div className="profile-sidebar__wizard-chrome">
+                  <button
+                    type="button"
+                    className="profile-sidebar__return"
+                    onClick={handleReturnToMap}
+                    aria-label="Return to map"
+                  >
+                    <ArrowLeft size={15} strokeWidth={2.2} aria-hidden />
+                    <span>Return to map</span>
+                  </button>
+                </div>
+              )}
               <div className="profile-sidebar__wizard-body">
                 <PresetWizardShell
                   key={editingProfileId || 'create'}

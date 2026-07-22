@@ -7,13 +7,19 @@
 .env.*
 !.env.example
 
-# --- Documentation: exclude internal / protocol / feature-request only ---
-0_documentation/development_protocols/
-0_documentation/feature_requests/
-0_documentation/summary_files/
-0_documentation/tasks/
-0_documentation/verification/
-0_documentation/startup.md
+# --- Documentation: only APP_MAIN, APP_DEBUG, GRAPH on GitHub ---
+0_documentation/*
+!0_documentation/APP_MAIN.md
+!0_documentation/APP_DEBUG.md
+!0_documentation/GRAPH.md
+0_documentation/**/*
+
+# --- Python bytecode (never publish) ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.nbc
+*.nbi
 
 # --- Large data & unused ---
 1_data/
@@ -30,6 +36,8 @@
 4_backend_engine/run_command.txt
 4_backend_engine/mapbox_usage.json
 4_backend_engine/mapbox_usage.json.tmp
+# Local test-mode profile store (may contain custom profiles; not for GitHub)
+4_backend_engine/user_profiles.json
 
 # --- 5_frontend: env & build (node_modules/build also in 5_frontend/.gitignore) ---
 5_frontend/.env

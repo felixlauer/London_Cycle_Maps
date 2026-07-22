@@ -1,90 +1,61 @@
-import React, { useRef, useState } from 'react';
+import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
- * Compact multi-leg pager — shell language (not legacy legAnalysis.css).
- * Bare chevrons + label; dots at bottom; optional swipe on the body.
+ * Compact top latch for multi-leg switching — chevrons + "1 / 2" only.
+ * Used on collapsed and expanded island (all breakpoints).
  */
-export default function IslandLegPager({
+export default function IslandLegLatch({
   legCount,
   activeLegIndex,
   onChangeLeg,
-  legLabel,
-  children,
 }) {
-  const touchStartX = useRef(null);
-  const [slideDir, setSlideDir] = useState(0);
-
-  if (legCount <= 1) {
-    return (
-      <div className="island-leg-pager island-leg-pager--single">
-        <div className="island-leg-pager__body">{children}</div>
-      </div>
-    );
-  }
+  if (legCount <= 1) return null;
 
   const go = (next) => {
     const clamped = Math.max(0, Math.min(legCount - 1, next));
     if (clamped === activeLegIndex) return;
-    setSlideDir(clamped > activeLegIndex ? 1 : -1);
     onChangeLeg?.(clamped);
   };
 
   return (
-    <div className="island-leg-pager">
-      <div className="island-leg-pager__nav">
-        <button
-          type="button"
-          className="island-leg-pager__arrow"
-          disabled={activeLegIndex <= 0}
-          onClick={() => go(activeLegIndex - 1)}
-          aria-label="Previous leg"
-        >
-          <ChevronLeft size={16} strokeWidth={2.2} aria-hidden />
-        </button>
-        <div className="island-leg-pager__label">{legLabel}</div>
-        <button
-          type="button"
-          className="island-leg-pager__arrow"
-          disabled={activeLegIndex >= legCount - 1}
-          onClick={() => go(activeLegIndex + 1)}
-          aria-label="Next leg"
-        >
-          <ChevronRight size={16} strokeWidth={2.2} aria-hidden />
-        </button>
-      </div>
-      <div
-        key={activeLegIndex}
-        className={`island-leg-pager__body${slideDir >= 0 ? ' is-next' : ' is-prev'}`}
-        onTouchStart={(e) => {
-          touchStartX.current = e.changedTouches[0].clientX;
+    <div className="island-leg-latch" role="group" aria-label="Route segments">
+      <button
+        type="button"
+        className="island-leg-latch__arrow"
+        disabled={activeLegIndex <= 0}
+        onClick={(e) => {
+          e.stopPropagation();
+          go(activeLegIndex - 1);
         }}
-        onTouchEnd={(e) => {
-          if (touchStartX.current == null) return;
-          const dx = e.changedTouches[0].clientX - touchStartX.current;
-          touchStartX.current = null;
-          if (Math.abs(dx) < 40) return;
-          if (dx < 0) go(activeLegIndex + 1);
-          else go(activeLegIndex - 1);
-        }}
+        aria-label="Previous segment"
       >
-        {children}
-      </div>
-      <div className="island-leg-pager__dots" role="tablist" aria-label="Route parts">
-        {Array.from({ length: legCount }, (_, i) => (
-          <button
-            key={i}
-            type="button"
-            role="tab"
-            aria-selected={i === activeLegIndex}
-            className={`island-leg-pager__dot${i === activeLegIndex ? ' is-active' : ''}`}
-            aria-label={`Show part ${i + 1}`}
-            onClick={() => go(i)}
-          />
-        ))}
-      </div>
+        <ChevronLeft size={14} strokeWidth={2.4} aria-hidden />
+      </button>
+      <span className="island-leg-latch__count" aria-live="polite">
+        {activeLegIndex + 1}
+        <span className="island-leg-latch__sep"> / </span>
+        {legCount}
+      </span>
+      <button
+        type="button"
+        className="island-leg-latch__arrow"
+        disabled={activeLegIndex >= legCount - 1}
+        onClick={(e) => {
+          e.stopPropagation();
+          go(activeLegIndex + 1);
+        }}
+        aria-label="Next segment"
+      >
+        <ChevronRight size={14} strokeWidth={2.4} aria-hidden />
+      </button>
     </div>
   );
+}
+
+/** @deprecated alias — keep imports working during migration */
+export function IslandLegPager(props) {
+  return <IslandLegLatch {...props} />;
 }
 
 /** Point names for leg labels: Start / Via 1… / End */

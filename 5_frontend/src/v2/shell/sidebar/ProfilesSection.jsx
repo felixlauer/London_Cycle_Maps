@@ -29,6 +29,7 @@ function sortCustoms(customs, order) {
 
 /**
  * Profiles — single-line rows; Santander-style status dot on the left = active.
+ * Mobile: edit/delete icons only when a row is expanded by tap.
  */
 export default function ProfilesSection({
   profiles = [],
@@ -40,6 +41,7 @@ export default function ProfilesSection({
   const { favouriteOrder, setFavouriteOrder, openWizard, openAuthPanel } = useSidebar();
   const [dragId, setDragId] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
 
   const customs = useMemo(() => {
     const list = (profiles || []).filter(isCustomProfile);
@@ -86,6 +88,10 @@ export default function ProfilesSection({
     }
   };
 
+  const toggleExpanded = (id) => {
+    setExpandedId((cur) => (cur === id ? null : id));
+  };
+
   return (
     <section
       className="sb-section sb-profiles"
@@ -125,6 +131,7 @@ export default function ProfilesSection({
                   const quick = index < 3;
                   const showMoreBand = index === 3;
                   const active = p.id === activeProfileId;
+                  const expanded = expandedId === p.id;
                   return (
                     <React.Fragment key={p.id}>
                       {showMoreBand && (
@@ -142,6 +149,7 @@ export default function ProfilesSection({
                           'sb-profile-row',
                           quick ? 'is-quick' : '',
                           active ? 'is-active' : '',
+                          expanded ? 'is-expanded' : '',
                           dragId === p.id ? 'is-dragging' : '',
                         ].filter(Boolean).join(' ')}
                         draggable
@@ -149,6 +157,16 @@ export default function ProfilesSection({
                         onDragOver={onDragOver}
                         onDrop={onDrop(p.id)}
                         onDragEnd={() => setDragId(null)}
+                        onClick={() => toggleExpanded(p.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggleExpanded(p.id);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={expanded}
                       >
                         <span className="sb-profile-row__lead" aria-hidden>
                           <span
@@ -192,6 +210,7 @@ export default function ProfilesSection({
                           className="sb-profile-row__grip"
                           aria-label={`Reorder ${p.name}`}
                           tabIndex={-1}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <Equal size={15} strokeWidth={2.2} aria-hidden />
                         </button>

@@ -4,4 +4,5 @@
 !.env.example
 graph-cache/
 run_command.txt
+user_profiles.json
 *.log

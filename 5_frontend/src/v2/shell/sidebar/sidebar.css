@@ -131,11 +131,6 @@
   transition: color 150ms var(--sb-ease), background-color 150ms var(--sb-ease);
 }
 
-.profile-sidebar__return:hover {
-  color: var(--sb-text);
-  background: var(--sb-surface);
-}
-
 .profile-sidebar__return:active {
   transform: scale(0.97);
 }
@@ -264,6 +259,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 4px var(--sb-pad) 8px;
 }
 
@@ -514,6 +511,32 @@ button.sb-card__row:hover {
 
 .sb-profile-row:hover .sb-profile-row__actions {
   opacity: 1;
+}
+
+/* Touch: hide edit/delete until the row is tapped; bike sits next to grip */
+@media (hover: none), (pointer: coarse) {
+  .sb-profile-row {
+    display: flex;
+  }
+
+  .sb-profile-row__lead { order: 0; }
+  .sb-profile-row__name { order: 1; }
+  .sb-profile-row__bike { order: 2; }
+  .sb-profile-row__actions { order: 3; }
+  .sb-profile-row__grip { order: 4; }
+
+  .sb-profile-row__actions {
+    display: none;
+    opacity: 1;
+    pointer-events: none;
+  }
+
+  .sb-profile-row.is-expanded .sb-profile-row__bike { order: 3; }
+  .sb-profile-row.is-expanded .sb-profile-row__actions {
+    display: flex;
+    order: 2;
+    pointer-events: auto;
+  }
 }
 
 .sb-profile-row__action {
@@ -767,5 +790,66 @@ button.sb-card__row:hover {
   .profile-sidebar__collapse {
     animation: none;
     transition: none;
+  }
+}
+
+/* Mobile: full-bleed overlay drawer (no blur / latch) */
+.profile-sidebar__scrim {
+  display: none;
+}
+
+.profile-sidebar.is-mobile {
+  z-index: 40;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
+.profile-sidebar.is-mobile.is-open {
+  width: 100vw;
+  max-width: 100vw;
+  pointer-events: auto;
+}
+
+.profile-sidebar.is-mobile .profile-sidebar__frame {
+  width: 100%;
+  max-width: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+  min-height: 100%;
+  border-radius: 0;
+  z-index: 21;
+}
+
+.profile-sidebar.is-mobile .profile-sidebar__clip {
+  inset: 0;
+  height: 100%;
+  border-radius: 0;
+  z-index: 21;
+  overflow: hidden;
+}
+
+.profile-sidebar.is-mobile .profile-sidebar__collapse {
+  display: none;
+}
+
+.profile-sidebar.is-mobile .profile-sidebar__top {
+  height: calc(var(--shell-inset) + 56px + 12px);
+}
+
+.profile-sidebar.is-mobile.is-wizard .profile-sidebar__wizard-body {
+  padding-top: calc(var(--shell-inset) + 56px + 8px);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .profile-sidebar__return:hover {
+    color: var(--sb-text);
+    background: var(--sb-surface);
   }
 }

@@ -57,25 +57,34 @@
 
 /* —— Collapsed pill: 4 equal horizontal cells, content centred —— */
 .island-collapsed {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  align-items: center;
+  display: flex;
+  flex-direction: column;
   height: 108px;
-  padding: 0 28px 0 12px;
+  padding: 0 28px 0 28px; /* match chevron side for symmetry */
   box-sizing: border-box;
   cursor: pointer;
   user-select: none;
 }
 
-.island-collapsed.is-multi {
-  height: 122px;
-  /* Keep the four cells in the same vertical band as the single-leg pill;
-     the extra height is only for the cramped caption/dots row underneath. */
-  align-items: start;
+.island-collapsed.is-mobile {
+  cursor: default;
 }
 
-.island-collapsed.is-multi .island-collapsed__cell {
+.island-collapsed__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  flex: 1;
+  min-height: 0;
+}
+
+.island-collapsed.is-multi {
   height: 108px;
+  align-items: stretch;
+}
+
+.island-collapsed.is-multi .island-collapsed__grid {
+  height: 100%;
 }
 
 .island-collapsed:focus-visible {
@@ -134,8 +143,25 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;
   gap: 4px;
   min-width: 0;
+  overflow: hidden;
+}
+
+.island-slot__visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+}
+
+.island-slot__visual .island-spark {
+  width: 56px;
+  height: 56px;
+  max-width: none;
 }
 
 .island-slot__caption {
@@ -143,6 +169,12 @@
   font-weight: 600;
   color: var(--island-sub);
   white-space: nowrap;
+  line-height: 1.2;
+  min-height: 1.2em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
   transition: color 140ms var(--island-ease);
 }
 
@@ -176,7 +208,7 @@
   pointer-events: none;
 }
 
-.island-collapsed__chevron {
+.island-collapsed__chevron-btn {
   position: absolute;
   right: 12px;
   top: 50%;
@@ -186,23 +218,347 @@
   justify-content: center;
   width: 26px;
   height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  border: none;
   border-radius: 999px;
+  background: transparent;
   color: var(--island-sub);
+  cursor: pointer;
   transition: background-color 150ms var(--island-ease), color 150ms var(--island-ease);
 }
 
-.island-collapsed.is-multi .island-collapsed__chevron {
-  top: 54px;
+.island-collapsed.is-multi .island-collapsed__chevron-btn {
+  top: calc(50% + 8px);
 }
 
-.island-collapsed:hover .island-collapsed__chevron {
-  background: var(--sb-surface, #f4f4f5);
+@media (hover: hover) and (pointer: fine) {
+  .island-collapsed__chevron-btn:hover {
+    background: var(--sb-surface, #f4f4f5);
+    color: var(--island-text);
+  }
+
+  .map-shell[data-theme='dark'] .island-collapsed__chevron-btn:hover {
+    background: #2c2c2e;
+  }
+}
+
+/* Top multi-leg latch — snapped onto island top (like sidebar collapse latch) */
+.island-leg-latch {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 24px;
+  margin: 0;
+  padding: 0 6px;
+  border: 1px solid var(--shell-border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  background: var(--shell-bg);
+  box-shadow: var(--shell-shadow);
+  pointer-events: auto;
+}
+
+.island-leg-latch__arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--island-sub);
+  cursor: pointer;
+}
+
+.island-leg-latch__arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .island-leg-latch__arrow:hover:not(:disabled) {
+    background: var(--sb-surface, #f4f4f5);
+    color: var(--island-text);
+  }
+}
+
+.island-leg-latch__count {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
   color: var(--island-text);
+  min-width: 2.6em;
+  text-align: center;
 }
 
-.map-shell[data-theme='dark'] .island-collapsed:hover .island-collapsed__chevron {
-  background: #2c2c2e;
+.island-leg-latch__sep {
+  color: var(--island-sub);
+  font-weight: 600;
 }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.island-metric.is-two-line .island-metric__delta {
+  line-height: 1.2;
+}
+
+.island-spark {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Mobile expanded pages + progress */
+.island-expanded.is-mobile {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px 10px;
+  box-sizing: border-box;
+  height: 100%;
+  overflow: hidden;
+}
+
+.island-expanded__pages {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.island-expanded__pages > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.island-expanded__progress {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: end;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 100%;
+  margin-top: auto;
+  padding: 16px 0 0;
+  box-sizing: border-box;
+}
+
+.island-expanded__progress-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+}
+
+.island-expanded__progress-label {
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  color: var(--island-sub, #71717a);
+  text-align: center;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.island-expanded__progress-item.is-active .island-expanded__progress-label {
+  color: var(--island-text, #1c1c1e);
+}
+
+.island-expanded__progress-seg {
+  display: block;
+  width: 100%;
+  height: 4px;
+  border: none;
+  border-radius: 999px;
+  padding: 0;
+  background: var(--island-track);
+  pointer-events: none;
+  transition: background-color 150ms var(--island-ease);
+}
+
+.island-expanded__progress-seg.is-active,
+.island-expanded__progress-item.is-active .island-expanded__progress-seg {
+  background: var(--shell-brand, #ff0061);
+}
+
+.island-expanded__page--metrics.is-santander {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 767px) {
+  .island-collapsed {
+    padding: 0 18px 0 18px;
+  }
+
+  .island-collapsed__chevron-btn {
+    right: 2px;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .island-expanded__collapse {
+    right: 2px;
+  }
+
+  .island-collapsed .island-metric__value {
+    font-size: 34px;
+  }
+
+  .island-collapsed .island-metric__unit {
+    font-size: 14px;
+  }
+
+  .island-expanded.is-mobile .island-metric__value {
+    font-size: 42px;
+  }
+
+  .island-expanded.is-mobile .island-metric__unit {
+    font-size: 16px;
+  }
+
+  .island-expanded.is-mobile .island-metric__delta {
+    white-space: nowrap;
+    max-width: 100%;
+    font-size: 10.5px;
+  }
+
+  .island-expanded.is-mobile .island-expanded__metrics,
+  .island-expanded.is-mobile .island-expanded__page--metrics {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 52px;
+  }
+
+  .island-expanded.is-mobile .island-expanded__metrics.is-stacked {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .island-expanded.is-mobile .island-expanded__page--metrics.is-santander {
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .island-expanded.is-mobile .island-expanded__page--metrics.is-santander .island-expanded__metrics {
+    flex: 0 0 auto;
+    height: auto;
+  }
+
+  .island-expanded.is-mobile .island-expanded__chart {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    align-items: stretch;
+  }
+
+  .island-expanded.is-mobile .island-expanded__chart > *,
+  .island-expanded.is-mobile .island-chart {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .island-expanded__bars {
+    display: flex !important;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    padding: 0;
+  }
+
+  .island-expanded__bars .island-bars {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    justify-content: flex-start;
+    gap: 8px;
+    padding-top: 0;
+  }
+
+  .island-expanded.is-mobile .island-bars__note {
+    flex-shrink: 0;
+    margin: 0 0 6px;
+    font-size: 10.5px;
+    font-weight: 550;
+    line-height: 1.35;
+    color: var(--island-sub);
+    text-align: center;
+  }
+
+  .island-expanded.is-mobile .island-bars__heading {
+    font-size: 12px;
+  }
+
+  .island-expanded.is-mobile .island-bar__label,
+  .island-expanded.is-mobile .island-bar__label em {
+    font-size: 12px;
+  }
+
+  .island-expanded.is-mobile .island-bar__track {
+    height: 7px;
+  }
+
+  .island-expanded__page--metrics.is-santander {
+    overflow: hidden;
+  }
+}
+
 
 .island-collapsed__legs {
   position: absolute;
@@ -881,6 +1237,14 @@
   color: var(--island-text);
 }
 
+.island-bars__note {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.35;
+  color: var(--island-sub);
+}
+
 .island-bars__empty {
   margin: 0;
   font-size: 11px;
@@ -921,7 +1285,7 @@
 .island-bar__label {
   flex-shrink: 0;
   width: 118px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--island-sub);
   white-space: nowrap;
@@ -942,7 +1306,7 @@
   color: var(--island-text);
 }
 
-/* Narrow viewports — shed the bar column, then tighten the pill */
+/* Narrow viewports — shed the bar column on desktop grid only */
 @media (max-width: 940px) {
   .island-expanded__grid {
     grid-template-columns: 1fr 2fr;
@@ -952,22 +1316,22 @@
     grid-template-columns: 1fr 1fr 2fr;
   }
 
-  .island-expanded__bars {
+  .island-expanded:not(.is-mobile) .island-expanded__bars {
     display: none;
   }
 }
 
 @media (max-width: 640px) {
   .island-collapsed {
-    padding: 0 24px 0 8px;
+    padding: 0 18px;
   }
 
   .island-metric__value {
-    font-size: 28px;
+    font-size: 34px;
   }
 
   .island-metric__unit {
-    font-size: 12px;
+    font-size: 14px;
   }
 }
 

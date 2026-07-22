@@ -4,8 +4,8 @@ import OverlayModeRail from './OverlayModeRail';
 import './mapControls.css';
 
 /**
- * Bottom-right stack: overlay pill + Apple-style zoom + locate.
- * Free-floating — no outer chrome box.
+ * Map controls stack: overlay rail + zoom + locate/north combo.
+ * Mobile: top-right under routing (no zoom). Desktop: bottom-right.
  */
 export default function MapControlsZone({
   onZoomIn,
@@ -19,10 +19,11 @@ export default function MapControlsZone({
   overlayMode,
   isDark = false,
   onSelectOverlayMode,
+  compact = false,
 }) {
   return (
     <section
-      className="map-ctl"
+      className={`map-ctl${compact ? ' map-ctl--compact' : ''}`}
       aria-label="Map controls"
       data-zone="map-controls"
     >
@@ -31,6 +32,7 @@ export default function MapControlsZone({
         isDark={isDark}
         inactive={!routeRevealed}
         onSelectMode={onSelectOverlayMode}
+        compact={compact}
       />
 
       <div className="map-ctl__zoom" role="group" aria-label="Zoom">
@@ -53,36 +55,38 @@ export default function MapControlsZone({
         </button>
       </div>
 
-      <button
-        type="button"
-        className={
-          `map-ctl__btn` +
-          (locateActive ? ' is-active' : '') +
-          (locatePending ? ' is-pending' : '')
-        }
-        aria-label={locateActive ? 'Stop using my location' : 'Use my location'}
-        aria-pressed={locateActive}
-        disabled={locatePending}
-        onClick={onLocateToggle}
-      >
-        <LocateFixed size={18} strokeWidth={2.25} aria-hidden />
-      </button>
-
-      <button
-        type="button"
-        className={
-          `map-ctl__btn map-ctl__btn--north` +
-          (northNeedsReset ? ' is-active' : '')
-        }
-        aria-label="Reset map to north and flat view"
-        aria-disabled={!northNeedsReset || undefined}
-        onClick={northNeedsReset ? onResetNorth : undefined}
-      >
-        <span className="map-ctl__north" aria-hidden>
-          <Navigation2 className="map-ctl__north-icon" size={16} strokeWidth={2.25} />
-          <span className="map-ctl__north-n">N</span>
-        </span>
-      </button>
+      <div className="map-ctl__nav" role="group" aria-label="Location and orientation">
+        <button
+          type="button"
+          className={
+            `map-ctl__nav-btn` +
+            (locateActive ? ' is-active' : '') +
+            (locatePending ? ' is-pending' : '')
+          }
+          aria-label={locateActive ? 'Stop using my location' : 'Use my location'}
+          aria-pressed={locateActive}
+          disabled={locatePending}
+          onClick={onLocateToggle}
+        >
+          <LocateFixed size={18} strokeWidth={2.25} aria-hidden />
+        </button>
+        <span className="map-ctl__zoom-rule" aria-hidden />
+        <button
+          type="button"
+          className={
+            `map-ctl__nav-btn map-ctl__nav-btn--north` +
+            (northNeedsReset ? ' is-active' : '')
+          }
+          aria-label="Reset map to north and flat view"
+          aria-disabled={!northNeedsReset || undefined}
+          onClick={northNeedsReset ? onResetNorth : undefined}
+        >
+          <span className="map-ctl__north" aria-hidden>
+            <Navigation2 className="map-ctl__north-icon" size={16} strokeWidth={2.25} />
+            <span className="map-ctl__north-n">N</span>
+          </span>
+        </button>
+      </div>
     </section>
   );
 }

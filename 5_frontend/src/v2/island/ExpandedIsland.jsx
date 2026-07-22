@@ -1,16 +1,16 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { OVERLAY_KIND_META } from '../map/overlayModes';
 import MetricCell from './MetricCell';
 import ElevationChart from './ElevationChart';
 import ModeBarCharts from './ModeBarCharts';
 import IslandHireStations from './IslandHireStations';
-import IslandLegPager, { formatLegLabel } from './IslandLegPager';
 import WeatherPanel from './weather/WeatherPanel';
 import useRouteWeather from './weather/useRouteWeather';
 import { resolveExtremeWarning } from './weather/resolveExtreme';
 import { modeChunksFor } from './modeData';
 import { buildSlices } from './routeGeometry';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import {
   formatDurationParts,
   formatDistanceParts,
@@ -20,6 +20,10 @@ import {
 } from './metrics';
 
 const NODE_TYPES = new Set(['barrier', 'signal', 'calming']);
+const PAGE_METRICS = 0;
+const PAGE_CHART = 1;
+const PAGE_BARS = 2;
+const PAGE_LABELS = ['Core metrics', 'Chart overview', 'Detailed analysis'];
 
 function toSlices(chunks, index, modeId) {
   return buildSlices(chunks, index).map((s, i) => ({
@@ -45,10 +49,7 @@ function nodeLabel(n) {
 }
 
 /**
- * Expanded sheet — metrics | elevation chart | bar charts.
- * Santander: left quarter splits into stacked metrics + hire station cards.
- * Non-Santander: full metrics; only on extreme weather → stacked metrics + warning.
- * Multi-leg: top pager switches the active leg (charts/map follow).
+ * Expanded sheet — desktop 3-col grid; mobile swipe pages (metrics | chart | bars).
  */
 export default function ExpandedIsland({
   safest,
@@ -72,7 +73,10 @@ export default function ExpandedIsland({
   startCoord = null,
   departAtIso = null,
 }) {
+  const isMobile = useIsMobile();
   const [sheetHover, setSheetHover] = useState(null);
+  const [page, setPage] = useState(PAGE_CHART);
+  const touchStart = useRef(null);
   const sStats = safest?.stats || {};
   const fStats = fastest?.stats || {};
   const totalM = index?.totalM || Number(sStats.length_m) || 0;
@@ -82,7 +86,7 @@ export default function ExpandedIsland({
     ? formatWalkParts(walkStats?.duration_min, walkStats?.distance_m, units)
     : null;
 
-  const weatherEnabled = !santander && Boolean(startCoord);
+  const weatherEnabled = !isMobile && !santander && Boolean(startCoord);
   const { data: weather, ready: weatherReady } = useRouteWeather({
     lat: startCoord?.[0],
     lon: startCoord?.[1],
@@ -139,8 +143,9 @@ export default function ExpandedIsland({
     return kept;
   }, [safest, barModes, index]);
 
-  const showExtremeSlot = Boolean(extremeWarning);
+  const showExtremeSlot = !isMobile && Boolean(extremeWarning);
   const metricsStacked = santander || showExtremeSlot;
+  const deltaCompare = isMobile ? 'non-tuned' : 'shortest';
 
   const metricsBlock = (
     <div className={`island-expanded__metrics${metricsStacked ? ' is-stacked' : ''}`}>
@@ -149,7 +154,7 @@ export default function ExpandedIsland({
         <MetricCell
           ariaLabel="Trip time"
           parts={formatDurationParts(sStats.duration_min)}
-          delta={formatTimeDelta(sStats.duration_min, fStats.duration_min)}
+          delta={formatTimeDelta(sStats.duration_min, fStats.duration_min, { compare: deltaCompare })}
         />
       </div>
       <div className="island-expanded__metric-block">
@@ -157,7 +162,7 @@ export default function ExpandedIsland({
         <MetricCell
           ariaLabel="Trip distance"
           parts={formatDistanceParts(sStats.length_m, units)}
-          delta={formatDistanceDelta(sStats.length_m, fStats.length_m, units)}
+          delta={formatDistanceDelta(sStats.length_m, fStats.length_m, units, { compare: deltaCompare })}
         />
       </div>
     </div>
@@ -174,7 +179,45 @@ export default function ExpandedIsland({
     metricsBlock
   );
 
-  const body = (
+  const metricsPage = santander ? (
+    <div className="island-expanded__page island-expanded__page--metrics is-santander">
+      {metricsBlock}
+      <div className="island-expanded__hire">
+        <IslandHireStations pickup={pickupStation} dropoff={dropoffStation} />
+      </div>
+    </div>
+  ) : leftColumn;
+
+  const chartPage = (
+    <div className="island-expanded__chart">
+      <ElevationChart
+        profile={safest?.elevation_profile}
+        totalM={totalM}
+        slices={slices}
+        trafficSlices={trafficSlices}
+        nodeMarkers={nodeMarkers}
+        units={units}
+        externalHover={chartHover}
+        onSegmentHover={handleHover}
+        onScrub={onScrub}
+      />
+    </div>
+  );
+
+  const barsPage = (
+    <div className="island-expanded__bars">
+      <ModeBarCharts
+        safest={safest}
+        modes={barModes || []}
+        externalHover={chartHover}
+        onHoverChange={handleHover}
+        maxKindsPerChart={isMobile ? 4 : Infinity}
+        showOverlayHint={isMobile}
+      />
+    </div>
+  );
+
+  const desktopBody = (
     <div className={`island-expanded__grid${santander ? ' is-santander' : ''}`}>
       {leftColumn}
       {santander && (
@@ -182,32 +225,40 @@ export default function ExpandedIsland({
           <IslandHireStations pickup={pickupStation} dropoff={dropoffStation} />
         </div>
       )}
-      <div className="island-expanded__chart">
-        <ElevationChart
-          profile={safest?.elevation_profile}
-          totalM={totalM}
-          slices={slices}
-          trafficSlices={trafficSlices}
-          nodeMarkers={nodeMarkers}
-          units={units}
-          externalHover={chartHover}
-          onSegmentHover={handleHover}
-          onScrub={onScrub}
-        />
-      </div>
-      <div className="island-expanded__bars">
-        <ModeBarCharts
-          safest={safest}
-          modes={barModes}
-          externalHover={chartHover}
-          onHoverChange={handleHover}
-        />
-      </div>
+      {chartPage}
+      {barsPage}
     </div>
   );
 
+  const pages = [metricsPage, chartPage, barsPage];
+
+  const onTouchStart = (e) => {
+    touchStart.current = {
+      x: e.changedTouches[0].clientX,
+      y: e.changedTouches[0].clientY,
+    };
+  };
+
+  const onTouchEnd = (e) => {
+    if (!touchStart.current) return;
+    const dx = e.changedTouches[0].clientX - touchStart.current.x;
+    const dy = e.changedTouches[0].clientY - touchStart.current.y;
+    touchStart.current = null;
+    if (Math.abs(dy) > Math.abs(dx) && dy > 50) {
+      onCollapse?.();
+      return;
+    }
+    if (Math.abs(dx) < 40) return;
+    if (dx < 0) setPage((p) => Math.min(PAGE_BARS, p + 1));
+    else setPage((p) => Math.max(PAGE_METRICS, p - 1));
+  };
+
   return (
-    <div className={`island-expanded${santander ? ' is-santander' : ''}`}>
+    <div
+      className={`island-expanded${santander ? ' is-santander' : ''}${isMobile ? ' is-mobile' : ''}`}
+      onTouchStart={isMobile ? onTouchStart : undefined}
+      onTouchEnd={isMobile ? onTouchEnd : undefined}
+    >
       <button
         type="button"
         className="island-expanded__collapse"
@@ -217,14 +268,35 @@ export default function ExpandedIsland({
         <ChevronDown size={16} strokeWidth={2.2} aria-hidden />
       </button>
 
-      <IslandLegPager
-        legCount={legCount}
-        activeLegIndex={activeLegIndex}
-        onChangeLeg={onChangeLeg}
-        legLabel={formatLegLabel(activeLegIndex, legCount, viaCount)}
-      >
-        {body}
-      </IslandLegPager>
+      {isMobile ? (
+        <>
+          <div className="island-expanded__pages" data-page={page}>
+            {pages[page]}
+          </div>
+          <div className="island-expanded__progress" role="tablist" aria-label="Island panels">
+            {[PAGE_METRICS, PAGE_CHART, PAGE_BARS].map((i) => (
+              <button
+                key={i}
+                type="button"
+                role="tab"
+                aria-selected={page === i}
+                className={`island-expanded__progress-item${page === i ? ' is-active' : ''}`}
+                onClick={() => setPage(i)}
+              >
+                <span className="island-expanded__progress-label">
+                  {PAGE_LABELS[i]}
+                </span>
+                <span
+                  className={`island-expanded__progress-seg${page === i ? ' is-active' : ''}`}
+                  aria-hidden
+                />
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        desktopBody
+      )}
     </div>
   );
 }

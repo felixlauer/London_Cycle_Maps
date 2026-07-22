@@ -40,9 +40,23 @@ export function resolveBarModes(safest, barA, barB, {
   hasTraffic = false,
   wantsLight = false,
   hasRough = false,
+  maxCharts = MAX_BAR_CHARTS,
+  budget = BAR_CHART_BUDGET,
 } = {}) {
   const bars = [barA, barB].filter(Boolean);
   let used = bars.reduce((n, m) => n + barKindCount(safest, m), 0);
+  const chartCap = Math.max(1, maxCharts);
+  const barBudget = Math.max(1, budget);
+
+  // If the locked pair already exceeds budget, keep only what fits.
+  while (bars.length > 1 && used > barBudget) {
+    const dropped = bars.pop();
+    used -= barKindCount(safest, dropped);
+  }
+  if (bars.length > chartCap) {
+    bars.length = chartCap;
+    used = bars.reduce((n, m) => n + barKindCount(safest, m), 0);
+  }
 
   const candidates = [];
   const push = (m) => {
@@ -58,10 +72,10 @@ export function resolveBarModes(safest, barA, barB, {
   push('surface');
 
   for (const m of candidates) {
-    if (bars.length >= MAX_BAR_CHARTS) break;
+    if (bars.length >= chartCap) break;
     const n = barKindCount(safest, m);
     if (n <= 0) continue;
-    if (used + n > BAR_CHART_BUDGET) continue;
+    if (used + n > barBudget) continue;
     bars.push(m);
     used += n;
   }
@@ -74,6 +88,8 @@ export function resolveIslandSlots({
   bikeType = 'standard',
   isDarkOutside = false,
   profile = null,
+  maxBarCharts = MAX_BAR_CHARTS,
+  barBudget = BAR_CHART_BUDGET,
 }) {
   const hasTraffic = sumChunkLengthM(trafficChunks(safest)) > 0;
   const wantsLight = isDarkOutside && profileWantsLight(profile);
@@ -124,6 +140,8 @@ export function resolveIslandSlots({
     hasTraffic,
     wantsLight,
     hasRough,
+    maxCharts: maxBarCharts,
+    budget: barBudget,
   });
 
   return {

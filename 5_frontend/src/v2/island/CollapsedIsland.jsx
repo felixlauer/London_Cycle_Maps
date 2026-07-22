@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ChevronUp } from 'lucide-react';
 import ElevationSparkline from './ElevationSparkline';
 import ModeDonut from './ModeDonut';
 import MetricCell from './MetricCell';
 import { islandModeMeta } from './modeData';
 import { OVERLAY_KIND_META } from '../map/overlayModes';
-import { formatCollapsedLegParts } from './IslandLegPager';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import {
   formatDurationParts,
   formatDistanceParts,
@@ -38,11 +38,19 @@ function ContentSlot({ slot, safest, externalHover, onHoverChange }) {
     ? donutSegmentCaption(modeId, activeKind)
     : (meta?.label || modeId);
 
+  const DONUT = 56;
+
   if (!slot) return null;
   if (slot.type === 'elevation') {
     return (
       <div className="island-slot">
-        <ElevationSparkline profile={safest?.elevation_profile} width={120} height={44} />
+        <div className="island-slot__visual" style={{ width: DONUT, height: DONUT }}>
+          <ElevationSparkline
+            profile={safest?.elevation_profile}
+            width={DONUT}
+            height={DONUT}
+          />
+        </div>
         <span className="island-slot__caption">Elevation</span>
       </div>
     );
@@ -50,24 +58,27 @@ function ContentSlot({ slot, safest, externalHover, onHoverChange }) {
 
   return (
     <div className="island-slot">
-      <ModeDonut
-        safest={safest}
-        modeId={modeId}
-        size={56}
-        strokeWidth={5.5}
-        externalHover={externalHover}
-        onHoverChange={(seg) => {
-          setLocalKind(seg?.kind || null);
-          onHoverChange?.(seg);
-        }}
-      />
+      <div className="island-slot__visual" style={{ width: DONUT, height: DONUT }}>
+        <ModeDonut
+          safest={safest}
+          modeId={modeId}
+          size={DONUT}
+          strokeWidth={5.5}
+          externalHover={externalHover}
+          onHoverChange={(seg) => {
+            setLocalKind(seg?.kind || null);
+            onHoverChange?.(seg);
+          }}
+        />
+      </div>
       <span className="island-slot__caption">{caption}</span>
     </div>
   );
 }
 
 /**
- * Collapsed island — four equal cells; multi-leg shows part caption + dots.
+ * Collapsed island — four equal cells.
+ * Mobile: expand via swipe-up or chevron only (not tap-anywhere).
  */
 export default function CollapsedIsland({
   safest,
@@ -76,101 +87,91 @@ export default function CollapsedIsland({
   units,
   onExpand,
   legCount = 1,
-  activeLegIndex = 0,
-  onChangeLeg,
-  viaCount = 0,
   externalHover = null,
   onSegmentHover,
 }) {
+  const isMobile = useIsMobile();
+  const touchStartY = useRef(null);
   const sStats = safest?.stats || {};
   const fStats = fastest?.stats || {};
   const multi = legCount > 1;
-  const legParts = multi
-    ? formatCollapsedLegParts(activeLegIndex, legCount, viaCount)
-    : null;
+
+  const handleExpandClick = (e) => {
+    if (isMobile) {
+      // Mobile: only the chevron expands (handled separately)
+      if (!e.target.closest?.('.island-collapsed__chevron-btn')) return;
+    }
+    onExpand();
+  };
 
   return (
     <div
-      className={`island-collapsed${multi ? ' is-multi' : ''}`}
-      role="button"
-      tabIndex={0}
-      aria-label="Expand route analysis"
-      onClick={(e) => {
-        if (e.target.closest?.('.island-collapsed__legs')) return;
-        onExpand();
-      }}
-      onKeyDown={(e) => {
+      className={`island-collapsed${multi ? ' is-multi' : ''}${isMobile ? ' is-mobile' : ''}`}
+      role={isMobile ? 'group' : 'button'}
+      tabIndex={isMobile ? undefined : 0}
+      aria-label={isMobile ? 'Route summary' : 'Expand route analysis'}
+      onClick={isMobile ? undefined : handleExpandClick}
+      onKeyDown={isMobile ? undefined : (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onExpand();
         }
       }}
+      onTouchStart={(e) => {
+        if (!isMobile) return;
+        touchStartY.current = e.changedTouches[0].clientY;
+      }}
+      onTouchEnd={(e) => {
+        if (!isMobile || touchStartY.current == null) return;
+        const dy = e.changedTouches[0].clientY - touchStartY.current;
+        touchStartY.current = null;
+        if (dy < -40) onExpand();
+      }}
     >
-      <div className="island-collapsed__cell">
-        <MetricCell
-          ariaLabel="Trip time"
-          parts={formatDurationParts(sStats.duration_min)}
-          delta={formatTimeDelta(sStats.duration_min, fStats.duration_min)}
-        />
-      </div>
-      <div className="island-collapsed__cell">
-        <MetricCell
-          ariaLabel="Trip distance"
-          parts={formatDistanceParts(sStats.length_m, units)}
-          delta={formatDistanceDelta(sStats.length_m, fStats.length_m, units)}
-        />
-      </div>
-      <div className="island-collapsed__cell">
-        <ContentSlot
-          slot={slots.left}
-          safest={safest}
-          externalHover={externalHover}
-          onHoverChange={onSegmentHover}
-        />
-      </div>
-      <div className="island-collapsed__cell">
-        <ContentSlot
-          slot={slots.right}
-          safest={safest}
-          externalHover={externalHover}
-          onHoverChange={onSegmentHover}
-        />
-      </div>
-
-      {legParts && (
-        <div
-          className="island-collapsed__legs"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          <span className="island-collapsed__leg-caption island-collapsed__leg-caption--left">
-            {legParts.viewing}
-          </span>
-          <div className="island-collapsed__dots" role="tablist" aria-label="Route parts">
-            {Array.from({ length: legCount }, (_, i) => (
-              <button
-                key={i}
-                type="button"
-                role="tab"
-                aria-selected={i === activeLegIndex}
-                className={`island-collapsed__dot${i === activeLegIndex ? ' is-active' : ''}`}
-                aria-label={`Show part ${i + 1}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChangeLeg?.(i);
-                }}
-              />
-            ))}
-          </div>
-          <span className="island-collapsed__leg-caption island-collapsed__leg-caption--right">
-            {legParts.part}
-          </span>
+      <div className="island-collapsed__grid">
+        <div className="island-collapsed__cell">
+          <MetricCell
+            ariaLabel="Trip time"
+            parts={formatDurationParts(sStats.duration_min)}
+            delta={isMobile ? null : formatTimeDelta(sStats.duration_min, fStats.duration_min)}
+          />
         </div>
-      )}
+        <div className="island-collapsed__cell">
+          <MetricCell
+            ariaLabel="Trip distance"
+            parts={formatDistanceParts(sStats.length_m, units)}
+            delta={isMobile ? null : formatDistanceDelta(sStats.length_m, fStats.length_m, units)}
+          />
+        </div>
+        <div className="island-collapsed__cell">
+          <ContentSlot
+            slot={slots.left}
+            safest={safest}
+            externalHover={externalHover}
+            onHoverChange={onSegmentHover}
+          />
+        </div>
+        <div className="island-collapsed__cell">
+          <ContentSlot
+            slot={slots.right}
+            safest={safest}
+            externalHover={externalHover}
+            onHoverChange={onSegmentHover}
+          />
+        </div>
+      </div>
 
-      <span className="island-collapsed__chevron" aria-hidden>
-        <ChevronUp size={16} strokeWidth={2.2} />
-      </span>
+      <button
+        type="button"
+        className="island-collapsed__chevron-btn"
+        aria-label="Expand route analysis"
+        onClick={(e) => {
+          e.stopPropagation();
+          onExpand();
+        }}
+      >
+        <ChevronUp size={16} strokeWidth={2.2} aria-hidden />
+      </button>
     </div>
   );
 }

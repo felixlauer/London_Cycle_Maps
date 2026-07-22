@@ -6,7 +6,9 @@ Documentation for the **user-facing routing app**: frontend (`5_frontend`) and b
 
 ## 1. Purpose
 
-The main app (**Tuned Cycling**) is the production cycling route planner for London. Users select a **routing profile** (or use **Test Mode** to override routing weights), set start and end on the map, and get two routes (fastest vs profile-optimized). A **Route overlays** picker (bottom-right) lets users choose which edge and point layers to draw on the optimized route after **Get Route** — independent of profile weights. No full-map data exploration — that stays in the debug app.
+The main app (**Tuned Cycling**) is the production cycling route planner for London. Users select a **routing profile**, set start / vias / end on the map, and get two routes (fastest vs profile-optimized). After **Get Route**, a bottom-right **overlay mode rail** shows typed analysis layers on the optimized path (independent of profile weights). Trip analysis lives in a bottom **Dynamic Island**. No full-map data exploration — that stays in the debug app.
+
+**Customer-facing UI (Jul 2026+):** `5_frontend/src/v2/` — run `npm start -- --v2`. Legacy `App.js` remains for Test Mode / segment inspector. Full remodel notes: [`design/WORKING_NOTES_JUL2026.md`](design/WORKING_NOTES_JUL2026.md), protocol: [`development_protocols/V2_FRONTEND_REMODEL.md`](development_protocols/V2_FRONTEND_REMODEL.md).
 
 ---
 
@@ -23,13 +25,13 @@ The main app (**Tuned Cycling**) is the production cycling route planner for Lon
 ### 2.2 Data flow
 
 1. On load, frontend restores the Supabase session (`AuthProvider`), then fetches `GET /profiles` and the active profile (`GET /profiles/:id`) through `flaskClient` (fresh JWT per request); selection persisted in `localStorage`. Profile fetches are deferred until the session check resolves (no guest flash / double fetch).
-2. User sets **start** and **end** via map click **or** Mapbox text search (left panel); both update the same `[lat, lon]` state. Search selection flies the map to the chosen place; map clicks do not.
-3. When both points exist, frontend prefetches routes in the background; user clicks **Get Route** to reveal results.
-4. **Profile mode (default):** frontend calls `GET /route` with coordinates and `profile_id`; backend loads weights via the active `ProfileStore` (Supabase in production, local JSON otherwise — see §2.5).
-5. **Test Mode (level 1):** top-bar master toggle bypasses Supabase — no JWT is sent, requests carry `X-Tuned-Test-Mode: 1`, and Flask uses `LocalJsonStore`. Profiles still work normally (system + local custom via `user_profiles.json`; wizard enabled without login). **Manual weights (level 2):** a nested sub-toggle inside the Test panel hides profile selection and sends raw weight query params (no `profile_id`).
-6. Backend loads graph once at startup; builds STRtree for edge snap; for each request parses **request-scoped weights**, sets `calming_source='both'` (hardcoded), runs **A\*** twice (fastest and optimized), returns paths, stats, overlay chunks, and **node_highlights**.
-7. Frontend draws two polylines, overlays gated by active weights (&gt; 0), condensed stats panel (all metrics with Δ vs fastest).
-8. Right-click on map → `GET /inspect` → segment inspector popup and red segment overlay.
+2. User sets **start**, optional **vias**, and **end** via map click **or** Mapbox text search (Routing Core in v2 / left panel in legacy); both update the same `[lat, lon]` state. Search selection flies the map to the chosen place; map clicks do not.
+3. When both points exist, frontend prefetches routes in the background; user clicks **Get Route** to reveal results (`routeRevealed` in v2).
+4. **Profile mode (default):** frontend calls `GET /route` with coordinates and `profile_id` (plus optional session `bike_type` override in v2); backend loads weights via the active `ProfileStore` (Supabase in production, local JSON otherwise — see §2.5).
+5. **Test Mode (legacy only):** top-bar master toggle bypasses Supabase — no JWT is sent, requests carry `X-Tuned-Test-Mode: 1`, and Flask uses `LocalJsonStore`. Profiles still work normally (system + local custom via `user_profiles.json`; wizard enabled without login). **Manual weights (level 2):** a nested sub-toggle inside the Test panel hides profile selection and sends raw weight query params (no `profile_id`). **Not exposed in v2.**
+6. Backend loads graph once at startup; builds STRtree for edge snap; for each request parses **request-scoped weights**, sets `calming_source='both'` (hardcoded), runs **A\*** twice (fastest and optimized), returns paths, stats, overlay chunks (incl. **v2 typed runs** + **elevation_profile**), and **node_highlights**.
+7. Frontend draws two polylines (Beeline casing in v2), overlays via mode rail (v2) or FAB (legacy), analysis in Dynamic Island (v2) or condensed stats panel (legacy).
+8. **Legacy only:** right-click on map → `GET /inspect` → segment inspector popup and red segment overlay.
 
 ### 2.3 Backend (app.py)
 
@@ -55,19 +57,44 @@ The main app (**Tuned Cycling**) is the production cycling route planner for Lon
 
 ### 2.4 Frontend (5_frontend)
 
-- Single-page React app; main UI in `App.js`, wrapped in `<AuthProvider>` (`src/auth/AuthProvider.jsx`).
-- **Top bar** (`src/components/TopBar.jsx`): brand, status line, **ProfileMenu** (avatar dropdown), and the master **Test Mode** toggle.
-- **ProfileMenu** (`src/components/ProfileMenu.jsx`): while the session check is loading it renders a disabled skeleton (never a "Guest" flash). Guest: system presets + disabled "Log in to create custom profiles" + Log in. Logged in: initials avatar, system + custom profiles, Create Profile (wizard), Settings (email + password reset), Sign out. Test Mode: "Local dev" label, all local profiles, wizard enabled, auth items hidden.
-- **Auth** (`src/auth/`): `AuthProvider.jsx` + `sessionStore.js` — login / signup / reset / password change go through **rate-limited Flask** `/auth/*` endpoints (no Supabase anon key in the browser bundle). `AuthModal.jsx`, `PasswordRecoveryModal.jsx`, `auth.css`.
-- **API client** (`src/api/flaskClient.js`): attaches `Authorization: Bearer` from `sessionStore` (refresh via `POST /auth/refresh` on 401). Test mode sends `X-Tuned-Test-Mode: 1` instead.
-- **Route points panel** (top-left): [`RoutePointsPanel.jsx`](../5_frontend/src/components/RoutePointsPanel.jsx) — start / up to **3 via stops** / end (Mapbox autocomplete), ⇅ swap (no vias), ≡ drag reorder, Santander toggle, Get Route. Profile selection lives in the ProfileMenu.
-- **Route overlay picker** (bottom-right): hideable **Layers** FAB — edge overlays (lit, steep, TfL, green, narrow, disruptions) and point overlays (barriers, signals, junctions, calming) on the **optimized route only**. On **Get Route**, only **TfL cycleways** is on by default; other overlays are off until toggled. Display-only (routing unchanged). Catalog: `GET /overlay_catalog`.
-- **Test Mode** (`src/components/TestModePanel.jsx`): master toggle in the top bar bypasses Supabase (level 1); the panel contains a nested **Manual weight overrides** sub-toggle (level 2, off by default) that reveals the raw weight toggle grid and bypasses profile selection.
-- Map: **Mapbox GL JS** via `react-map-gl` (`src/map/CycleMap.jsx`); center London; day=`streets-v12` / night=`dark-v11`; `MapFlyTo` on search selection. Public token: `REACT_APP_MAPBOX_TOKEN` (`pk.…`, URL-restricted). Geocode still Flask-proxied.
-- State: auth session (`isLoading`, `user`), profiles, active profile, test mode + manual weights mode, start/end (+ labels), route results, inspector.
-- **Env:** frontend needs **`REACT_APP_MAPBOX_TOKEN`** (public `pk.…` only, URL-restricted) for the Mapbox GL basemap. No Supabase secrets in CRA. Backend `.env` holds `SUPABASE_*`, `MAPBOX_API_KEY` (Search proxy), TfL/TomTom/ORS, and Mapbox quota caps (`MAPBOX_SEARCH_SESSION_LIMIT`, `MAPBOX_MAP_LOAD_LIMIT`).
-- **Mapbox billing guard:** Flask tracks monthly usage in `4_backend_engine/mapbox_usage.json` (UTC month; survives restarts). Search sessions (unique `session_token`) hard-cut at **450**/mo (free **500**); map loads (client `POST /mapbox/map_load` before Map init) hard-cut at **45 000**/mo (free **50 000**). Over-limit → **429**. `GET /mapbox/quota` for status. Seed first file with `MAPBOX_SEARCH_SESSIONS_USED` / `MAPBOX_MAP_LOADS_USED` to align with the Mapbox dashboard.
-- Theming: light/dark from Night Mode toggle (`light_weight` in profile affects routing cost, not theme).
+**Two UIs share one CRA app:**
+
+| UI | Entry | Role |
+|----|-------|------|
+| **v2 (default for product work)** | `npm start -- --v2` or `REACT_APP_UI_VERSION=v2` → `src/v2/App.jsx` | Customer-facing shell — zones, island, mode rail, sidebar |
+| **Legacy** | `npm start` → `src/App.js` | Test Mode, segment inspector, old overlay FAB |
+
+Shared infrastructure (both UIs): `src/map/` (Mapbox GL), `src/auth/`, `src/api/flaskClient.js`, `src/wizard/` steps, `src/components/santander/SantanderStationsLayer.jsx`, geocode helpers.
+
+#### 2.4.1 v2 shell (Jul 2026 remodel)
+
+- **Layout:** five floating solid zones over a full-bleed map — **no** full-width top bar. See [`design/BRIEF.md`](design/BRIEF.md) + protocol [`development_protocols/V2_FRONTEND_REMODEL.md`](development_protocols/V2_FRONTEND_REMODEL.md).
+  - **Top-left Routing Core** (`shell/zones/RoutingCoreZone.jsx`): Mode · Bike · Santander row, waypoints (≤3 vias), Depart at, Get Route.
+  - **Top-center Alert Pill** (`alerts/useAlertPill.js`): ephemeral priority queue (errors, Santander guide, bike coerce, sticky hire confirms).
+  - **Top-right Profile pill** → **slide-out sidebar** (`ProfileSidebar`): auth, profile CRUD/wizard, favourites C1–C3, appearance, units. Mobile: avatar moves into Routing Core; sidebar goes near-fullscreen.
+  - **Bottom-center Dynamic Island**: collapsed metrics → expanded Beeline-like sheet (elevation, mode donuts/bars, extreme weather, multi-leg latch, Santander hire cards).
+  - **Bottom-right:** overlay **mode rail** (SVG path-morph capsule↔T) + zoom / locate / north. Traffic always-on (not a rail slot).
+- **Map:** Mapbox GL via `react-map-gl` (`src/map/CycleMap.jsx` + `v2/map/PlanningMap.jsx`). **Standard** style + night `lightPreset` (not deprecated standalone dark style). Beeline-cased routes (pink `#FF0061` + white casing; grey shortest; dashed walk). Quota gate `POST /mapbox/map_load` before init.
+- **Overlays (v2):** one mode at a time — Cycleways (default) · Attractions · Surface · Hills · Light (night only). Typed connected runs from `/route` (`*_typed`); hover chips; VF > TfL. Legacy free FAB / `GET /overlay_catalog` not used.
+- **State:** monolithic in `v2/App.jsx` — waypoints, profiles, session `bike_type`, Santander hire steps, depart, prefetch/commit, `routeRevealed`, overlay mode, island expand, `routeHover` bridge. Client prefs (appearance / units / favourite order) in `SidebarContext` **localStorage** — not Flask profile rows.
+- **Auth:** same `AuthProvider` + Flask `/auth/*`. Auth UI embeds in sidebar (`AuthPanel`); password recovery modal at root. **Test Mode UI is out of v2** (legacy only).
+- **Theming:** appearance `light | dark | system | auto` (`resolveAppearance.js`); auto uses `GET /night_status`. Profile `light_weight` still affects **routing cost**, not UI theme.
+- **Units:** metric / imperial frontend formatting (`v2/units.js`).
+- **Weather:** `GET /weather` (Open-Meteo proxy). Extreme warnings only steal island layout / mobile weather control. QA: `python app.py --weather-test`.
+- **Motion / icons:** `motion` (`motion/react`), `lucide-react`, Meteocons for weather. Tailwind 3 optional utilities (`src/v2/**`, preflight off).
+- **Parity tracker:** [`design/FUNCTIONALITY_CHECKLIST.md`](design/FUNCTIONALITY_CHECKLIST.md).
+
+#### 2.4.2 Legacy UI (still shipped)
+
+- Top bar + ProfileMenu + Test Mode + manual weights; left route points panel; bottom-left condensed stats; bottom-right Layers FAB; right-click segment inspector.
+- Map day/night may still use classic style paths in older code paths — prefer v2 Standard + lightPreset for product work.
+- Test mode: `X-Tuned-Test-Mode: 1` when allowed (localhost + `ALLOW_TEST_MODE=1`).
+
+#### 2.4.3 Env & Mapbox billing (both UIs)
+
+- Frontend: **`REACT_APP_MAPBOX_TOKEN`** (public `pk.…`, URL-restricted). No Supabase secrets in CRA.
+- Backend `.env`: `SUPABASE_*`, `MAPBOX_API_KEY` (Search proxy), TfL/TomTom/ORS, Mapbox quota caps.
+- **Mapbox billing guard:** `4_backend_engine/mapbox_usage.json` (UTC month). Search sessions hard-cut **450**/mo; map loads **45 000**/mo. Over-limit → **429**. `GET /mapbox/quota`. Seed with `MAPBOX_SEARCH_SESSIONS_USED` / `MAPBOX_MAP_LOADS_USED` to match dashboard.
 
 ### 2.5 Auth + profile storage (Supabase)
 
@@ -127,30 +154,40 @@ The main app (**Tuned Cycling**) is the production cycling route planner for Lon
 
 ### 3.5 Display
 
-- **Two routes:** Fastest (grey) and optimized (red light / cyan dark) — always shown after **Get Route**. Multi-leg: full path drawn; inactive legs dimmed while swiping analysis.
-- **Stats panel** (bottom-left): hero Time + Distance rows; condensed table of secondary metrics with optimized value and Δ vs fastest. Multi-leg: pager shows one leg at a time (`Leg N/M · Start → Via 1`).
-- **Route overlays:** user-selected via bottom-right **Layers** picker (edge polylines + point markers along optimized path). Backend returns all overlay chunks on every `/route`; `node_highlights` uses `overlay_mode=True` (full path features). Visibility is client-side only.
-- **Header:** “Tuned Cycling” + status line with timing and active profile name.
+- **Two routes:** Fastest (grey, Beeline casing) and optimized/tuned (fuchsia `#FF0061` + white casing) — shown after **Get Route**. Multi-leg: full path drawn; inactive legs dimmed; click inactive leg to switch analysis.
+- **v2 Dynamic Island** (bottom-center): collapsed time/distance + microcharts; expand → elevation profile, mode donuts/bars, extreme weather slot, leg latch, Santander walk+cycle heroes. Deltas labeled **vs shortest**.
+- **v2 overlay mode rail** (bottom-right): Cycleways (default on reveal) · Attractions · Surface · Hills · Light (night). Traffic always-on (Tiger Orange). Typed connected runs + hover chips. Display-only.
+- **Legacy:** bottom-left condensed stats table + Layers FAB (`GET /overlay_catalog`) — still in `App.js` only.
+- Brand / status: v2 uses zone chrome (no legacy top-bar status strip); optional status hints still partial (see checklist R-18).
 
 ### 3.5a Santander Cycles hire mode
 
-- Toggle in the **Route points** panel (independent of riding profile). **Incompatible with via stops** for now (cleared when the other is enabled). **TODO:** vias on the hire bike leg.
-- **Get Route** enters guided pickup → dropoff selection with map pins (mockup: compact `bikes | docks`, expanded regular/electric/empty + walk estimate); bike A* runs station→station; walk legs are dashed grey polylines (ORS via backend). Soft-fail 1.5 km / 3 suitable — see §4.2.
+- Toggle in the **Routing Core** (v2) or Route points panel (legacy). **Incompatible with via stops** and **Depart-at** for now. **TODO:** vias on the hire bike leg (checklist S-11).
+- **Get Route** enters guided pickup → dropoff selection with map pins; bike A* runs station→station; walk legs dashed with primary casing (ORS via backend). Soft-fail 1.5 km / 3 suitable — see §4.2.
+- **v2 chrome:** guide / soft banners / unsuitable confirm via **alert pill**; hire cards + walk stats in expanded island.
+
 ### 3.5b Leave now / Depart at
 
-- Control under **Get Route** in Route points ([`DepartAtControl.jsx`](../5_frontend/src/components/DepartAtControl.jsx)): Leave now (default) or Depart at (next 7 London weekdays, 15-min steps).
-- Sends `GET /route?depart_at=…` when Depart at is selected. Future (&gt;30 min): parks @ that time; live traffic off — banner “Live traffic not applied for future departures.” See §3.3.
+- Control under waypoints in Routing Core ([`v2/routing/DepartAtControl.jsx`](../5_frontend/src/v2/routing/DepartAtControl.jsx); legacy twin under Route points): Leave now (default) or Depart at (next 7 London weekdays, 15-min steps).
+- Sends `GET /route?depart_at=…` when Depart at is selected. Future (&gt;30 min): parks @ that time; live traffic off — **alert pill** “Live traffic not applied for future departures.” See §3.3.
+
+### 3.5c Route weather (v2)
+
+- Flask `GET /weather?lat&lon&at?` proxies Open-Meteo (`weather_proxy.py`); ~12 min cache by rounded location + hour.
+- Frontend resolves extreme conditions (`resolveExtreme.js`); only extremes reshape the expanded island metrics quarter (desktop) or show `WeatherControlZone` (mobile).
+- QA: `python app.py --weather-test` — synthetic extremes rotate each UTC minute (`startup.md`).
 
 ### 3.6 Segment inspector
 
-- **Right-click** on map → request to `GET /inspect?lat=…&lon=…` → backend returns nearest edge’s tags + geometry.
-- **Inspector window** (offset from click so segment stays visible): core tags (name, surface, maxspeed, grade, length, elevation_start, elevation_end); when edge is affected by a live disruption (TfL or TomTom), also shows `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` (and for TomTom: `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay`); “Show All Tags” expands to full edge attributes.
-- **Red polyline** overlay on the inspected segment; left-click elsewhere or close button dismisses.
+- **Legacy only:** right-click → `GET /inspect` → popup + red segment overlay.
+- **Out of v2** — replaced by overlay hover chips + alerts. Do not port without an explicit product decision.
 
-### 3.7 Daylight and theme
+### 3.7 Daylight, appearance, and theme
 
-- On load, frontend calls sunrise-sunset API (London); if current time is before sunrise or after sunset, Night Mode is turned on automatically and status set to “Night detected. Dark Mode ON.”
-- Dark theme: dark background, light text, inverted map tiles, cyan optimized route, yellow lit segments, green steep segments, blue/teal TfL and green overlays.
+- **v2 appearance prefs:** light / dark / system / **auto** (London sunrise/sunset via `GET /night_status`). Force via `npm start -- --day|--night` → `REACT_APP_FORCE_MODE`.
+- Map follows effective theme through Mapbox Standard **lightPreset** (`MapLightPreset.jsx`).
+- Profile `light_weight` / night illumination still gates **routing** and can auto-select the Light overlay mode when dark outside — separate from UI appearance unless appearance=`auto`.
+- Legacy Night Mode toggle behaviour remains in `App.js` only.
 
 ---
 
@@ -162,7 +199,11 @@ The main app (**Tuned Cycling**) is the production cycling route planner for Lon
 | GET | `/profiles/<profile_id>` | optional `Authorization` | `{ id, name, weights, ... }` or 404; custom profiles require ownership |
 | POST | `/profiles` | `Authorization` required (or test mode); JSON `{ name, weights, bike_type, preset, toggles }` — other fields dropped | profile (201), 400 invalid, 401 guest |
 | GET | `/route` | `start_lat`, `start_lon`, `end_lat`, `end_lon`, optional **`vias`** (`lat,lon;…` max 3), optional **`purpose`** (`commit`\|`prefetch`, default `commit`), **`profile_id`** *or* explicit weight params; optional **`depart_at`** (ISO-8601 London) | See below — `legs[]` + aggregated `fastest`/`safest`; commit → 429 if IP over 5/min |
-| GET | `/overlay_catalog` | — | `{ version, edge: [...], point: [...] }` — route overlay picker metadata |
+| GET | `/overlay_catalog` | — | `{ version, edge: [...], point: [...] }` — **legacy** Layers FAB only (not used by v2 mode rail) |
+| GET | `/night_status` | — | London day/night / sunrise-sunset payload for appearance + light overlay gating |
+| GET | `/weather` | `lat`, `lon`, optional `at` (ISO) | Open-Meteo proxy: temp, WMO code, wind, UV, etc. Test mode: synthetic extremes (`--weather-test`) |
+| GET | `/mapbox/quota` | — | Mapbox monthly usage / limits |
+| POST | `/mapbox/map_load` | — | Reserve one map-load unit before Mapbox GL init (429 if over cap) |
 | POST | `/admin/update_tfl` | (none) | `{ ok, message, count }` — fetch TfL Road Disruptions, rebuild master lookup |
 | POST | `/admin/update_tomtom` | (none) | `{ ok, message, count }` — fetch TomTom Traffic Incidents, rebuild master lookup |
 | GET | `/admin/tfl_status` | — | `{ loaded, edge_count, disruption_count, last_update, error }` — TfL live data status |
@@ -202,7 +243,8 @@ Independent of riding profiles. Module: [`4_backend_engine/santander_live.py`](.
 
 - **Stats** (per route): `length_m`, `accidents`, `duration_min`, `illumination_pct`, `rough_pct`, `elevation_gain`, `steep_count`, `tfl_cycleway_pct`, `tfl_quietway_pct`, `speed_stress_km`, **`speed_stress_pct`**, `narrow_km`, `green_km`, `barrier_count`, `give_way_count`, `stop_sign_count` (edge-based), `calming_count` (according to `calming_source`), `signal_count`, `junction_count`, `disruption_count`.
 - **Elevation profile** (Dynamic Island): `safest.elevation_profile` is a list of `{ d_m, elev_m }` samples along the optimized path (distance from start in metres, node elevation), downsampled to ≤120 points keeping first/last. Present per leg and merged at top level with per-leg distance offsets.
-- **Paths / geometry:** arrays of `[lat, lon]` (WGS84). Chunk arrays are lists of segment geometries for the optimized route only. **node_highlights** is a list of `{ lat, lon, type, details }` where `type` is `barrier`, `signal`, `junction`, `junction_danger`, or `calming` and `details` holds e.g. `{ barrier: "gate" }`, `{ traffic_calming: "hump", source: "way" }` or `"point"`, `{ degree: 5 }`. Calming highlights use the chosen `calming_source`; point-based calming uses stored `traffic_calming_point_lat/lon`. **Inspector:** when an edge is affected by a live disruption, tags include `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` (and for TomTom: `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay`). Routing uses the merged live lookup (Section 4.1) for the “Live TfL Disruptions” weight.
+- **v2 typed overlays:** on each safest (and per-leg safest), `build_v2_overlay_bundle` adds connected-run arrays: `green_typed`, `cycle_typed`, `surface_typed`, `hill_typed`, `light_typed`, `disruption_typed` — each feature `{ path, kind, length_m, run_id, … }` after `_collapse_edge_runs` (path-adjacent merge). Traffic (`disruption_typed`) is always drawn in v2; other modes are selected via the mode rail.
+- **Paths / geometry:** arrays of `[lat, lon]` (WGS84). Legacy chunk arrays still returned for the old FAB. **node_highlights** is a list of `{ lat, lon, type, details }` where `type` is `barrier`, `signal`, `junction`, `junction_danger`, or `calming` and `details` holds e.g. `{ barrier: "gate" }`, `{ traffic_calming: "hump", source: "way" }` or `"point"`, `{ degree: 5 }`. Calming highlights use the chosen `calming_source`; point-based calming uses stored `traffic_calming_point_lat/lon`. **Inspector (legacy):** when an edge is affected by a live disruption, tags include `tfl_live_category`, `tfl_live_severity`, `tfl_live_description` (and for TomTom: `tfl_live_iconCategory`, `tfl_live_magnitudeOfDelay`). Routing uses the merged live lookup (Section 4.1) for the live-disruption weight.
 
 ---
 
@@ -335,14 +377,20 @@ Route stats (`calculate_path_stats`) use the same masks for accidents, speed str
 | `4_backend_engine/supabase/migrations/001_profiles.sql` | Supabase `profiles` table + RLS policies |
 | `4_backend_engine/test_profile_store.py` | Tenancy, sanitization, and test-mode gate tests |
 | `6_verification/migrate_profiles_to_supabase.py` | Seeds system presets into Supabase |
-| `5_frontend/src/auth/` | `supabaseClient`, `AuthProvider` (isLoading), `AuthModal`, `auth.css` |
+| `5_frontend/src/auth/` | `AuthProvider`, `AuthPanel` (v2 sidebar), `AuthModal` (legacy), recovery, `auth.css` |
 | `5_frontend/src/api/flaskClient.js` | `apiFetch` — fresh JWT per request, test-mode header, 401 handling |
-| `5_frontend/src/components/` | `TopBar`, `ProfileMenu`, `TestModePanel`, `RoutePointsPanel`, `LegAnalysisPager` |
+| `5_frontend/src/map/` | Shared Mapbox GL: `CycleMap`, Beeline `RouteLayers`, markers, fly-to, light preset |
+| `5_frontend/src/v2/` | **Customer UI** — `App.jsx`, shell zones, island, routing chrome, overlays, sidebar (see `v2/README.md`) |
+| `5_frontend/src/components/` | Legacy: `TopBar`, `ProfileMenu`, `TestModePanel`, `RoutePointsPanel`, `LegAnalysisPager`; shared Santander layer |
 | `4_backend_engine/tfl_live.py` | Shared TfL live disruption module (STRtree, API fetch, spatial matching, lookup table) |
-| `5_frontend/src/App.js` | Map, profile selector, Test Mode, route display, inspector, stats, API calls |
-| `5_frontend/src/index.js` | React root |
+| `4_backend_engine/weather_proxy.py` | Open-Meteo proxy + weather-test extremes for `/weather` |
+| `4_backend_engine/mapbox_usage.py` | Monthly Mapbox search/map-load hard-cuts |
+| `5_frontend/src/App.js` | Legacy UI: Test Mode, inspector, old overlay FAB |
+| `5_frontend/src/index.js` | React root — switches legacy vs v2 via `REACT_APP_UI_VERSION` |
 | `5_frontend/public/index.html` | HTML shell |
-| `4_backend_engine/app.py` | Flask app, graph load, cost functions, `/route` (multi-leg vias), `/inspect` |
+| `4_backend_engine/app.py` | Flask app, graph load, cost functions, `/route` (typed overlays + elevation), `/weather`, `/inspect` |
+| `0_documentation/development_protocols/V2_FRONTEND_REMODEL.md` | v2 remodel protocol (locked decisions + agent workflow) |
+| `0_documentation/design/WORKING_NOTES_JUL2026.md` | Chronological remodel working notes |
 | `4_backend_engine/route_vias.py` | Parse `vias=` param, concatenate paths, aggregate multi-leg stats |
 | `4_backend_engine/auth_rate_limit.py` | Auth/geocode/route-commit IP budgets + login lockout |
 | `4_backend_engine/cost_masks.py` | Vehicular-free and steps penalty masks |
@@ -363,6 +411,6 @@ Route stats (`calculate_path_stats`) use the same masks for accidents, speed str
 - **New feature or toggle:** Update Section 3 (Features) and, if the API changes, Section 4 (API).
 - **New endpoint or request params:** Update Section 4 and Section 2.2 (data flow).
 - **Change of port, graph path, or stack:** Update Section 2.
-- **New UI panel or major refactor:** Update Section 3 and Section 5.
+- **v2 UI change:** Update §2.4, tick [`design/FUNCTIONALITY_CHECKLIST.md`](design/FUNCTIONALITY_CHECKLIST.md), append [`design/WORKING_NOTES_JUL2026.md`](design/WORKING_NOTES_JUL2026.md), and update locked decisions in [`development_protocols/V2_FRONTEND_REMODEL.md`](development_protocols/V2_FRONTEND_REMODEL.md) when a product decision changes.
 
-A reminder to update this file is in the top comment of `5_frontend/src/App.js` and at the top of `4_backend_engine/app.py`.
+A reminder to update this file is in the top comment of `5_frontend/src/App.js` / `src/v2/App.jsx` and at the top of `4_backend_engine/app.py`.

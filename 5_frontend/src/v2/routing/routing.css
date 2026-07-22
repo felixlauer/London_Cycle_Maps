@@ -53,7 +53,7 @@
   height: 34px;
   padding: 0 9px;
   box-sizing: border-box;
-  border: none;
+  border: 1px solid var(--rc-line);
   border-radius: 10px;
   background: var(--rc-surface);
   color: var(--rc-text);
@@ -64,12 +64,14 @@
   transition: background-color 150ms var(--rc-ease-out), transform 160ms var(--rc-ease-out);
 }
 
-.rc-pill:hover {
-  background: var(--rc-surface-hover);
-}
-
 .rc-pill:active {
   transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rc-pill:hover {
+    background: var(--rc-surface-hover);
+  }
 }
 
 .rc-pill.is-open {
@@ -471,6 +473,7 @@
   align-items: center;
   justify-content: center;
   gap: 0;
+  width: 100%;
   height: 42px;
   border: none;
   border-radius: 10px;
@@ -535,8 +538,10 @@
   transform: none;
 }
 
-.rc-get-route:hover:not(:disabled):not(.is-disabled) {
-  filter: brightness(1.06);
+@media (hover: hover) and (pointer: fine) {
+  .rc-get-route:hover:not(:disabled):not(.is-disabled) {
+    filter: brightness(1.06);
+  }
 }
 
 .rc-get-route:active:not(:disabled):not(.is-disabled):not(.is-busy) {
@@ -690,5 +695,327 @@
   .rc-get-route__dot {
     animation: none;
     opacity: 1;
+  }
+}
+
+/* ---------- Mobile routing chrome (< md) ---------- */
+
+.rc-toprow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rc-toprow .rc-quick {
+  flex: 1;
+  min-width: 0;
+}
+
+.rc-mobile-avatar {
+  display: none;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+  margin: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--rc-line);
+  border-radius: 999px;
+  background: var(--shell-bg, #fff);
+  box-shadow: var(--shell-shadow, 0 4px 24px rgba(0, 0, 0, 0.06));
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  color: inherit;
+}
+
+.rc-mobile-avatar__face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  box-sizing: border-box;
+  padding: 0 2px;
+  background: linear-gradient(135deg, #ff0061, #ff4d8f);
+  color: #fff;
+}
+
+.rc-mobile-avatar__face.is-guest {
+  background: linear-gradient(135deg, #7768ae, #9b8fc9);
+}
+
+.rc-mobile-avatar__face.is-loading {
+  background: #e4e4e7;
+  animation: profile-pill-pulse 1.2s ease-in-out infinite;
+}
+
+.rc-mobile-avatar__face .profile-pill__initials {
+  font-size: 11.5px;
+}
+
+.rc-mobile-avatar__face .profile-pill__initials.is-guest-label {
+  font-size: 7.5px;
+}
+
+.rc-route-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rc-route-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.rc-wp-with-pill {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rc-wp-with-pill__fields {
+  flex: 1;
+  min-width: 0;
+}
+
+.rc-wp-with-pill__side {
+  display: none;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+.rc-route-row__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rc-route-row__side {
+  display: none;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+.rc-route-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  min-height: 40px;
+  height: 100%;
+  border: none;
+  border-radius: 12px;
+  background: var(--rc-accent);
+  color: #fff;
+  cursor: pointer;
+  padding: 6px 0;
+  box-sizing: border-box;
+  transition: transform 160ms var(--rc-ease-out), filter 150ms var(--rc-ease-out);
+}
+
+.rc-route-pill:active:not(.is-disabled):not(.is-busy) {
+  transform: scale(0.97);
+}
+
+.rc-route-pill.is-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rc-route-pill__icons {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.rc-route-pill__diamond {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  opacity: 0.92;
+  width: 24px;
+  height: 24px;
+}
+
+.rc-route-pill__arrow {
+  position: relative;
+  z-index: 1;
+  color: var(--rc-accent);
+  width: 13px;
+  height: 13px;
+}
+
+.rc-route-pill__icons.is-pulse {
+  animation: rc-route-pill-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes rc-route-pill-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.rc-wp-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: var(--rc-text-sub);
+}
+
+.rc-wp-collapse__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 28px;
+}
+
+.rc-wp-collapse__lines span {
+  display: block;
+  height: 1px;
+  background: var(--rc-line);
+}
+
+.rc-wp-collapse__label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Collapsed vias — same start/end card, compact rows + centered solid pill */
+.rc-wpcard--vias-hidden {
+  position: relative;
+}
+
+.rc-wpcard--vias-hidden .rc-wp-row {
+  height: 36px;
+}
+
+.rc-wpcard--vias-hidden .rc-wp-input input {
+  height: 36px;
+  line-height: 36px;
+}
+
+.rc-wpcard--vias-hidden .rc-wp-grip {
+  height: 36px;
+}
+
+.rc-wp-hidden-pill {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 5px 14px;
+  border: 1px solid var(--rc-line);
+  border-radius: 999px;
+  background: var(--shell-bg, #ffffff);
+  box-shadow: 0 2px 10px rgba(16, 24, 40, 0.1);
+  color: var(--rc-text);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  max-width: calc(100% - 48px);
+  opacity: 1;
+}
+
+.map-shell[data-theme='dark'] .rc-wp-hidden-pill {
+  background: var(--shell-bg);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+@media (max-width: 767px) {
+  .rc-panel {
+    width: 100%;
+    max-width: none;
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .rc-quick {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 7px;
+  }
+
+  .rc-pill {
+    height: 34px;
+    padding: 0 9px;
+    gap: 6px;
+    font-size: 12.5px;
+  }
+
+  .rc-pill__label {
+    font-size: 12.5px;
+  }
+
+  .rc-pill--santander {
+    width: 100%;
+    min-width: 0;
+    padding: 0 9px;
+  }
+
+  .rc-pill--santander .rc-pill__label {
+    max-width: none;
+  }
+
+  .rc-mobile-avatar {
+    display: inline-flex;
+  }
+
+  .rc-wp-with-pill__side {
+    display: flex;
+  }
+
+  .rc-get-route-desktop {
+    display: none;
+  }
+
+  .rc-waypoints {
+    min-width: 0;
+  }
+}
+
+@media (min-width: 768px) {
+  .rc-mobile-avatar {
+    display: none !important;
+  }
+
+  .rc-wp-with-pill__side {
+    display: none !important;
+  }
+
+  .rc-get-route-desktop {
+    display: block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rc-route-pill__icons.is-pulse {
+    animation: none;
   }
 }

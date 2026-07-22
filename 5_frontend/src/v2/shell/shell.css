@@ -46,7 +46,7 @@
 .map-shell .mapboxgl-ctrl-bottom-right {
   bottom: 0;
   right: var(--shell-sidebar-w);
-  transition: right 320ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: right 480ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .map-shell .mapboxgl-ctrl-bottom-left {
@@ -74,11 +74,13 @@
   overflow: visible;
 }
 
-/* Top-center — alert pill (viewport-centered; ignores sidebar overlay) */
+/* Top-center — alert pill (viewport-centered via left/right + auto margins) */
 .shell-zone--alert {
   top: var(--shell-inset);
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-left: auto;
+  margin-right: auto;
   width: min(420px, calc(100vw - var(--shell-inset) * 2 - 400px));
   min-height: 40px;
   border-radius: 999px;
@@ -99,12 +101,25 @@
   box-sizing: border-box;
   overflow: hidden;
   /* No spring bounce — ease-out only; width driven by sidebar inset var */
-  transition: width 320ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: width 480ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .shell-zone--profile.is-sidebar-open {
   width: calc(var(--shell-sidebar-w) - (var(--shell-inset) * 2));
   max-width: calc(100vw - var(--shell-inset) * 2);
+}
+
+.profile-pill__chrome {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-pill__close-x {
+  display: none;
 }
 
 /* Wizard is fullscreen, but the account pill keeps the expanded-sidebar size */
@@ -154,8 +169,10 @@
   color: #fff;
 }
 
-.profile-pill__slot--avatar:hover {
-  filter: brightness(1.06);
+@media (hover: hover) and (pointer: fine) {
+  .profile-pill__slot--avatar:hover {
+    filter: brightness(1.06);
+  }
 }
 
 .profile-pill__slot--avatar.is-signed-in {
@@ -241,16 +258,20 @@
   line-height: 1.2;
 }
 
-.profile-pill__auth-link:hover {
-  color: #18181b;
+@media (hover: hover) and (pointer: fine) {
+  .profile-pill__auth-link:hover {
+    color: #18181b;
+  }
 }
 
 .map-shell[data-theme='dark'] .profile-pill__auth-link {
   color: #a1a1aa;
 }
 
-.map-shell[data-theme='dark'] .profile-pill__auth-link:hover {
-  color: #f4f4f5;
+@media (hover: hover) and (pointer: fine) {
+  .map-shell[data-theme='dark'] .profile-pill__auth-link:hover {
+    color: #f4f4f5;
+  }
 }
 
 .profile-pill__logo {
@@ -276,7 +297,7 @@
 }
 
 .map-shell.is-island-multi:not(.is-island-expanded) {
-  --shell-island-h: 122px;
+  --shell-island-h: 108px;
 }
 
 .shell-zone--island {
@@ -286,7 +307,10 @@
   width: min(560px, calc(100vw - var(--shell-sidebar-w) - var(--shell-inset) * 2));
   height: var(--shell-island-h);
   border-radius: 999px;
-  overflow: hidden;
+  overflow: visible;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   transition:
     width 360ms cubic-bezier(0.23, 1, 0.32, 1),
     height 360ms cubic-bezier(0.23, 1, 0.32, 1),
@@ -295,7 +319,18 @@
   animation: island-spawn 260ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-/* Expanded: full width; bottom clearance ~40% more than side inset */
+.shell-zone--island .island-body {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  background: var(--shell-bg);
+  border: 1px solid var(--shell-border);
+  box-shadow: var(--shell-shadow);
+  pointer-events: auto;
+}
+
+/* Expanded: full width; bottom clearance for Mapbox attribution */
 .map-shell.is-island-expanded .shell-zone--island {
   bottom: calc(var(--shell-inset) * 1.4);
   width: calc(100vw - var(--shell-sidebar-w) - var(--shell-inset) * 2);
@@ -322,6 +357,218 @@
   .shell-zone--alert {
     width: calc(100vw - var(--shell-inset) * 2 - 128px);
     top: calc(var(--shell-inset) + 56px);
+  }
+}
+
+/* Mobile layout (< md): full-width routing, hide profile pill, alert under panel */
+@media (max-width: 767px) {
+  .map-shell {
+    --shell-inset: 12px;
+    /* Collapsed lower on screen */
+    --shell-island-bottom: calc(var(--shell-inset) * 3.5);
+  }
+
+  .map-shell.is-island-expanded {
+    /* ~20% shorter than desktop 300px */
+    --shell-island-h: 240px;
+  }
+
+  .shell-zone--routing {
+    width: calc(100vw - var(--shell-inset) * 2);
+    max-width: none;
+    right: var(--shell-inset);
+  }
+
+  .shell-zone--profile {
+    display: none !important;
+  }
+
+  .map-shell.is-sidebar-open .shell-zone--profile {
+    display: flex !important;
+    top: var(--shell-inset);
+    left: var(--shell-inset);
+    right: var(--shell-inset);
+    width: auto;
+    max-width: none;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 2px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    height: 56px;
+    z-index: 45;
+    margin: 0;
+    overflow: visible;
+  }
+
+  .map-shell.is-sidebar-open .shell-zone--profile.is-sidebar-open {
+    width: auto;
+    max-width: none;
+  }
+
+  .map-shell.is-sidebar-open .shell-zone--profile .profile-pill__close-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: #71717a;
+    cursor: pointer;
+  }
+
+  .map-shell[data-theme='dark'].is-sidebar-open .shell-zone--profile .profile-pill__close-x {
+    color: #a1a1aa;
+  }
+
+  .map-shell.is-sidebar-open .shell-zone--profile .profile-pill__chrome {
+    flex: 1;
+    min-width: 0;
+    height: 56px;
+    padding: 5px;
+    box-sizing: border-box;
+    background: var(--shell-bg);
+    border: 1px solid var(--shell-border);
+    border-radius: 999px;
+    box-shadow: var(--shell-shadow);
+  }
+
+  .map-shell.is-sidebar-open .shell-zone--profile .profile-pill__main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .map-shell.is-sidebar-open .shell-zone--profile .profile-pill__slot--logo {
+    margin-left: auto;
+  }
+
+  .shell-zone--alert {
+    left: 0;
+    right: 0;
+    top: var(--alert-mobile-top, calc(var(--shell-inset) + 180px));
+    width: auto;
+    max-width: min(420px, calc(100vw - var(--shell-inset) * 2 - 80px));
+  }
+
+  .shell-zone--island {
+    width: 80vw;
+    left: 50%;
+  }
+
+  .map-shell.is-island-expanded .shell-zone--island {
+    width: calc(100vw - var(--shell-inset) * 2);
+    /* Lift so Mapbox attribution stays visible */
+    bottom: calc(var(--shell-inset) * 3.2);
+  }
+
+  /* Align controls flush with routing panel right edge */
+  .map-ctl {
+    right: var(--shell-inset);
+    align-items: flex-end;
+  }
+
+  /* Only pack controls horizontally when overlay collides with expanded island */
+  .map-shell.is-ctl-colliding .map-ctl {
+    flex-direction: row-reverse;
+    align-items: flex-end;
+    gap: 6px;
+  }
+}
+
+/* Weather control — mobile only */
+.weather-ctl {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .weather-ctl {
+    --wc-ease: cubic-bezier(0.23, 1, 0.32, 1);
+    position: absolute;
+    left: var(--shell-inset);
+    top: var(--wc-mobile-top, 200px);
+    z-index: 12;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    pointer-events: auto;
+  }
+
+  .weather-ctl__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--shell-border);
+    border-radius: 14px;
+    background: var(--shell-bg);
+    box-shadow: var(--shell-shadow);
+    cursor: default;
+    padding: 0;
+    transition:
+      border-color 200ms var(--wc-ease),
+      transform 160ms var(--wc-ease);
+  }
+
+  .weather-ctl.is-accent .weather-ctl__btn {
+    border-color: var(--shell-brand, #ff0061);
+    border-width: 2px;
+    cursor: pointer;
+  }
+
+  .weather-ctl.is-pulse .weather-ctl__btn {
+    animation: weather-ctl-pulse 700ms var(--wc-ease);
+  }
+
+  .weather-ctl__btn:active {
+    transform: scale(0.94);
+  }
+
+  .weather-ctl__btn:disabled {
+    cursor: default;
+  }
+
+  .weather-ctl__icon {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    display: block;
+  }
+
+  .weather-ctl__panel {
+    margin-top: 8px;
+    width: min(260px, calc(100vw - var(--shell-inset) * 2 - 56px));
+    padding: 12px;
+    border-radius: 14px;
+    background: var(--shell-bg);
+    border: 2px solid var(--shell-brand, #ff0061);
+    box-shadow: var(--shell-shadow);
+  }
+
+  .weather-ctl__panel .island-weather__hero {
+    width: 72px;
+    height: 72px;
+  }
+
+  .weather-ctl__panel .island-weather__title {
+    font-size: 16px;
+  }
+}
+
+@keyframes weather-ctl-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--shell-brand, #ff0061) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--shell-brand, #ff0061) 22%, transparent);
   }
 }
 

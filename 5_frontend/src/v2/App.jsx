@@ -25,6 +25,7 @@ import {
 } from './map/overlayModes';
 import { profileWantsLight } from './island/resolveIslandSlots';
 import { pickInactiveLegIndex } from '../map/RouteLayers';
+import './tailwind.css';
 import './alerts/alertPill.css';
 import './shell/shell.css';
 
@@ -976,6 +977,18 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           overlayMode,
           isDark: isDarkOutside,
           onSelectOverlayMode: handleSelectOverlayMode,
+        }}
+        weatherControlProps={{
+          visible: Boolean(routeRevealed && safestData),
+          startCoord: start || null,
+          departAtIso: departMode === 'depart_at' ? departAtIso : null,
+          santander: Boolean(santanderMode),
+          onExtremeDetected: (warning) => {
+            pushAlert({
+              type: 'warning',
+              message: `Extreme weather detected: ${warning.title}`,
+            });
+          },
         }}
       />
       {passwordRecoveryPending && <PasswordRecoveryModal themeMode={themeMode} />}
