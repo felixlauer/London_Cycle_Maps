@@ -6,6 +6,7 @@ import { themeForMode } from './theme';
 import MapApiBridge from './MapApiBridge';
 import UserLocationMarker from './UserLocationMarker';
 import V2OverlayLayers from './V2OverlayLayers';
+import NonTunedRouteHint from './NonTunedRouteHint';
 
 const noop = () => {};
 
@@ -23,6 +24,7 @@ export default function PlanningMap({
   routeLegs = null,
   activeLegIndex = 0,
   fastestPath = null,
+  fastestStats = null,
   safestPath = null,
   safestData = null,
   walkStartPath = null,
@@ -56,6 +58,20 @@ export default function PlanningMap({
     }
     return safestData;
   }, [routeLegs, activeLegIndex, safestData]);
+
+  const activeFastestPath = useMemo(() => {
+    if (routeLegs && routeLegs.length > 1) {
+      return routeLegs[activeLegIndex]?.fastest?.path || fastestPath;
+    }
+    return fastestPath;
+  }, [routeLegs, activeLegIndex, fastestPath]);
+
+  const activeFastestStats = useMemo(() => {
+    if (routeLegs && routeLegs.length > 1) {
+      return routeLegs[activeLegIndex]?.fastest?.stats || fastestStats;
+    }
+    return fastestStats;
+  }, [routeLegs, activeLegIndex, fastestStats]);
 
   return (
     <CycleMap
@@ -95,6 +111,16 @@ export default function PlanningMap({
           units={units}
           externalHover={routeHover?.source === 'island' ? routeHover : null}
           onHoverChange={onRouteHoverChange}
+        />
+      )}
+      {routeRevealed && (
+        <NonTunedRouteHint
+          path={activeFastestPath}
+          stats={activeFastestStats}
+          units={units}
+          routeLegs={routeLegs}
+          activeLegIndex={activeLegIndex}
+          enabled={routeRevealed}
         />
       )}
       {hireStep === 'dropoff' && pickupStation && (

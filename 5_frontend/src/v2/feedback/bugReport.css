@@ -1,0 +1,212 @@
+/* Bug report overlay — matches auth modal language, all breakpoints. */
+
+.bug-report-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  background: rgba(16, 24, 40, 0.4);
+  animation: bug-report-fade 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes bug-report-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.bug-report-modal {
+  --br-bg: #ffffff;
+  --br-bg-soft: #f4f4f5;
+  --br-text: #1c1c1e;
+  --br-text-sub: #71717a;
+  --br-border: #e5e7eb;
+  --br-accent: #ff0061;
+  --br-error: #b42318;
+  --br-ok: #166534;
+
+  width: min(440px, 100%);
+  max-height: min(90dvh, 640px);
+  overflow: auto;
+  border-radius: 16px;
+  border: 1px solid var(--br-border);
+  background: var(--br-bg);
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.2);
+  color: var(--br-text);
+  padding: 18px 20px 20px;
+  box-sizing: border-box;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  animation: bug-report-pop 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.bug-report-modal[data-theme='dark'] {
+  --br-bg: #1c1c1e;
+  --br-bg-soft: #2c2c2e;
+  --br-text: #f4f4f5;
+  --br-text-sub: #a1a1aa;
+  --br-border: #3a3a3c;
+  --br-error: #f97066;
+  --br-ok: #75e0b3;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+@keyframes bug-report-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.bug-report-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.bug-report-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.bug-report-modal__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--br-text-sub);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .bug-report-modal__close:hover {
+    background: var(--br-bg-soft);
+    color: var(--br-text);
+  }
+}
+
+.bug-report-modal__hint {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--br-text-sub);
+}
+
+.bug-report-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bug-report-modal__label {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--br-text-sub);
+}
+
+.bug-report-modal__textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  box-sizing: border-box;
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--br-border);
+  background: var(--br-bg-soft);
+  color: var(--br-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.bug-report-modal__textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--br-accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.bug-report-modal__textarea:disabled {
+  opacity: 0.7;
+}
+
+.bug-report-modal__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  font-weight: 550;
+  color: var(--br-text-sub);
+}
+
+.bug-report-modal__meta .is-warn {
+  color: var(--br-error);
+}
+
+.bug-report-modal__error {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--br-error);
+}
+
+.bug-report-modal__success {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--br-ok);
+}
+
+.bug-report-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bug-report-modal__btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--br-border);
+  background: var(--br-bg-soft);
+  color: var(--br-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.bug-report-modal__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bug-report-modal__btn--primary {
+  background: var(--br-accent);
+  border-color: var(--br-accent);
+  color: #ffffff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .bug-report-modal__btn--primary:hover:not(:disabled) {
+    filter: brightness(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bug-report-overlay,
+  .bug-report-modal {
+    animation: none;
+  }
+}

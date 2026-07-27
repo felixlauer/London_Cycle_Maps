@@ -46,7 +46,7 @@ export default function PasswordRecoveryModal({ themeMode }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
-              minLength={6}
+              minLength={10}
               required
             />
           </label>
@@ -58,7 +58,7 @@ export default function PasswordRecoveryModal({ themeMode }) {
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               autoComplete="new-password"
-              minLength={6}
+              minLength={10}
               required
             />
           </label>

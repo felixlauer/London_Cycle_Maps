@@ -37,6 +37,11 @@ export function buildTutorialSteps({ isMobile }) {
     : '[data-zone="profile"] .profile-pill__chrome';
 
   const islandEl = () => q('[data-zone="dynamic-island"]');
+  /** Collapsed = pill (CSS 999px); expanded = 20px sheet — never force capsule. */
+  const islandTarget = () => {
+    const island = islandEl();
+    return island ? desc(island, { ring: true }) : null;
+  };
   const overlayEl = () => q('[data-zone="map-controls"] .overlay-pill');
 
   const steps = [
@@ -106,7 +111,8 @@ export function buildTutorialSteps({ isMobile }) {
       platform: 'all',
       title: 'Start and destination',
       body: "Set where you're starting and where you're headed. Search an address or drop a pin on the map - both work for either field.",
-      placement: 'bottom',
+      // Mobile: keep the tip low so Mapbox suggestions stay tappable above it.
+      placement: isMobile ? 'screen-bottom' : 'bottom',
       /** Dim is visual-only so map clicks still register (map is full-bleed under chrome). */
       mapInteract: true,
       targets: () => {
@@ -164,9 +170,8 @@ export function buildTutorialSteps({ isMobile }) {
       placement: 'top',
       targets: () => {
         const out = [];
-        const island = islandEl();
-        if (island) out.push(desc(island, { ring: true }));
-        // Route bbox hole added in controller when routeBoundsAlongside is set
+        const island = islandTarget();
+        if (island) out.push(island);
         return out;
       },
       routeBoundsAlongside: true,
@@ -177,13 +182,14 @@ export function buildTutorialSteps({ isMobile }) {
       platform: 'all',
       title: 'Map overlays',
       body: 'Switch the map overlay to Attractions. Watch the map, this selector and the panel below update together.',
-      placement: 'left',
+      // Keep tip off the right-side overlay rail on phones.
+      placement: isMobile ? 'screen-bottom' : 'left',
       targets: () => {
         const out = [];
         const overlay = overlayEl();
-        const island = islandEl();
+        const island = islandTarget();
         if (overlay) out.push(desc(overlay, { ring: true, capsule: true }));
-        if (island) out.push(desc(island, { ring: true }));
+        if (island) out.push(island);
         return out;
       },
       routeBoundsAlongside: true,
@@ -203,8 +209,8 @@ export function buildTutorialSteps({ isMobile }) {
       targets: () => {
         const out = [];
         const overlay = overlayEl();
-        const island = islandEl();
-        if (island) out.push(desc(island, { ring: true }));
+        const island = islandTarget();
+        if (island) out.push(island);
         if (overlay) out.push(desc(overlay, { ring: true, capsule: true }));
         return out;
       },
@@ -223,9 +229,9 @@ export function buildTutorialSteps({ isMobile }) {
       placement: 'top',
       targets: () => {
         const out = [];
-        const island = islandEl();
+        const island = islandTarget();
         const overlay = overlayEl();
-        if (island) out.push(desc(island, { ring: true }));
+        if (island) out.push(island);
         if (overlay) out.push(desc(overlay, { ring: true, capsule: true }));
         return out;
       },
@@ -244,9 +250,9 @@ export function buildTutorialSteps({ isMobile }) {
       placement: 'top',
       targets: () => {
         const out = [];
-        const island = islandEl();
+        const island = islandTarget();
         const overlay = overlayEl();
-        if (island) out.push(desc(island, { ring: true }));
+        if (island) out.push(island);
         if (overlay) out.push(desc(overlay, { ring: true, capsule: true }));
         return out;
       },
@@ -264,9 +270,9 @@ export function buildTutorialSteps({ isMobile }) {
       placement: 'top',
       targets: () => {
         const out = [];
-        const island = islandEl();
+        const island = islandTarget();
         const overlay = overlayEl();
-        if (island) out.push(desc(island, { ring: true }));
+        if (island) out.push(island);
         if (overlay) out.push(desc(overlay, { ring: true, capsule: true }));
         return out;
       },
@@ -282,7 +288,7 @@ export function buildTutorialSteps({ isMobile }) {
       title: 'Your space',
       body: 'Open your profile to reach your space.',
       placement: isMobile ? 'bottom' : 'left',
-      targets: () => el(spaceSel),
+      targets: () => el(spaceSel).map((n) => desc(n, { ring: true, capsule: true })),
       advance: {
         type: 'auto',
         when: (s) => Boolean(s.sidebarOpen),
@@ -292,10 +298,30 @@ export function buildTutorialSteps({ isMobile }) {
       id: 'sidebar-overview',
       platform: 'all',
       title: 'Profiles and settings',
-      body: 'This is where you manage profiles, adjust account and system settings, and you can always replay this tour from the bottom of the panel.',
+      body: 'This is where you manage profiles and adjust account and system settings.',
       placement: 'left',
       targets: () => el('.profile-sidebar.is-open'),
-      advance: { type: 'button', finish: true },
+      advance: { type: 'button' },
+    },
+    {
+      id: 'sidebar-help',
+      platform: 'all',
+      title: 'Help when you need it',
+      body: 'Replay this tour anytime from Revisit tutorial, or tap Report a bug if something feels off — bug reports are greatly appreciated and help us improve TUNE.',
+      placement: 'left',
+      targets: () => {
+        const links = q('[data-tutorial="sidebar-help-links"]');
+        return links ? [desc(links, { ring: true })] : el('.profile-sidebar.is-open');
+      },
+      onEnter: () => {
+        try {
+          q('[data-tutorial="sidebar-help-links"]')
+            ?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+        } catch {
+          /* ignore */
+        }
+      },
+      advance: { type: 'button', finish: true, finishLabel: 'Finish tutorial' },
     },
   ];
 

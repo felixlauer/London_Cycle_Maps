@@ -239,19 +239,64 @@ class TranslationLayerTest(unittest.TestCase):
 
 
 class RouteTimeEstimateTest(unittest.TestCase):
-    def test_fast_multiplier(self):
+    def test_fast_multiplier_phase_a_only(self):
+        import os
         from route_time_estimate import (
             FAST_PRESET_DURATION_SPEED_MULTIPLIER,
             cruise_duration_min,
             duration_speed_multiplier_for_preset,
         )
 
-        self.assertEqual(duration_speed_multiplier_for_preset("fast"), 1.35)
-        self.assertEqual(duration_speed_multiplier_for_preset("safe"), 1.0)
-        base = cruise_duration_min(6000.0, 15.0, 1.0)
-        fast = cruise_duration_min(6000.0, 15.0, FAST_PRESET_DURATION_SPEED_MULTIPLIER)
-        self.assertLess(fast, base)
-        self.assertAlmostEqual(fast, base / 1.35, places=4)
+        prev = os.environ.get("ROUTE_TIME_MODEL")
+        os.environ["ROUTE_TIME_MODEL"] = "phase_a"
+        try:
+            self.assertEqual(duration_speed_multiplier_for_preset("fast"), 1.35)
+            self.assertEqual(duration_speed_multiplier_for_preset("safe"), 1.0)
+            base = cruise_duration_min(6000.0, 15.0, 1.0)
+            fast = cruise_duration_min(6000.0, 15.0, FAST_PRESET_DURATION_SPEED_MULTIPLIER)
+            self.assertLess(fast, base)
+            self.assertAlmostEqual(fast, base / 1.35, places=4)
+        finally:
+            if prev is None:
+                os.environ.pop("ROUTE_TIME_MODEL", None)
+            else:
+                os.environ["ROUTE_TIME_MODEL"] = prev
+
+    def test_phase_b_default_disables_fast_multiplier(self):
+        import os
+        from route_time_estimate import duration_speed_multiplier_for_preset, route_time_model
+
+        prev = os.environ.pop("ROUTE_TIME_MODEL", None)
+        try:
+            self.assertEqual(route_time_model(), "penalties")
+            self.assertEqual(duration_speed_multiplier_for_preset("fast"), 1.0)
+        finally:
+            if prev is not None:
+                os.environ["ROUTE_TIME_MODEL"] = prev
+
+    def test_miotti_climb_and_jafari_vf(self):
+        from route_time_estimate import (
+            climb_seconds_per_metre_for_bike,
+            cruise_duration_min,
+            cruise_duration_min_with_vf,
+            estimate_duration_min_phase_b,
+        )
+
+        self.assertEqual(climb_seconds_per_metre_for_bike("standard"), 2.58)
+        self.assertEqual(climb_seconds_per_metre_for_bike("ebike"), 1.54)
+        flat = cruise_duration_min(10000.0, 20.36, 1.0)
+        # All separated: +7.51% → shorter cruise
+        sep = cruise_duration_min_with_vf(
+            10000.0, 20.36, {"core": 10000.0}
+        )
+        self.assertLess(sep, flat)
+        self.assertAlmostEqual(sep, flat / 1.0751, places=3)
+        # Climb adds Miotti seconds
+        no_climb = estimate_duration_min_phase_b(1000.0, 16.0, elevation_gain=0.0)
+        with_climb = estimate_duration_min_phase_b(
+            1000.0, 16.0, elevation_gain=60.0, bike_type="standard"
+        )
+        self.assertAlmostEqual(with_climb - no_climb, 60.0 * 2.58 / 60.0, places=3)
 
 
 class RewardLerpTest(unittest.TestCase):

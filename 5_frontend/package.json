@@ -21,6 +21,7 @@
   "scripts": {
     "start": "node start.js",
     "build": "react-scripts build",
+    "build:prod": "node build-prod.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -34,7 +35,11 @@
     "production": [
       ">0.2%",
       "not dead",
-      "not op_mini all"
+      "not op_mini all",
+      "not ie <= 11",
+      "not chrome < 90",
+      "not safari < 14",
+      "not firefox < 90"
     ],
     "development": [
       "last 1 chrome version",

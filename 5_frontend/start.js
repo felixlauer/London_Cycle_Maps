@@ -8,7 +8,22 @@
  * the API client uses window.location.hostname (LAN IP) instead of 127.0.0.1.
  * Plain `npm start` behaves exactly as before (legacy UI, auto day/night).
  */
+const fs = require('fs');
+const path = require('path');
 const { spawn } = require('child_process');
+
+// Ensure Mapbox CSP worker is available at /mapbox-gl-csp-worker.js in dev.
+const workerSrc = path.join(
+  __dirname,
+  'node_modules',
+  'mapbox-gl',
+  'dist',
+  'mapbox-gl-csp-worker.js'
+);
+const workerDest = path.join(__dirname, 'public', 'mapbox-gl-csp-worker.js');
+if (fs.existsSync(workerSrc)) {
+  fs.copyFileSync(workerSrc, workerDest);
+}
 
 const args = process.argv.slice(2);
 const env = { ...process.env };

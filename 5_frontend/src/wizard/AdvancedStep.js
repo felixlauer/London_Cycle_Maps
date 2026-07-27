@@ -2,22 +2,40 @@ import React, { useMemo, useState } from 'react';
 import AnchoredSlider from './AnchoredSlider';
 import BudgetBar from './BudgetBar';
 import { totalMinutes, activeConflictWarnings } from './budget';
+import {
+  FAST_SLIDER_NOTES,
+  FAST_SLIDER_QUESTIONS,
+  sliderSaveMinutes,
+  totalDistanceCostMinutes,
+  totalSaveMinutes,
+} from './fastSavings';
 
 /**
- * Collapsible advanced tuning: master detour budget + per-weight anchored
- * sliders prefilled from the chosen preset. Slider minute costs fill the
- * budget bar (linear-sum "Estimated detour" - see budget.js).
+ * Collapsible advanced tuning: master budget + per-weight anchored sliders.
+ * Safe/Leisure: detour budget. Fast + `timeSavingFraming` (v2): time-saving goal.
  */
 export default function AdvancedStep({
   config, bikeType, preset, weights, onWeightChange, budget, onBudgetChange,
+  timeSavingFraming = false,
 }) {
   const [open, setOpen] = useState(false);
   const sliders = config.sliders || {};
   const exemplary = config.exemplary_route || {};
   const bikeRules = config.bike_types?.[bikeType]?.rules || {};
   const hillDisabled = !!bikeRules.hill_weight_epsilon;
+  const savingsMode = timeSavingFraming && preset === 'fast';
 
-  const used = totalMinutes(sliders, weights, bikeType);
+  const used = useMemo(() => {
+    if (savingsMode) {
+      return totalSaveMinutes(sliders, weights, { hillDisabled });
+    }
+    return totalMinutes(sliders, weights, bikeType);
+  }, [savingsMode, sliders, weights, bikeType, hillDisabled]);
+
+  const distanceNoteMin = useMemo(() => {
+    if (!savingsMode) return null;
+    return totalDistanceCostMinutes(sliders, weights, bikeType);
+  }, [savingsMode, sliders, weights, bikeType]);
 
   const warningsByWeight = useMemo(() => {
     const active = activeConflictWarnings(config.conflict_warnings?.[preset], weights);
@@ -34,8 +52,9 @@ export default function AdvancedStep({
   return (
     <>
       <p className="wiz-intro">
-        Happy with the preset? You can skip this step. Otherwise, set a detour
-        budget and tune each preference.
+        {savingsMode
+          ? 'Happy with the preset? You can skip this step. Otherwise, set a time-saving goal and tune how hard Fast should hunt.'
+          : 'Happy with the preset? You can skip this step. Otherwise, set a detour budget and tune each preference.'}
       </p>
 
       <button type="button" className="wiz-collapse-toggle" onClick={() => setOpen((v) => !v)}>
@@ -54,10 +73,16 @@ export default function AdvancedStep({
 
           <div className="wiz-budget-sticky">
             <div className="wiz-panel" style={{ marginBottom: 0 }}>
-              <div className="wiz-panel-title">Detour budget</div>
+              <div className="wiz-panel-title">
+                {savingsMode ? 'Time-saving goal' : 'Detour budget'}
+              </div>
               <div className="wiz-slider" style={{ marginBottom: 8 }}>
                 <div className="wiz-slider-head">
-                  <span className="wiz-slider-label">How many extra minutes are OK overall?</span>
+                  <span className="wiz-slider-label">
+                    {savingsMode
+                      ? 'How much time should we try to save on a typical ride?'
+                      : 'How many extra minutes are OK overall?'}
+                  </span>
                   <span className="wiz-slider-cost">{budget} min</span>
                 </div>
                 <input
@@ -67,10 +92,15 @@ export default function AdvancedStep({
                   step="1"
                   value={budget}
                   onChange={(e) => onBudgetChange(parseInt(e.target.value, 10))}
-                  aria-label="Detour budget"
+                  aria-label={savingsMode ? 'Time-saving goal' : 'Detour budget'}
                 />
               </div>
-              <BudgetBar used={used} budget={budget} />
+              <BudgetBar
+                used={used}
+                budget={budget}
+                mode={savingsMode ? 'savings' : 'detour'}
+                distanceNoteMin={distanceNoteMin}
+              />
             </div>
           </div>
 
@@ -99,6 +129,10 @@ export default function AdvancedStep({
                   onChange={onWeightChange}
                   bikeType={bikeType}
                   warning={warningsByWeight[key]}
+                  mode={savingsMode ? 'savings' : 'detour'}
+                  saveMinutes={savingsMode ? sliderSaveMinutes(cfg, weights[key] ?? 0) : null}
+                  questionOverride={savingsMode ? (FAST_SLIDER_QUESTIONS[key] || null) : null}
+                  note={savingsMode ? (FAST_SLIDER_NOTES[key] || null) : null}
                 />
               );
             })}

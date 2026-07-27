@@ -156,7 +156,7 @@ export default function AccountManageSection({
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 autoComplete="new-password"
-                minLength={6}
+                minLength={10}
                 required
               />
             </label>
@@ -167,7 +167,7 @@ export default function AccountManageSection({
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
-                minLength={6}
+                minLength={10}
                 required
               />
             </label>

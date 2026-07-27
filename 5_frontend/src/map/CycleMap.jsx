@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Map, { NavigationControl, MapProvider } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import mapboxLib from './setupMapboxWorker';
 import { API_BASE } from '../api/flaskClient';
 import {
   MAPBOX_TOKEN,
@@ -115,6 +116,7 @@ export default function CycleMap({
         {gate === 'ok' && (
           <Map
             id="main"
+            mapLib={mapboxLib}
             mapboxAccessToken={MAPBOX_TOKEN}
             mapStyle={MAP_STYLE}
             config={initialBasemapConfig}

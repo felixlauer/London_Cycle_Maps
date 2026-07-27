@@ -141,6 +141,39 @@ def require_auth(fn):
     return wrapper
 
 
+def require_admin(fn):
+    """Gate mutating /admin/* routes.
+
+    - If ADMIN_API_KEY is set: require matching X-Admin-Key header (constant-time).
+    - If unset (local default): allow only from localhost remote_addr.
+
+    Read-only /admin/*_status GETs stay public for legacy UI.
+    """
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        import hmac
+
+        expected = (os.environ.get("ADMIN_API_KEY") or "").strip()
+        provided = (request.headers.get("X-Admin-Key") or "").strip()
+        if expected:
+            key_ok = (
+                bool(provided)
+                and len(provided) == len(expected)
+                and hmac.compare_digest(provided, expected)
+            )
+            if not key_ok:
+                return jsonify({"error": "admin key required"}), 403
+            return fn(*args, **kwargs)
+        if request.remote_addr not in _LOCALHOST_ADDRS:
+            return jsonify({
+                "error": "admin updates require ADMIN_API_KEY or localhost",
+            }), 403
+        return fn(*args, **kwargs)
+
+    return wrapper
+
+
 def assert_profile_access(profile: dict | None):
     """(error_response, status) or (None, None) for a fetched profile.
 

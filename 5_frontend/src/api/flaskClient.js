@@ -15,11 +15,22 @@ import {
   isAccessTokenExpired,
 } from '../auth/sessionStore';
 
-/** Default: loopback. With `npm start -- --mobile`, use the page hostname (LAN IP). */
-export const API_BASE =
-  process.env.REACT_APP_MOBILE_DEBUG === '1' && typeof window !== 'undefined'
-    ? `http://${window.location.hostname}:5000`
-    : 'http://127.0.0.1:5000';
+/**
+ * Resolve Flask API origin.
+ * - REACT_APP_API_BASE set (e.g. `/api` in prod behind nginx) → use it
+ * - else `npm start -- --mobile` → `http://<page-hostname>:5000`
+ * - else local default → `http://127.0.0.1:5000`
+ */
+function resolveApiBase() {
+  const fromEnv = (process.env.REACT_APP_API_BASE || '').trim().replace(/\/$/, '');
+  if (fromEnv) return fromEnv;
+  if (process.env.REACT_APP_MOBILE_DEBUG === '1' && typeof window !== 'undefined') {
+    return `http://${window.location.hostname}:5000`;
+  }
+  return 'http://127.0.0.1:5000';
+}
+
+export const API_BASE = resolveApiBase();
 
 const unauthorizedListeners = new Set();
 let refreshInFlight = null;

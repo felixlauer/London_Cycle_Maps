@@ -8,14 +8,15 @@ Artifacts (next to the final graph):
     park_oh_exprs.json
     floors.json
     csr.npz             # CSR arrays + idx_to_node (n,2)
-    nodes.npz           # car counts, dangerous flags, cluster-suppressed (CSR order)
-    edges.npz           # edge_u/edge_v (n,2) endpoints aligned with table rows
+    nodes.npz           # car counts, dangerous flags, cluster-suppressed, signal_cluster_id
+    edges.npz           # edge_u/edge_v + signal_entry/exit (+ lat/lon for debug)
     geom_offsets.npy    # int64 offsets (mmap-friendly)
     geom_flat.npy       # float32 (n_pts, 2) lat/lon
     geom_wkb.npz        # offsets + uint8 blob (Shapely WKB for STRtree)
 
 Bump CACHE_FORMAT_VERSION or FORMULA_ID when on-disk layout or cost logic changes.
 Kill-switch: ROUTING_CACHE=0|false|off → ignore cache and rebuild at startup.
+Signal clusters: SIGNAL_CLUSTERS=0 → legacy per-node signal cost (skip entry marks).
 """
 from __future__ import annotations
 
@@ -32,10 +33,11 @@ import numpy as np
 
 log = logging.getLogger("routing_cache")
 
-# Bump when npz/json/npy layout or apply semantics change (v2: lazy geom store, .npy).
-CACHE_FORMAT_VERSION = 2
-# Bump when edge-cost / junction / heuristic-floor formulas change (invalidates cache).
-FORMULA_ID = "2026-07-13-v1"
+# Bump when npz/json/npy layout or apply semantics change (v2: lazy geom store, .npy;
+# v3: signal_cluster_id + signal_entry/exit edge stamps).
+CACHE_FORMAT_VERSION = 3
+# Bump when edge-cost / junction / heuristic-floor / signal-cluster formulas change.
+FORMULA_ID = "2026-07-27-signal-cluster-postmerge-v5.1"
 
 TABLE_ARRAY_NAMES = (
     "length",
@@ -72,8 +74,15 @@ class RoutingCacheBundle:
     car_physical_road_count: np.ndarray
     is_dangerous_junction: np.ndarray
     cluster_suppressed: np.ndarray
+    signal_cluster_id: np.ndarray  # int32, CSR node order (0 = none)
     edge_u: np.ndarray
     edge_v: np.ndarray
+    signal_entry: np.ndarray  # uint8, edge-table order
+    signal_exit: np.ndarray  # uint8, edge-table order
+    signal_entry_lat: np.ndarray  # float64, NaN if none
+    signal_entry_lon: np.ndarray
+    signal_exit_lat: np.ndarray
+    signal_exit_lon: np.ndarray
     geom_offsets: np.ndarray
     geom_flat: np.ndarray  # float32 (n_pts, 2) lat,lon
     wkb_offsets: np.ndarray
@@ -200,6 +209,7 @@ def save_routing_cache(
     car_count = np.empty(n_nodes, dtype=np.int16)
     dangerous = np.empty(n_nodes, dtype=np.uint8)
     suppressed = np.zeros(n_nodes, dtype=np.uint8)
+    signal_cluster_id = np.zeros(n_nodes, dtype=np.int32)
     idx_to_node = np.empty((n_nodes, 2), dtype=np.float64)
     for i, nid in enumerate(csr.idx_to_node):
         idx_to_node[i] = _node_to_xy(nid)
@@ -208,6 +218,30 @@ def save_routing_cache(
         dangerous[i] = 1 if nd.get("is_dangerous_junction") else 0
         if nid in junction_suppressed:
             suppressed[i] = 1
+        signal_cluster_id[i] = int(nd.get("signal_cluster_id") or 0)
+
+    # --- signal entry/exit in edge-table order ---
+    signal_entry = np.zeros(n_edges, dtype=np.uint8)
+    signal_exit = np.zeros(n_edges, dtype=np.uint8)
+    signal_entry_lat = np.full(n_edges, np.nan, dtype=np.float64)
+    signal_entry_lon = np.full(n_edges, np.nan, dtype=np.float64)
+    signal_exit_lat = np.full(n_edges, np.nan, dtype=np.float64)
+    signal_exit_lon = np.full(n_edges, np.nan, dtype=np.float64)
+    for i, (_u, _v, d) in enumerate(edge_by_eid):
+        if d.get("signal_entry") in (True, 1, "1", "yes", "true"):
+            signal_entry[i] = 1
+            try:
+                signal_entry_lat[i] = float(d["signal_entry_lat"])
+                signal_entry_lon[i] = float(d["signal_entry_lon"])
+            except (KeyError, TypeError, ValueError):
+                pass
+        if d.get("signal_exit") in (True, 1, "1", "yes", "true"):
+            signal_exit[i] = 1
+            try:
+                signal_exit_lat[i] = float(d["signal_exit_lat"])
+                signal_exit_lon[i] = float(d["signal_exit_lon"])
+            except (KeyError, TypeError, ValueError):
+                pass
 
     # --- tables ---
     tables_dict = {name: np.asarray(getattr(tables, name)) for name in TABLE_ARRAY_NAMES}
@@ -292,8 +326,19 @@ def save_routing_cache(
         car_physical_road_count=car_count,
         is_dangerous_junction=dangerous,
         cluster_suppressed=suppressed,
+        signal_cluster_id=signal_cluster_id,
     )
-    np.savez(cache_dir / "edges.npz", edge_u=edge_u, edge_v=edge_v)
+    np.savez(
+        cache_dir / "edges.npz",
+        edge_u=edge_u,
+        edge_v=edge_v,
+        signal_entry=signal_entry,
+        signal_exit=signal_exit,
+        signal_entry_lat=signal_entry_lat,
+        signal_entry_lon=signal_entry_lon,
+        signal_exit_lat=signal_exit_lat,
+        signal_exit_lon=signal_exit_lon,
+    )
     # Standalone .npy for mmap-friendly lazy geom store (not .npz).
     np.save(cache_dir / "geom_offsets.npy", offsets)
     np.save(cache_dir / "geom_flat.npy", geom_flat)
@@ -390,8 +435,15 @@ def load_routing_cache(cache_dir: Path, *, mmap_geom: bool = True) -> RoutingCac
         car_physical_road_count=nodes["car_physical_road_count"],
         is_dangerous_junction=nodes["is_dangerous_junction"],
         cluster_suppressed=nodes["cluster_suppressed"],
+        signal_cluster_id=nodes["signal_cluster_id"],
         edge_u=edges["edge_u"],
         edge_v=edges["edge_v"],
+        signal_entry=edges["signal_entry"],
+        signal_exit=edges["signal_exit"],
+        signal_entry_lat=edges["signal_entry_lat"],
+        signal_entry_lon=edges["signal_entry_lon"],
+        signal_exit_lat=edges["signal_exit_lat"],
+        signal_exit_lon=edges["signal_exit_lon"],
         geom_offsets=geom_offsets,
         geom_flat=geom_flat,
         wkb_offsets=wkb["offsets"],
@@ -488,10 +540,15 @@ def apply_bundle_to_graph(G, bundle: RoutingCacheBundle) -> frozenset:
         nd = G.nodes[nid]
         nd["car_physical_road_count"] = int(bundle.car_physical_road_count[i])
         nd["is_dangerous_junction"] = bool(bundle.is_dangerous_junction[i])
+        cid = int(bundle.signal_cluster_id[i])
+        if cid > 0:
+            nd["signal_cluster_id"] = cid
+        else:
+            nd.pop("signal_cluster_id", None)
         if bundle.cluster_suppressed[i]:
             suppressed.add(nid)
 
-    # Edge stamps via endpoint map (order-independent) — _eid/_vf only
+    # Edge stamps via endpoint map (order-independent) — _eid/_vf + signal entry/exit
     eid_map = {}
     for i in range(n_edges):
         u = _xy_to_node(bundle.edge_u[i])
@@ -506,18 +563,51 @@ def apply_bundle_to_graph(G, bundle: RoutingCacheBundle) -> frozenset:
             raise KeyError(f"edge {u!r}->{v!r} missing from routing cache")
         d["_eid"] = int(i)
         d["_vf"] = int(vf[i])
+        # Clear then restore signal marks from cache
+        d.pop("signal_entry", None)
+        d.pop("signal_exit", None)
+        d.pop("signal_cluster_id", None)
+        d.pop("signal_entry_lat", None)
+        d.pop("signal_entry_lon", None)
+        d.pop("signal_exit_lat", None)
+        d.pop("signal_exit_lon", None)
+        if bundle.signal_entry[i]:
+            d["signal_entry"] = True
+            if not np.isnan(bundle.signal_entry_lat[i]):
+                d["signal_entry_lat"] = float(bundle.signal_entry_lat[i])
+                d["signal_entry_lon"] = float(bundle.signal_entry_lon[i])
+        if bundle.signal_exit[i]:
+            d["signal_exit"] = True
+            if not np.isnan(bundle.signal_exit_lat[i]):
+                d["signal_exit_lat"] = float(bundle.signal_exit_lat[i])
+                d["signal_exit_lon"] = float(bundle.signal_exit_lon[i])
+        # cluster id on entry or exit edge
+        if bundle.signal_entry[i] or bundle.signal_exit[i]:
+            # Prefer destination cluster for entry; source for exit-only
+            cid_v = int(bundle.signal_cluster_id[csr.node_to_idx[v]]) if v in csr.node_to_idx else 0
+            cid_u = int(bundle.signal_cluster_id[csr.node_to_idx[u]]) if u in csr.node_to_idx else 0
+            if bundle.signal_entry[i] and cid_v > 0:
+                d["signal_cluster_id"] = cid_v
+            elif cid_u > 0:
+                d["signal_cluster_id"] = cid_u
         stamped += 1
     if stamped != n_edges:
         raise ValueError(f"stamped {stamped} edges but cache has {n_edges}")
 
     install_geom_store(bundle.geom_offsets, bundle.geom_flat)
 
+    n_entry = int(np.count_nonzero(bundle.signal_entry))
+    n_exit = int(np.count_nonzero(bundle.signal_exit))
+    n_sig_nodes = int(np.count_nonzero(bundle.signal_cluster_id > 0))
     log.info(
-        "routing_cache: applied stamps (_eid/_vf) to %d nodes / %d edges in %.2fs "
-        "(geom via EdgeGeomStore, no per-edge _coords)",
+        "routing_cache: applied stamps (_eid/_vf/signal) to %d nodes / %d edges in %.2fs "
+        "(signal nodes=%d entry=%d exit=%d; geom via EdgeGeomStore)",
         csr.n_nodes,
         n_edges,
         time.perf_counter() - t0,
+        n_sig_nodes,
+        n_entry,
+        n_exit,
     )
     return frozenset(suppressed)
 

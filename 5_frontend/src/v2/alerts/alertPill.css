@@ -5,15 +5,14 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  left: 0;
-  right: 0;
+  /* left/right come from .shell-zone--alert (--alert-pad-*) */
   margin-left: auto;
   margin-right: auto;
   min-height: 0 !important;
   height: auto;
   padding: 0;
   width: max-content !important;
-  max-width: min(520px, calc(100vw - var(--shell-inset) * 2 - 360px));
+  max-width: 100%;
   border: none;
   box-shadow: none;
   background: transparent;
@@ -138,10 +137,6 @@
 }
 
 @media (max-width: 767px) {
-  .shell-zone--alert.alert-pill {
-    max-width: min(420px, calc(100vw - var(--shell-inset) * 2 - 80px));
-  }
-
   .shell-zone--alert.alert-pill.is-visible {
     transform: translateY(0) scale(1);
   }

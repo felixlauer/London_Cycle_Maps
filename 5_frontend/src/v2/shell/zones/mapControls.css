@@ -40,6 +40,18 @@
   pointer-events: auto;
 }
 
+/* Overlay rail (and its expanding label) paints above zoom / locate / north */
+.map-ctl .overlay-pill {
+  position: relative;
+  z-index: 2;
+}
+
+.map-ctl__zoom,
+.map-ctl__nav {
+  position: relative;
+  z-index: 1;
+}
+
 .map-ctl__north {
   display: flex;
   flex-direction: column;

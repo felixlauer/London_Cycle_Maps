@@ -74,14 +74,15 @@
   overflow: visible;
 }
 
-/* Top-center — alert pill (viewport-centered via left/right + auto margins) */
+/* Top-center — alert pill; side pads measured from chrome in MapShell */
 .shell-zone--alert {
   top: var(--shell-inset);
-  left: 0;
-  right: 0;
+  left: var(--alert-pad-left, var(--shell-inset));
+  right: var(--alert-pad-right, var(--shell-inset));
   margin-left: auto;
   margin-right: auto;
-  width: min(420px, calc(100vw - var(--shell-inset) * 2 - 400px));
+  width: auto;
+  max-width: 100%;
   min-height: 40px;
   border-radius: 999px;
 }
@@ -355,7 +356,10 @@
   }
 
   .shell-zone--alert {
-    width: calc(100vw - var(--shell-inset) * 2 - 128px);
+    left: var(--alert-pad-left, var(--shell-inset));
+    right: var(--alert-pad-right, var(--shell-inset));
+    width: auto;
+    max-width: 100%;
     top: calc(var(--shell-inset) + 56px);
   }
 }
@@ -450,11 +454,11 @@
   }
 
   .shell-zone--alert {
-    left: 0;
-    right: 0;
+    left: var(--alert-pad-left, var(--shell-inset));
+    right: var(--alert-pad-right, var(--shell-inset));
     top: var(--alert-mobile-top, calc(var(--shell-inset) + 180px));
     width: auto;
-    max-width: min(420px, calc(100vw - var(--shell-inset) * 2 - 80px));
+    max-width: 100%;
   }
 
   .shell-zone--island {
@@ -475,15 +479,22 @@
   }
 
   /*
-   * Expanded island: always pack locate/north beside the overlay rail.
-   * Top-align so the shorter nav stack lines up with the top of the pill
-   * (not the bottom). Avoid overlap-detection — packing shortens the stack
-   * and cleared the hit test, which flickered the layout every frame.
+   * Expanded island + tight vertical room only: pack locate/north beside
+   * the overlay (class set from MapControlsZone). Otherwise keep the usual
+   * stacked layout. Overlay stays left so its label arm opens into the map.
    */
-  .map-shell.is-island-expanded .map-ctl {
-    flex-direction: row-reverse;
+  .map-ctl.is-ctl-packed {
+    flex-direction: row;
     align-items: flex-start;
     gap: 6px;
+  }
+
+  .map-ctl.is-ctl-packed .overlay-pill {
+    z-index: 2;
+  }
+
+  .map-ctl.is-ctl-packed .map-ctl__nav {
+    z-index: 1;
   }
 }
 

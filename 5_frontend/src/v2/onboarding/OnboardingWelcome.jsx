@@ -33,7 +33,7 @@ export default function OnboardingWelcome() {
           </button>
           <p className="onb-flat__alt">
             <button type="button" className="onb-text-link" onClick={chooseSignIn}>
-              Sign in
+              Log in
             </button>
             {' or '}
             <button type="button" className="onb-text-link" onClick={chooseGuest}>

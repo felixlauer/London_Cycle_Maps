@@ -11,6 +11,7 @@ import { resolveExtremeWarning } from './weather/resolveExtreme';
 import { modeChunksFor } from './modeData';
 import { buildSlices } from './routeGeometry';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { useOnboarding } from '../onboarding/OnboardingContext';
 import {
   formatDurationParts,
   formatDistanceParts,
@@ -76,6 +77,7 @@ export default function ExpandedIsland({
   onPageChange,
 }) {
   const isMobile = useIsMobile();
+  const { phase: onboardingPhase } = useOnboarding();
   const [sheetHover, setSheetHover] = useState(null);
   const [page, setPage] = useState(PAGE_CHART);
   const [dragX, setDragX] = useState(0);
@@ -97,7 +99,10 @@ export default function ExpandedIsland({
     ? formatWalkParts(walkStats?.duration_min, walkStats?.distance_m, units)
     : null;
 
-  const weatherEnabled = !isMobile && !santander && Boolean(startCoord);
+  const weatherEnabled = !isMobile
+    && onboardingPhase !== 'tutorial'
+    && !santander
+    && Boolean(startCoord);
   const { data: weather, ready: weatherReady } = useRouteWeather({
     lat: startCoord?.[0],
     lon: startCoord?.[1],
@@ -154,10 +159,10 @@ export default function ExpandedIsland({
     return kept;
   }, [safest, barModes, index]);
 
-  const showExtremeSlot = !isMobile && Boolean(extremeWarning);
+  const showExtremeSlot = !isMobile
+    && onboardingPhase !== 'tutorial'
+    && Boolean(extremeWarning);
   const metricsStacked = santander || showExtremeSlot;
-  const deltaCompare = isMobile ? 'non-tuned' : 'non-optimised';
-
   const metricsBlock = (
     <div className={`island-expanded__metrics${metricsStacked ? ' is-stacked' : ''}`}>
       <div className="island-expanded__metric-block">
@@ -165,7 +170,7 @@ export default function ExpandedIsland({
         <MetricCell
           ariaLabel="Trip time"
           parts={formatDurationParts(sStats.duration_min)}
-          delta={formatTimeDelta(sStats.duration_min, fStats.duration_min, { compare: deltaCompare })}
+          delta={formatTimeDelta(sStats.duration_min, fStats.duration_min)}
           twoLineDelta={!isMobile}
         />
       </div>
@@ -174,7 +179,7 @@ export default function ExpandedIsland({
         <MetricCell
           ariaLabel="Trip distance"
           parts={formatDistanceParts(sStats.length_m, units)}
-          delta={formatDistanceDelta(sStats.length_m, fStats.length_m, units, { compare: deltaCompare })}
+          delta={formatDistanceDelta(sStats.length_m, fStats.length_m, units)}
           twoLineDelta={!isMobile}
         />
       </div>

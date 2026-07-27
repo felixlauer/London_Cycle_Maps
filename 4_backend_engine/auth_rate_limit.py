@@ -54,6 +54,24 @@ GEOCODE_IP_MAX = 60
 ROUTE_COMMIT_IP_WINDOW_S = 60
 ROUTE_COMMIT_IP_MAX = 5
 
+# Background route prefetch (purpose=prefetch).
+ROUTE_PREFETCH_IP_WINDOW_S = 60
+ROUTE_PREFETCH_IP_MAX = 30
+
+# Mapbox GL map_load reservations.
+MAP_LOAD_IP_WINDOW_S = 60
+MAP_LOAD_IP_MAX = 20
+
+# ORS foot-walking proxy (Santander).
+SANTANDER_WALK_IP_WINDOW_S = 60
+SANTANDER_WALK_IP_MAX = 20
+
+# Bug reports — keep spam down without blocking genuine reports.
+BUG_REPORT_IP_WINDOW_S = 60 * 60
+BUG_REPORT_IP_MAX = 8
+BUG_REPORT_USER_WINDOW_S = 60 * 60
+BUG_REPORT_USER_MAX = 12
+
 _lock = threading.Lock()
 _ip_hits: dict[str, list[float]] = {}
 _email_fails: dict[str, list[float]] = {}
@@ -64,6 +82,11 @@ _signup_ip_hits: dict[str, list[float]] = {}
 _user_sensitive_hits: dict[str, list[float]] = {}
 _geocode_ip_hits: dict[str, list[float]] = {}
 _route_commit_ip_hits: dict[str, list[float]] = {}
+_route_prefetch_ip_hits: dict[str, list[float]] = {}
+_map_load_ip_hits: dict[str, list[float]] = {}
+_santander_walk_ip_hits: dict[str, list[float]] = {}
+_bug_report_ip_hits: dict[str, list[float]] = {}
+_bug_report_user_hits: dict[str, list[float]] = {}
 
 
 def _prune(timestamps: list[float], window_s: float, now: float) -> list[float]:
@@ -72,7 +95,7 @@ def _prune(timestamps: list[float], window_s: float, now: float) -> list[float]:
 
 
 def _client_ip(remote_addr: str | None, x_forwarded_for: str | None = None) -> str:
-    """Prefer first X-Forwarded-For hop when behind a reverse proxy; else remote."""
+    """Prefer first X-Forwarded-For hop when trusted; else remote_addr only."""
     if x_forwarded_for:
         first = x_forwarded_for.split(",")[0].strip()
         if first:
@@ -81,7 +104,18 @@ def _client_ip(remote_addr: str | None, x_forwarded_for: str | None = None) -> s
 
 
 def client_ip_from_request(req) -> str:
-    return _client_ip(req.remote_addr, req.headers.get("X-Forwarded-For"))
+    """Client IP for rate limits.
+
+    When TRUST_PROXY=1, Flask should also use ProxyFix so remote_addr is the
+    real client (nginx). We then read X-Forwarded-For only if still needed.
+    When TRUST_PROXY is off, ignore X-Forwarded-For (spoofable on a public bind).
+    """
+    import os
+
+    trust = os.environ.get("TRUST_PROXY", "").strip().lower() in ("1", "true", "yes")
+    if trust:
+        return _client_ip(req.remote_addr, req.headers.get("X-Forwarded-For"))
+    return _client_ip(req.remote_addr, None)
 
 
 def check_ip_auth_budget(ip: str) -> RateLimitResult:
@@ -245,6 +279,88 @@ def check_route_commit_allowed(ip: str) -> RateLimitResult:
     return RateLimitResult(True)
 
 
+def check_route_prefetch_allowed(ip: str) -> RateLimitResult:
+    """30 background route prefetch requests per IP per minute."""
+    now = time.monotonic()
+    with _lock:
+        hits = _prune(_route_prefetch_ip_hits.get(ip, []), ROUTE_PREFETCH_IP_WINDOW_S, now)
+        if len(hits) >= ROUTE_PREFETCH_IP_MAX:
+            retry = max(1, int(ROUTE_PREFETCH_IP_WINDOW_S - (now - hits[0])) + 1)
+            return RateLimitResult(
+                False,
+                retry,
+                f"Too many prefetch requests. Try again in {retry} seconds.",
+            )
+        hits.append(now)
+        _route_prefetch_ip_hits[ip] = hits
+    return RateLimitResult(True)
+
+
+def check_map_load_allowed(ip: str) -> RateLimitResult:
+    """20 map_load reservations per IP per minute."""
+    now = time.monotonic()
+    with _lock:
+        hits = _prune(_map_load_ip_hits.get(ip, []), MAP_LOAD_IP_WINDOW_S, now)
+        if len(hits) >= MAP_LOAD_IP_MAX:
+            retry = max(1, int(MAP_LOAD_IP_WINDOW_S - (now - hits[0])) + 1)
+            return RateLimitResult(
+                False,
+                retry,
+                f"Too many map load requests. Try again in {retry} seconds.",
+            )
+        hits.append(now)
+        _map_load_ip_hits[ip] = hits
+    return RateLimitResult(True)
+
+
+def check_santander_walk_allowed(ip: str) -> RateLimitResult:
+    """20 Santander walk-proxy requests per IP per minute."""
+    now = time.monotonic()
+    with _lock:
+        hits = _prune(_santander_walk_ip_hits.get(ip, []), SANTANDER_WALK_IP_WINDOW_S, now)
+        if len(hits) >= SANTANDER_WALK_IP_MAX:
+            retry = max(1, int(SANTANDER_WALK_IP_WINDOW_S - (now - hits[0])) + 1)
+            return RateLimitResult(
+                False,
+                retry,
+                f"Too many walk requests. Try again in {retry} seconds.",
+            )
+        hits.append(now)
+        _santander_walk_ip_hits[ip] = hits
+    return RateLimitResult(True)
+
+
+def check_bug_report_allowed(ip: str, user_id: str | None = None) -> RateLimitResult:
+    """Hourly caps per IP and (when signed in) per user."""
+    now = time.monotonic()
+    with _lock:
+        ip_hits = _prune(_bug_report_ip_hits.get(ip, []), BUG_REPORT_IP_WINDOW_S, now)
+        if len(ip_hits) >= BUG_REPORT_IP_MAX:
+            retry = max(1, int(BUG_REPORT_IP_WINDOW_S - (now - ip_hits[0])) + 1)
+            return RateLimitResult(
+                False,
+                retry,
+                f"Too many bug reports. Try again in {retry} seconds.",
+            )
+        if user_id:
+            uid = str(user_id)
+            user_hits = _prune(
+                _bug_report_user_hits.get(uid, []), BUG_REPORT_USER_WINDOW_S, now
+            )
+            if len(user_hits) >= BUG_REPORT_USER_MAX:
+                retry = max(1, int(BUG_REPORT_USER_WINDOW_S - (now - user_hits[0])) + 1)
+                return RateLimitResult(
+                    False,
+                    retry,
+                    f"Too many bug reports. Try again in {retry} seconds.",
+                )
+            user_hits.append(now)
+            _bug_report_user_hits[uid] = user_hits
+        ip_hits.append(now)
+        _bug_report_ip_hits[ip] = ip_hits
+    return RateLimitResult(True)
+
+
 def reset_for_tests() -> None:
     """Clear all buckets — unit tests only."""
     with _lock:
@@ -257,3 +373,8 @@ def reset_for_tests() -> None:
         _user_sensitive_hits.clear()
         _geocode_ip_hits.clear()
         _route_commit_ip_hits.clear()
+        _route_prefetch_ip_hits.clear()
+        _map_load_ip_hits.clear()
+        _santander_walk_ip_hits.clear()
+        _bug_report_ip_hits.clear()
+        _bug_report_user_hits.clear()

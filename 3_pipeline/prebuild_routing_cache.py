@@ -16,6 +16,9 @@ Automatically invoked at the end of run_graph_pipeline.py; also runnable alone:
 
 When changing cache layout or cost formulas, bump FORMULA_ID / CACHE_FORMAT_VERSION
 in 4_backend_engine/routing_cache.py and re-run this script.
+
+Signal clusters (Phase 1): derived here from existing node traffic_signals tags —
+no build_graph rebuild required. Re-run this script after signal_clusters.py changes.
 """
 from __future__ import annotations
 
@@ -159,6 +162,30 @@ def main() -> int:
         flush=True,
     )
 
+    t0 = time.perf_counter()
+    from signal_clusters import apply_signal_clusters
+
+    sig_meta = apply_signal_clusters(G)
+    timings["signal_clusters"] = round(time.perf_counter() - t0, 3)
+    print(
+        f"--> Signal clusters: {sig_meta.get('clusters', 0)} clusters / "
+        f"{sig_meta.get('signal_nodes', 0)} seeds → "
+        f"{sig_meta.get('expanded_nodes', 0)} nodes; "
+        f"entry={sig_meta.get('entry_edges', 0)} "
+        f"(ped={sig_meta.get('entry_ped_edges', 0)}) "
+        f"exit={sig_meta.get('exit_edges', 0)} "
+        f"merged={sig_meta.get('merged_pairs', 0)} "
+        f"post={sig_meta.get('post_merged', 0)} "
+        f"closed={sig_meta.get('closed_nodes', 0)} "
+        f"holes={sig_meta.get('holes_remaining', 0)} "
+        f"({timings['signal_clusters']:.1f}s)",
+        flush=True,
+    )
+    eby = sig_meta.get("entry_by_highway") or {}
+    if eby:
+        top = ", ".join(f"{k}={v}" for k, v in list(eby.items())[:8])
+        print(f"--> Signal entry by highway: {top}", flush=True)
+
     # Build tables WITH geometry parse so _coords exist before save
     t0 = time.perf_counter()
     print("--> Edge cost tables + geometry parse (slow, once)...", flush=True)
@@ -177,7 +204,7 @@ def main() -> int:
         give_way_fn=app_mod._edge_give_way_penalty,
         stop_sign_fn=app_mod._edge_stop_sign_penalty,
         calming_fn=app_mod._traffic_calming_additive,
-        signal_fn=app_mod._node_signal_penalty,
+        signal_fn=app_mod._signal_penalty_for_cost,
         intersection_fn=app_mod._node_intersection_penalty,
         mini_rb_fn=app_mod._node_mini_roundabout_penalty,
         is_yes_fn=app_mod._is_yes_attr,
@@ -267,7 +294,7 @@ def main() -> int:
             give_way_fn=app_mod._edge_give_way_penalty,
             stop_sign_fn=app_mod._edge_stop_sign_penalty,
             calming_fn=app_mod._traffic_calming_additive,
-            signal_fn=app_mod._node_signal_penalty,
+            signal_fn=app_mod._signal_penalty_for_cost,
             intersection_fn=app_mod._node_intersection_penalty,
             mini_rb_fn=app_mod._node_mini_roundabout_penalty,
             is_yes_fn=app_mod._is_yes_attr,

@@ -17,7 +17,7 @@ from typing import Any
 _service = None
 _anon = None
 
-MIN_PASSWORD_LEN = 6
+MIN_PASSWORD_LEN = 10
 MAX_DISPLAY_NAME_LEN = 80
 
 

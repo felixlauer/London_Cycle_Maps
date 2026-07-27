@@ -142,7 +142,7 @@ export default function CollapsedIsland({
           <MetricCell
             ariaLabel="Trip time"
             parts={formatDurationParts(sStats.duration_min)}
-            delta={isMobile ? null : formatTimeDelta(sStats.duration_min, fStats.duration_min, { compare: 'non-optimised' })}
+            delta={isMobile ? null : formatTimeDelta(sStats.duration_min, fStats.duration_min)}
             twoLineDelta={!isMobile}
           />
         </div>
@@ -150,7 +150,7 @@ export default function CollapsedIsland({
           <MetricCell
             ariaLabel="Trip distance"
             parts={formatDistanceParts(sStats.length_m, units)}
-            delta={isMobile ? null : formatDistanceDelta(sStats.length_m, fStats.length_m, units, { compare: 'non-optimised' })}
+            delta={isMobile ? null : formatDistanceDelta(sStats.length_m, fStats.length_m, units)}
             twoLineDelta={!isMobile}
           />
         </div>

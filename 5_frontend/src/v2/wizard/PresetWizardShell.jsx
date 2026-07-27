@@ -6,6 +6,7 @@ import QuestionsStep from '../../wizard/QuestionsStep';
 import { totalMinutes, roundHalf } from '../../wizard/budget';
 import { apiFetch } from '../../api/flaskClient';
 import { MAX_PROFILE_NAME_LEN, validateProfileName } from './profileName';
+import { seedFastBudget, totalSaveMinutes } from '../../wizard/fastSavings';
 import '../../wizard/wizard.css';
 import './wizardShell.css';
 
@@ -126,8 +127,13 @@ export default function PresetWizardShell({
     setWeights(nextWeights);
     setToggles(togglesFromProfile(p, config));
     setName((p.name || '').slice(0, MAX_PROFILE_NAME_LEN));
-    const est = roundHalf(totalMinutes(config.sliders, nextWeights, bike));
-    setBudget(Math.max(5, Math.ceil(est || 10)));
+    const bikeRules = config.bike_types?.[bike]?.rules || {};
+    if ((p.preset || null) === 'fast') {
+      setBudget(seedFastBudget(config.sliders, nextWeights, bikeRules));
+    } else {
+      const est = roundHalf(totalMinutes(config.sliders, nextWeights, bike));
+      setBudget(Math.max(5, Math.ceil(est || 10)));
+    }
     setHydrated(true);
     setPendingProfile(null);
   }, [config, pendingProfile, hydrated]);
@@ -135,14 +141,21 @@ export default function PresetWizardShell({
   const selectPreset = (id) => {
     setPreset(id);
     const p = config.presets[id];
-    setWeights({ ...p.weights });
+    const nextWeights = { ...p.weights };
+    setWeights(nextWeights);
     setToggles((prev) => ({
       ...prev,
       ...p.toggles,
       vf_infrastructure: prev.vf_infrastructure,
     }));
-    const est = p.estimated_detour_min_by_bike?.[bikeType || 'standard'] ?? 10;
-    setBudget(Math.max(5, Math.ceil(est)));
+    const bike = bikeType || 'standard';
+    const bikeRules = config.bike_types?.[bike]?.rules || {};
+    if (id === 'fast') {
+      setBudget(seedFastBudget(config.sliders, nextWeights, bikeRules));
+    } else {
+      const est = p.estimated_detour_min_by_bike?.[bike] ?? 10;
+      setBudget(Math.max(5, Math.ceil(est)));
+    }
   };
 
   const handleWeightChange = (key, value) => {
@@ -153,10 +166,14 @@ export default function PresetWizardShell({
     setToggles((prev) => ({ ...prev, [key]: value }));
   };
 
+  const hillDisabled = Boolean(config?.bike_types?.[bikeType]?.rules?.hill_weight_epsilon);
   const estUsed = useMemo(() => {
     if (!config || !bikeType) return 0;
+    if (preset === 'fast') {
+      return totalSaveMinutes(config.sliders, weights, { hillDisabled });
+    }
     return roundHalf(totalMinutes(config.sliders, weights, bikeType));
-  }, [config, weights, bikeType]);
+  }, [config, weights, bikeType, preset, hillDisabled]);
 
   const buildPayloadWeights = () => {
     const w = {};
@@ -233,6 +250,7 @@ export default function PresetWizardShell({
           onWeightChange={handleWeightChange}
           budget={budget}
           onBudgetChange={setBudget}
+          timeSavingFraming
         />
       );
     }
@@ -291,7 +309,8 @@ export default function PresetWizardShell({
         ) : <span />}
         {step >= 2 && config && bikeType && (
           <span className="v2wiz-est">
-            Estimated detour: <strong>{estUsed} min</strong>
+            {preset === 'fast' ? 'Estimated time saved' : 'Estimated detour'}
+            : <strong>{estUsed} min</strong>
           </span>
         )}
         {saveError && <span className="v2wiz-error">{saveError}</span>}

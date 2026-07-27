@@ -548,6 +548,7 @@
   left: 50%;
   transform: translateX(-50%);
   width: 240px;
+  max-width: min(240px, calc(100vw - 24px));
   background: var(--wiz-bg);
   color: var(--wiz-text);
   border: 1px solid var(--wiz-border);
@@ -560,6 +561,15 @@
   z-index: 50;
   text-transform: none;
   letter-spacing: normal;
+  box-sizing: border-box;
+  word-break: break-word;
+}
+
+.wiz-helptip-pop.is-fixed {
+  position: fixed;
+  bottom: auto;
+  transform: none;
+  z-index: 4000;
 }
 
 /* Name input */

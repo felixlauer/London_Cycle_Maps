@@ -18,7 +18,7 @@ import {
   consumeAuthHash,
 } from './sessionStore';
 
-const MIN_PASSWORD_LEN = 6;
+const MIN_PASSWORD_LEN = 10;
 
 const AuthContext = createContext({
   user: null,

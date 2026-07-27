@@ -348,11 +348,18 @@
   background: transparent !important;
   color: var(--rc-text) !important;
   font-family: inherit !important;
-  font-size: 13.5px !important;
+  /* ≥16px prevents iOS Safari auto-zoom on focus */
+  font-size: 16px !important;
   font-weight: 550 !important;
   line-height: 45px !important;
   outline: none;
   box-shadow: none !important;
+}
+
+@media (min-width: 768px) {
+  .rc-wp-input input {
+    font-size: 13.5px !important;
+  }
 }
 
 .rc-wp-input input::placeholder {

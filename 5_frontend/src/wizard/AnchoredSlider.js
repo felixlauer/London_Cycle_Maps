@@ -6,12 +6,38 @@ import { sliderMinutes, metricChangeLabel } from './budget';
  * Weight slider with smooth 0.1 drag, three highlighted anchors
  * (0 / moderate / max from the sweep data) and a minute-cost label.
  * Clicking an anchor snaps to it.
+ *
+ * `mode="savings"` (Fast v2): chip shows estimated time saved; optional
+ * `questionOverride` / `note` / `saveMinutes` from the parent.
  */
-export default function AnchoredSlider({ sliderKey, cfg, value, onChange, bikeType, warning }) {
+export default function AnchoredSlider({
+  sliderKey,
+  cfg,
+  value,
+  onChange,
+  bikeType,
+  warning,
+  mode = 'detour',
+  saveMinutes = null,
+  questionOverride = null,
+  note = null,
+}) {
+  const savings = mode === 'savings';
   const cap = cfg.cap ?? 1;
   const anchors = cfg.anchors || [];
-  const minutes = sliderMinutes(cfg, value, bikeType);
+  const detourMinutes = sliderMinutes(cfg, value, bikeType);
+  const minutes = savings && saveMinutes != null ? saveMinutes : detourMinutes;
   const displayVal = value <= 0.0001 ? 0 : value;
+  const question = questionOverride || cfg.question;
+
+  const costLabel = () => {
+    if (savings) {
+      if (minutes > 0.05) return `~${minutes.toFixed(1)} min saved est.`;
+      return 'no time save';
+    }
+    if (minutes > 0.05) return `+${minutes.toFixed(1)} min est.`;
+    return 'no detour';
+  };
 
   const anchorTitle = (a, idx) => {
     if (idx === 0) return 'Off';
@@ -27,11 +53,9 @@ export default function AnchoredSlider({ sliderKey, cfg, value, onChange, bikeTy
           {cfg.label}
           <HelpTip text={cfg.help} />
         </span>
-        <span className="wiz-slider-cost">
-          {minutes > 0.05 ? `+${minutes.toFixed(1)} min est.` : 'no detour'}
-        </span>
+        <span className="wiz-slider-cost">{costLabel()}</span>
       </div>
-      <div className="wiz-slider-question">{cfg.question}</div>
+      <div className="wiz-slider-question">{question}</div>
       <div className="wiz-slider-track-wrap">
         <input
           type="range"
@@ -64,6 +88,7 @@ export default function AnchoredSlider({ sliderKey, cfg, value, onChange, bikeTy
           })}
         </div>
       </div>
+      {note && <div className="wiz-slider-warning" style={{ opacity: 0.85 }}>{note}</div>}
       {warning && <div className="wiz-slider-warning">{warning}</div>}
     </div>
   );

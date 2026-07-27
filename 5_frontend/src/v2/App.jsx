@@ -371,7 +371,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     });
     if (pts.length === 0) return;
     if (pts.length === 1) {
-      setFlyTarget({ center: [pts[0].lat, pts[0].lon], zoom: 15.5, duration });
+      setFlyTarget({ center: [pts[0].lat, pts[0].lon], zoom: 14.2, duration });
       return;
     }
     let minLat = pts[0].lat;
@@ -393,10 +393,11 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
         [minLon - lonPad, minLat - latPad],
         [maxLon + lonPad, maxLat + latPad],
       ],
+      // Mobile: large top inset clears the routing panel so northern stations stay visible
       padding: mobile
-        ? { top: 88, bottom: 220, left: 36, right: 36 }
+        ? { top: 210, bottom: 96, left: 28, right: 28 }
         : { top: 100, bottom: 160, left: 48, right: 56 },
-      maxZoom: 15.2,
+      maxZoom: mobile ? 14.4 : 15.2,
       duration,
     });
   }, []);
@@ -600,7 +601,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
   }, [bumpRouteRequest, clearRouteData]);
 
   /** Fit viewport so the full route path (+ optional walk legs) is visible. */
-  const fitRouteBounds = useCallback((paths, { duration = 1.05 } = {}) => {
+  const fitRouteBounds = useCallback((paths, { duration = 1.05, island = 'collapsed' } = {}) => {
     const pts = [];
     const addPath = (path) => {
       if (!Array.isArray(path) || path.length === 0) return;
@@ -619,7 +620,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     (Array.isArray(paths) ? paths : [paths]).forEach(addPath);
     if (pts.length === 0) return;
     if (pts.length === 1) {
-      setFlyTarget({ center: [pts[0].lat, pts[0].lon], zoom: 15, duration });
+      setFlyTarget({ center: [pts[0].lat, pts[0].lon], zoom: 14.5, duration });
       return;
     }
     let minLat = pts[0].lat;
@@ -635,15 +636,23 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     const latPad = Math.max(0.0012, (maxLat - minLat) * 0.12);
     const lonPad = Math.max(0.0012, (maxLon - minLon) * 0.12);
     const mobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const expanded = island === 'expanded';
     setFlyTarget({
       bounds: [
         [minLon - lonPad, minLat - latPad],
         [maxLon + lonPad, maxLat + latPad],
       ],
+      // Collapsed island: modest bottom pad so the route isn't shoved under the top panel.
+      // Expanded: larger bottom pad for the sheet.
       padding: mobile
-        ? { top: 100, bottom: 220, left: 36, right: 36 }
+        ? {
+          top: 190,
+          bottom: expanded ? 270 : 148,
+          left: 28,
+          right: 28,
+        }
         : { top: 110, bottom: 180, left: 80, right: 80 },
-      maxZoom: 15,
+      maxZoom: mobile ? 14.2 : 15,
       duration,
     });
   }, []);
@@ -677,6 +686,16 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
   }, [bumpRouteRequest, clearRouteData, resetHireState]);
 
   const handleMapClick = useCallback((e) => {
+    // Dismiss mobile keyboard so the map stays usable (esp. iOS Safari).
+    try {
+      const active = document.activeElement;
+      if (active && active.closest?.('[data-zone="routing-core"]') && typeof active.blur === 'function') {
+        active.blur();
+      }
+    } catch {
+      /* ignore */
+    }
+
     if (hireStep === 'pickup' || hireStep === 'dropoff') {
       pushAlert({ type: 'warning', message: 'Select a Santander station on the map' });
       return;
@@ -694,6 +713,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     if (!validTarget) return;
     const { lng, lat } = e.lngLat;
     applyMapPoint(lat, lng, mapPickTarget);
+    setMapPickTarget(null);
   }, [
     hireStep, applyMapPoint, pushAlert,
     routeRevealed, routeLegs, activeLegIndex, mapPickTarget,
@@ -1154,6 +1174,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           routeLegs,
           activeLegIndex,
           fastestPath: fastestData?.path || null,
+          fastestStats: (activeFastest || fastestData)?.stats || null,
           safestPath: safestData?.path || null,
           safestData,
           walkStartPath,
@@ -1215,11 +1236,12 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           overlayPulse,
         }}
         weatherControlProps={{
-          visible: Boolean(routeRevealed && safestData),
+          visible: Boolean(routeRevealed && safestData && phase !== 'tutorial'),
           startCoord: start || null,
           departAtIso: departMode === 'depart_at' ? departAtIso : null,
           santander: Boolean(santanderMode),
           onExtremeDetected: (warning) => {
+            if (phase === 'tutorial') return;
             pushAlert({
               type: 'warning',
               message: `Extreme weather detected: ${warning.title}`,

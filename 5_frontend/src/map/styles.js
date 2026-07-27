@@ -1,4 +1,4 @@
-/** Mapbox Standard style — day/night via lightPreset (not classic dark-v11). */
+/** Mapbox Standard — day/night via lightPreset (not classic dark-v11). */
 
 export const MAP_STYLE = 'mapbox://styles/mapbox/standard';
 
@@ -31,3 +31,9 @@ export const DEFAULT_VIEW = {
   latitude: 51.505,
   zoom: 13,
 };
+
+/** Same-origin static worker (copied into public/ by build-prod / start). */
+export function mapboxWorkerUrl() {
+  const base = (process.env.PUBLIC_URL || '').replace(/\/$/, '');
+  return `${base}/mapbox-gl-csp-worker.js`;
+}

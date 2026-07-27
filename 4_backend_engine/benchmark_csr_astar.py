@@ -190,7 +190,7 @@ def main() -> None:
             give_way_fn=app_mod._edge_give_way_penalty,
             stop_sign_fn=app_mod._edge_stop_sign_penalty,
             calming_fn=app_mod._traffic_calming_additive,
-            signal_fn=app_mod._node_signal_penalty,
+            signal_fn=app_mod._signal_penalty_for_cost,
             intersection_fn=app_mod._node_intersection_penalty,
             mini_rb_fn=app_mod._node_mini_roundabout_penalty,
             is_yes_fn=app_mod._is_yes_attr,

@@ -26,16 +26,23 @@ const MARKER_PAD = 22;
 
 function parseRadius(el) {
   if (!el || typeof window === 'undefined') return 12;
-  try {
-    const raw = window.getComputedStyle(el).borderRadius || '12px';
-    const first = raw.split(' ')[0];
-    const n = parseFloat(first);
-    if (!Number.isFinite(n)) return 12;
-    if (first.includes('%') || n >= 999) return 999;
-    return n;
-  } catch {
-    return 12;
+  // Walk ancestors so `border-radius: inherit` on .island-body still resolves.
+  let node = el;
+  for (let i = 0; i < 4 && node; i += 1) {
+    try {
+      const raw = window.getComputedStyle(node).borderRadius || '';
+      const first = (raw.split(' ')[0] || '').trim();
+      const n = parseFloat(first);
+      if (Number.isFinite(n) && n > 0) {
+        if (first.includes('%') || n >= 999) return 999;
+        return n;
+      }
+    } catch {
+      /* keep walking */
+    }
+    node = node.parentElement;
   }
+  return 12;
 }
 
 function normalizeTarget(entry) {
@@ -56,10 +63,14 @@ function measureFromElement(el, {
   const radius = parseRadius(el);
   let rx;
   if (capsule || radius >= 999) {
+    // True pill / capsule — match the shorter side.
     rx = Math.min(r.width, r.height) / 2 + pad;
   } else {
-    // Prefer computed radius, but never look sharper than a soft 14px control.
-    rx = Math.max(radius, Math.min(14, Math.min(r.width, r.height) / 2));
+    // Track the element's own corner radius (e.g. expanded island = 20px).
+    rx = radius;
+    if (rx < 1) {
+      rx = Math.min(14, Math.min(r.width, r.height) / 2);
+    }
     rx = Math.min(rx + pad, (r.width + pad * 2) / 2, (r.height + pad * 2) / 2);
   }
   return {
@@ -218,6 +229,9 @@ function placeTooltip(anchor, placement, tipW, tipH, avoidRects = []) {
   } else if (placement === 'bottom') {
     top = anchor.bottom + gap;
     left = anchor.left + anchor.width / 2 - tipW / 2;
+  } else if (placement === 'screen-bottom') {
+    top = Math.max(16, vh - tipH - 28);
+    left = Math.max(16, (vw - tipW) / 2);
   } else if (placement === 'top') {
     top = anchor.top - tipH - gap;
     left = anchor.left + anchor.width / 2 - tipW / 2;
@@ -550,6 +564,7 @@ export default function TutorialController({ signals }) {
   }, [
     step, cameraSettled,
     signals.safestPath, signals.start, signals.end, signals.mapApiRef,
+    signals.islandExpanded, signals.islandPage,
   ]);
 
   useLayoutEffect(() => {
@@ -681,7 +696,8 @@ export default function TutorialController({ signals }) {
               disabled={!buttonEnabled}
               onClick={goNext}
             >
-              {step.advance?.finish ? 'Done' : 'Next'}
+              {step.advance?.finishLabel
+                || (step.advance?.finish ? 'Finish tutorial' : 'Next')}
             </button>
           </div>
         )}

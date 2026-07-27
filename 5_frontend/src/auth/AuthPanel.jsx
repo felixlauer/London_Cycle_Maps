@@ -186,9 +186,9 @@ export default function AuthPanel({
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={activeTab === 'signup' ? 'At least 6 characters' : 'Your password'}
+              placeholder={activeTab === 'signup' ? 'At least 10 characters' : 'Your password'}
               autoComplete={activeTab === 'signup' ? 'new-password' : 'current-password'}
-              minLength={6}
+              minLength={10}
               required
             />
           </label>

@@ -124,7 +124,7 @@ export default function AccountSettingsModal({ onClose, themeMode }) {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 autoComplete="new-password"
-                minLength={6}
+                minLength={10}
                 required
               />
             </label>
@@ -135,7 +135,7 @@ export default function AccountSettingsModal({ onClose, themeMode }) {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
-                minLength={6}
+                minLength={10}
                 required
               />
             </label>

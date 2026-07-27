@@ -22,6 +22,8 @@ _SUM_KEYS = (
     "stop_sign_count",
     "calming_count",
     "signal_count",
+    "signal_exit_count",
+    "signal_node_count",
     "junction_count",
     "disruption_count",
 )
@@ -119,6 +121,8 @@ def aggregate_path_stats(leg_stats: list[dict]) -> dict:
         "stop_sign_count": int(totals["stop_sign_count"]),
         "calming_count": int(totals["calming_count"]),
         "signal_count": int(totals["signal_count"]),
+        "signal_exit_count": int(totals["signal_exit_count"]),
+        "signal_node_count": int(totals["signal_node_count"]),
         "junction_count": int(totals["junction_count"]),
         "disruption_count": int(totals["disruption_count"]),
     }

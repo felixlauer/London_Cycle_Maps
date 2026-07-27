@@ -6,7 +6,7 @@ export default function MetricCell({ parts, delta, ariaLabel, twoLineDelta = fal
   let deltaSecondary = null;
   if (twoLineDelta && typeof delta === 'string' && delta.includes(' vs ')) {
     const idx = delta.indexOf(' vs ');
-    // "+5 min vs" / "non-optimised"
+    // "+5 min vs" / "non-tuned"
     deltaPrimary = `${delta.slice(0, idx)} vs`;
     deltaSecondary = delta.slice(idx + 4);
   }

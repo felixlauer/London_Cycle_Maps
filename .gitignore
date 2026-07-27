@@ -37,6 +37,7 @@ __pycache__/
 4_backend_engine/mapbox_usage.json.tmp
 # Local test-mode profile store (may contain custom profiles; not for GitHub)
 4_backend_engine/user_profiles.json
+4_backend_engine/bug_reports.json
 
 # --- 5_frontend: env & build (node_modules/build also in 5_frontend/.gitignore) ---
 5_frontend/.env
@@ -50,8 +51,20 @@ __pycache__/
 8_debug/**/.env
 8_debug/**/.env.*
 
+# --- Local agent / editor tooling (not for GitHub) ---
+.agents/skills/
+.cursor/rules/
+skills-lock.json
+_tmp_msg.txt
+
+# --- Local deploy / upload artifacts (too large for GitHub) ---
+*.tar.gz
+_tar_test_gpickle.err
+
 # --- General ---
 .vscode/
+.VSCodeCounter/
 *.log
 .DS_Store
 Thumbs.db
+

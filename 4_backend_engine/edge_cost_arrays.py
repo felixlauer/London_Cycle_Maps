@@ -365,13 +365,13 @@ def build_edge_cost_tables(
         calm_b[i] = float(calming_fn(d, "both"))
 
         node_v = G.nodes[v] if v in G.nodes else {}
+        # signal_fn(edge, node) — Phase 1 entry or legacy node wait.
+        sig_b[i] = float(signal_fn(d, node_v))
         if v in junction_suppressed:
-            sig_b[i] = 0.0
             ix_b[i] = 0.0
             mini_b[i] = 0.0
             junc_b[i] = 0.0
         else:
-            sig_b[i] = float(signal_fn(node_v))
             ix_b[i] = float(intersection_fn(node_v))
             mini_b[i] = float(mini_rb_fn(node_v))
             junc_b[i] = 8.0 if node_v.get("is_dangerous_junction", False) else 0.0

@@ -12,6 +12,7 @@ import PresetWizardShell from '../../wizard/PresetWizardShell';
 import { useSidebar, SIDEBAR_WIDTH_PX } from '../SidebarContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useOnboarding } from '../../onboarding/OnboardingContext';
+import BugReportModal from '../../feedback/BugReportModal';
 import ProfilesSection from './ProfilesSection';
 import AccountManageSection from './AccountManageSection';
 import SystemFooter from './SystemFooter';
@@ -70,6 +71,7 @@ export default function ProfileSidebar({
   const [wizardMounted, setWizardMounted] = useState(false);
   const [accountPanel, setAccountPanel] = useState(null);
   const [dragOffset, setDragOffset] = useState(0);
+  const [bugReportOpen, setBugReportOpen] = useState(false);
   const { w: vw } = useViewport();
 
   const isWizard = view === 'wizard';
@@ -310,21 +312,35 @@ export default function ProfileSidebar({
                   onExpandedPanelChange={setAccountPanel}
                 />
                 <SystemFooter />
-                <button
-                  type="button"
-                  className="sb-revisit-tutorial"
-                  onClick={() => {
-                    closeSidebar();
-                    window.setTimeout(() => replayTutorial(), 320);
-                  }}
-                >
-                  Revisit tutorial?
-                </button>
+                <div className="sb-help-links" data-tutorial="sidebar-help-links">
+                  <button
+                    type="button"
+                    className="sb-revisit-tutorial"
+                    onClick={() => {
+                      closeSidebar();
+                      window.setTimeout(() => replayTutorial(), 320);
+                    }}
+                  >
+                    Revisit tutorial?
+                  </button>
+                  <button
+                    type="button"
+                    className="sb-revisit-tutorial"
+                    onClick={() => setBugReportOpen(true)}
+                  >
+                    Report a bug
+                  </button>
+                </div>
               </div>
             </>
           )}
         </motion.div>
       </div>
+      <BugReportModal
+        open={bugReportOpen}
+        onClose={() => setBugReportOpen(false)}
+        themeMode={themeMode}
+      />
     </aside>
   );
 }

@@ -26,55 +26,41 @@ export function formatDistanceParts(metres, units = 'metric') {
   return { value: km < 10 ? km.toFixed(1) : String(Math.round(km)), unit: 'km' };
 }
 
-const COMPARE_LABEL = {
-  shortest: 'shortest',
-  'non-tuned': 'non-tuned route',
-  'non-optimised': 'non-optimised',
-};
+const COMPARE_VS = 'non-tuned';
 
-function compareSuffix(compare = 'non-optimised') {
-  return COMPARE_LABEL[compare] || COMPARE_LABEL['non-optimised'];
+function signedDelta(sign, magnitude) {
+  return `${sign}${magnitude} vs ${COMPARE_VS}`;
 }
 
-function signedDelta(sign, magnitude, compare) {
-  const vs = compareSuffix(compare);
-  if (compare === 'non-tuned') {
-    return `${sign} ${magnitude} vs ${vs}`;
-  }
-  return `${sign}${magnitude} vs ${vs}`;
-}
-
-/** Signed comparison vs fastest route — desktop/tablet: "vs non-optimised"; mobile: "vs non-tuned route". */
-export function formatTimeDelta(safestMin, fastestMin, { compare = 'non-optimised' } = {}) {
+/** Signed comparison vs non-tuned (fastest) baseline — all screen sizes. */
+export function formatTimeDelta(safestMin, fastestMin) {
   const a = Number(safestMin);
   const b = Number(fastestMin);
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
   const delta = Math.round(a - b);
-  const vs = compareSuffix(compare);
-  if (delta === 0) return `same as ${vs}`;
+  if (delta === 0) return `same as ${COMPARE_VS}`;
   const sign = delta > 0 ? '+' : '−';
-  return signedDelta(sign, `${Math.abs(delta)} min`, compare);
+  return signedDelta(sign, `${Math.abs(delta)} min`);
 }
 
-/** Signed distance comparison vs fastest route. */
-export function formatDistanceDelta(safestM, fastestM, units = 'metric', { compare = 'non-optimised' } = {}) {
+/** Signed distance comparison vs non-tuned (fastest) baseline — all screen sizes. */
+export function formatDistanceDelta(safestM, fastestM, units = 'metric') {
   const a = Number(safestM);
   const b = Number(fastestM);
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
   const deltaM = a - b;
-  const vs = compareSuffix(compare);
-  if (Math.abs(deltaM) < 25) return `same as ${vs}`;
+  if (Math.abs(deltaM) < 25) return `same as ${COMPARE_VS}`;
   const sign = deltaM > 0 ? '+' : '−';
   const abs = Math.abs(deltaM);
   if (units === 'imperial') {
     const miles = abs / 1609.344;
     if (miles < 0.1) {
-      return signedDelta(sign, `${Math.round(abs / 0.3048)} ft`, compare);
+      return signedDelta(sign, `${Math.round(abs / 0.3048)} ft`);
     }
-    return signedDelta(sign, `${miles.toFixed(1)} mi`, compare);
+    return signedDelta(sign, `${miles.toFixed(1)} mi`);
   }
-  if (abs < 1000) return signedDelta(sign, `${Math.round(abs)} m`, compare);
-  return signedDelta(sign, `${(abs / 1000).toFixed(1)} km`, compare);
+  if (abs < 1000) return signedDelta(sign, `${Math.round(abs)} m`);
+  return signedDelta(sign, `${(abs / 1000).toFixed(1)} km`);
 }
 
 /** Split walk labels for Santander metrics: time above duration, distance above length. */

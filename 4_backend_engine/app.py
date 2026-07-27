@@ -21,7 +21,13 @@ import tfl_live
 import tomtom_live
 import live_disruptions
 import santander_live
-from route_time_estimate import cruise_duration_min, duration_speed_multiplier_for_preset
+from route_time_estimate import (
+    classify_vf_length_bucket,
+    cruise_duration_min,
+    duration_speed_multiplier_for_preset,
+    estimate_duration_min_phase_b,
+    route_time_model,
+)
 from routing_heuristic import (
     compute_optimized_cost_per_metre_lower_bound,
     get_route_algorithm,
@@ -40,6 +46,12 @@ import graph_csr
 import pathfinding_numba
 import mapbox_usage
 import weather_proxy
+from signal_clusters import (
+    apply_signal_clusters,
+    edge_has_signal_entry,
+    edge_has_signal_exit,
+    signal_clusters_enabled,
+)
 from barrier_clusters import (
     BARRIER_HARD_COST,
     barrier_additive_penalty,
@@ -63,10 +75,12 @@ import park_opening_hours
 import auth_admin
 import auth_middleware
 import auth_rate_limit
+import bug_reports
 import route_vias
 from cycleway_clusters import classify_cycleway_edge
-from auth_middleware import require_auth, assert_profile_access, extract_bearer_token
+from auth_middleware import require_auth, require_admin, assert_profile_access, extract_bearer_token
 from auth_rate_limit import client_ip_from_request
+import auth_redirect
 
 # --- CONFIGURATION ---
 # UPDATED: Pointing to the final, clean, dual-pass processed graph
@@ -75,7 +89,29 @@ GRAPH_PATH = os.path.join("..", "1_data", "london_elev_final_tfl.graphml")
 USE_RELOADER = os.environ.get("FLASK_USE_RELOADER", "").lower() in ("1", "true", "yes")
 
 app = Flask(__name__)
-CORS(app)
+
+
+def _configure_cors(flask_app):
+    """CORS_ORIGINS=comma list for prod; unset or * keeps allow-all (local/mobile)."""
+    raw = (os.environ.get("CORS_ORIGINS") or "").strip()
+    if not raw or raw == "*":
+        CORS(flask_app)
+        return
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    CORS(flask_app, origins=origins)
+
+
+def _configure_proxy_fix(flask_app):
+    """TRUST_PROXY=1 when behind nginx so remote_addr / HTTPS scheme are correct."""
+    if os.environ.get("TRUST_PROXY", "").strip().lower() not in ("1", "true", "yes"):
+        return
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    flask_app.wsgi_app = ProxyFix(flask_app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+
+_configure_cors(app)
+_configure_proxy_fix(app)
 auth_middleware.init_auth(app)
 
 G = None
@@ -227,7 +263,7 @@ BAD_SMOOTHNESS = frozenset(['bad', 'very_bad', 'horrible', 'impassable'])
 CYCLIST_SPEED_MPS = 16.0 / 3.6   # ~4.44 m/s (16 km/h) - penalty physics reference speed
 DEFAULT_STATS_SPEED_KMH = 16.0   # duration_min fallback when no bike type given
 WIDTH_STD_M = 1.5                # narrow stats/overlay threshold (width_weight removed from cost)
-SIGNAL_WAIT_SECONDS = 20         # Slightly increased so signal penalty is more visible
+SIGNAL_WAIT_SECONDS = 7.5        # Hybrid calib (~15% trip-share); was 20 (over-avoided lights)
 SPEED_DIFF_NEGLIGIBLE_KMH = 20
 SPEED_DIFF_LOW_KMH = 30
 M_MIN = 0.1   # Ensure edge weight never zero/negative for A*
@@ -390,10 +426,33 @@ def _edge_stop_sign_penalty(edge_data):
     return 0.0
 
 def _node_signal_penalty(node_data):
-    """Virtual distance = wait time * cyclist speed."""
+    """Legacy: virtual distance if node tagged traffic_signals=yes.
+
+    Prefer ``_edge_signal_penalty`` (Phase 1 cluster entry) for routing cost.
+    Kept for overlays/debug and SIGNAL_CLUSTERS=0 fallback.
+    """
     if str(node_data.get('traffic_signals', '')).lower() != 'yes':
         return 0.0
     return SIGNAL_WAIT_SECONDS * CYCLIST_SPEED_MPS
+
+
+def _edge_signal_penalty(edge_data):
+    """Signal wait as metres — once per signal-cluster entry edge (Phase 1)."""
+    if signal_clusters_enabled() and edge_has_signal_entry(edge_data):
+        return SIGNAL_WAIT_SECONDS * CYCLIST_SPEED_MPS
+    return 0.0
+
+
+def _signal_penalty_for_cost(edge_data, node_data=None):
+    """Cost helper: cluster entry when enabled, else legacy per-node tag."""
+    if signal_clusters_enabled():
+        return _edge_signal_penalty(edge_data)
+    return _node_signal_penalty(node_data or {})
+
+
+def _legacy_node_signal_cost_active() -> bool:
+    """True when cluster entry marks are off — fall back to per-node signal cost."""
+    return not signal_clusters_enabled()
 
 
 def _is_car_allowed_edge(edge_data):
@@ -614,6 +673,26 @@ if G is not None and not _ROUTING_CACHE_HIT:
         f"(radius {JUNCTION_CLUSTER_RADIUS_M:.0f} m; "
         f"{time.perf_counter() - _t_junc_cluster:.1f}s)"
     )
+    _t_sig = time.perf_counter()
+    _sig_meta = apply_signal_clusters(G)
+    print(
+        f"--> Signal clusters: {_sig_meta.get('clusters', 0)} clusters from "
+        f"{_sig_meta.get('signal_nodes', 0)} seeds → "
+        f"{_sig_meta.get('expanded_nodes', 0)} nodes; "
+        f"entry={_sig_meta.get('entry_edges', 0)} "
+        f"(ped={_sig_meta.get('entry_ped_edges', 0)}) "
+        f"exit={_sig_meta.get('exit_edges', 0)} "
+        f"merged={_sig_meta.get('merged_pairs', 0)} "
+        f"post={_sig_meta.get('post_merged', 0)} "
+        f"closed={_sig_meta.get('closed_nodes', 0)} "
+        f"holes={_sig_meta.get('holes_remaining', 0)} "
+        f"({time.perf_counter() - _t_sig:.1f}s; "
+        f"SIGNAL_CLUSTERS={'on' if _sig_meta.get('enabled') else 'off'})"
+    )
+    _eby = _sig_meta.get("entry_by_highway") or {}
+    if _eby:
+        top = ", ".join(f"{k}={v}" for k, v in list(_eby.items())[:8])
+        print(f"--> Signal entry by highway: {top}")
 elif G is not None and _ROUTING_CACHE_HIT:
     print(
         f"--> Junction/floors/cluster: from routing cache "
@@ -687,7 +766,7 @@ def _install_edge_cost_arrays():
         give_way_fn=_edge_give_way_penalty,
         stop_sign_fn=_edge_stop_sign_penalty,
         calming_fn=_traffic_calming_additive,
-        signal_fn=_node_signal_penalty,
+        signal_fn=_signal_penalty_for_cost,
         intersection_fn=_node_intersection_penalty,
         mini_rb_fn=_node_mini_roundabout_penalty,
         is_yes_fn=_is_yes_attr,
@@ -916,7 +995,10 @@ def make_weight_optimized(w, hours_map, fallback_open, apply_live: bool = True):
         A_barrier = _edge_barrier_penalty(d) * w_barrier
         A_give_way = _edge_give_way_penalty(d) * w_junction
         A_stop_sign = _edge_stop_sign_penalty(d) * w_junction
-        A_signal = _node_signal_penalty(node_v) * w_signal
+        if _legacy_node_signal_cost_active():
+            A_signal = _node_signal_penalty(node_v) * w_signal
+        else:
+            A_signal = _edge_signal_penalty(d) * w_signal
         A_calming = (
             0.0 if vehicular_free else _traffic_calming_additive(d, calming_src) * w_calming
         )
@@ -1018,6 +1100,7 @@ def calculate_path_stats(
     speed_kmh=None,
     vf_mask_allowed=None,
     duration_speed_multiplier: float = 1.0,
+    bike_type: str | None = None,
 ):
     total_length = 0.0
     total_accidents = 0.0
@@ -1031,15 +1114,22 @@ def calculate_path_stats(
     green_length = 0.0
     scenic_green_length = 0.0
     vf_selected_length = 0.0
+    vf_len_core = 0.0
+    vf_len_shared = 0.0
+    vf_len_bus = 0.0
+    vf_len_painted = 0.0
     barrier_count = 0
     barrier_penalty_count = 0
     give_way_count = 0
     stop_sign_count = 0
     calming_count = 0
     signal_count = 0
+    signal_exit_count = 0
+    signal_node_count = 0
     junction_count = 0
     disruption_count = 0
     vf_mask = vf_mask_allowed if vf_mask_allowed is not None else VF_MASK_ALL
+    use_entry = signal_clusters_enabled()
     for i in range(len(path_nodes) - 1):
         u = path_nodes[i]
         v = path_nodes[i+1]
@@ -1058,6 +1148,15 @@ def calculate_path_stats(
             rough_length += l
         if vehicular_free:
             vf_selected_length += l
+        bucket = classify_vf_length_bucket(edge_vf, vf_mask)
+        if bucket == "core":
+            vf_len_core += l
+        elif bucket == "shared_path":
+            vf_len_shared += l
+        elif bucket == "bus_lane":
+            vf_len_bus += l
+        elif bucket == "painted_lane":
+            vf_len_painted += l
         grade = float(edge_data.get('grade', 0.0))
         if not on_steps:
             if grade > 0:
@@ -1084,7 +1183,15 @@ def calculate_path_stats(
         if _edge_give_way_penalty(edge_data) > 0: give_way_count += 1
         if _edge_stop_sign_penalty(edge_data) > 0: stop_sign_count += 1
         node_v = G.nodes[v] if v in G.nodes else {}
-        if _node_signal_penalty(node_v) > 0: signal_count += 1
+        if _node_signal_penalty(node_v) > 0:
+            signal_node_count += 1
+        if use_entry:
+            if edge_has_signal_entry(edge_data):
+                signal_count += 1
+            if edge_has_signal_exit(edge_data):
+                signal_exit_count += 1
+        elif _node_signal_penalty(node_v) > 0:
+            signal_count += 1
         if v not in JUNCTION_CLUSTER_SUPPRESSED and (
             _node_intersection_penalty(node_v) > 0
             or _node_mini_roundabout_penalty(node_v) > 0
@@ -1093,11 +1200,51 @@ def calculate_path_stats(
             junction_count += 1
         if live_disruptions.get_edge_disruption(u, v): disruption_count += 1
 
-    duration_min = cruise_duration_min(
-        total_length,
-        float(speed_kmh) if speed_kmh else DEFAULT_STATS_SPEED_KMH,
-        duration_speed_multiplier,
-    )
+    start_in_sig = False
+    end_in_sig = False
+    if path_nodes:
+        nd0 = G.nodes[path_nodes[0]] if path_nodes[0] in G.nodes else {}
+        start_in_sig = int(nd0.get("signal_cluster_id") or 0) > 0
+        ndn = G.nodes[path_nodes[-1]] if path_nodes[-1] in G.nodes else {}
+        end_in_sig = int(ndn.get("signal_cluster_id") or 0) > 0
+    sig_delta = signal_count - signal_exit_count
+    if not use_entry:
+        signal_balance_ok = None
+    elif start_in_sig and not end_in_sig:
+        signal_balance_ok = sig_delta == -1 or abs(sig_delta) <= 1
+    elif end_in_sig and not start_in_sig:
+        signal_balance_ok = sig_delta == 1 or abs(sig_delta) <= 1
+    else:
+        signal_balance_ok = sig_delta == 0 or abs(sig_delta) <= 1
+
+    speed = float(speed_kmh) if speed_kmh else DEFAULT_STATS_SPEED_KMH
+    vf_lengths_m = {
+        "core": vf_len_core,
+        "shared_path": vf_len_shared,
+        "bus_lane": vf_len_bus,
+        "painted_lane": vf_len_painted,
+    }
+    model = route_time_model()
+    if model in ("penalties", "phase_b", "b"):
+        duration_min = estimate_duration_min_phase_b(
+            total_length,
+            speed,
+            signal_count=signal_count,
+            give_way_count=give_way_count,
+            stop_sign_count=stop_sign_count,
+            junction_count=junction_count,
+            calming_count=calming_count,
+            barrier_penalty_count=barrier_penalty_count,
+            elevation_gain=total_climb,
+            bike_type=bike_type or "standard",
+            vf_lengths_m=vf_lengths_m,
+        )
+    else:
+        duration_min = cruise_duration_min(
+            total_length,
+            speed,
+            duration_speed_multiplier,
+        )
     pct_lit = (lit_length / total_length * 100) if total_length > 0 else 0
     pct_rough = (rough_length / total_length * 100) if total_length > 0 else 0
     speed_stress_km = speed_stress_length / 1000.0
@@ -1118,10 +1265,18 @@ def calculate_path_stats(
         "speed_stress_km": round(speed_stress_km, 2), "speed_stress_pct": round(speed_stress_pct, 1),
         "green_km": round(green_km, 2),
         "green_pct": round(pct_green, 1), "vehicular_free_pct": round(pct_vf, 1),
+        "vf_length_core_m": round(vf_len_core, 0),
+        "vf_length_shared_path_m": round(vf_len_shared, 0),
+        "vf_length_bus_lane_m": round(vf_len_bus, 0),
+        "vf_length_painted_lane_m": round(vf_len_painted, 0),
         "barrier_count": barrier_count, "barrier_penalty_count": barrier_penalty_count,
         "give_way_count": give_way_count, "stop_sign_count": stop_sign_count,
         "calming_count": calming_count, "signal_count": signal_count, "junction_count": junction_count,
+        "signal_exit_count": signal_exit_count,
+        "signal_node_count": signal_node_count,
+        "signal_balance_ok": signal_balance_ok,
         "disruption_count": disruption_count,
+        "route_time_model": model if model in ("penalties", "phase_b", "b") else "phase_a",
     }
 
 def get_lit_sections(path_nodes):
@@ -1582,7 +1737,29 @@ def get_node_highlights(path_nodes, w=None, overlay_mode=False):
                 if lat is not None and lon is not None:
                     out.append({"lat": lat, "lon": lon, "type": "stop_sign", "details": {"stop_sign": "yes"}})
 
-    # --- Node-based: signal, junction (zebra), junction_danger, calming ---
+        # Phase 1: one highlight per signal-cluster entry (rep coords when present).
+        if weight_on('signal_weight') and signal_clusters_enabled() and edge_has_signal_entry(ed):
+            cid = int(ed.get("signal_cluster_id") or 0)
+            key_sig = (cid or key, "signal")
+            if key_sig not in seen:
+                seen.add(key_sig)
+                lat_s = ed.get("signal_entry_lat")
+                lon_s = ed.get("signal_entry_lon")
+                if lat_s is None or lon_s is None:
+                    lat_s, lon_s = _edge_display_point(ed, "signal_entry_lat", "signal_entry_lon")
+                if lat_s is not None and lon_s is not None:
+                    out.append({
+                        "lat": float(lat_s),
+                        "lon": float(lon_s),
+                        "type": "signal",
+                        "details": {
+                            "traffic_signals": "yes",
+                            "signal_cluster_id": cid or None,
+                            "source": "cluster_entry",
+                        },
+                    })
+
+    # --- Node-based: signal (legacy), junction (zebra), junction_danger, calming ---
     for i in range(len(path_nodes)):
         v = path_nodes[i]
         if v not in G.nodes:
@@ -1591,7 +1768,12 @@ def get_node_highlights(path_nodes, w=None, overlay_mode=False):
         lat = float(node_data.get('y', 0))
         lon = float(node_data.get('x', 0))
 
-        if weight_on('signal_weight') and _node_signal_penalty(node_data) > 0 and (v, 'signal') not in seen:
+        if (
+            weight_on('signal_weight')
+            and not signal_clusters_enabled()
+            and _node_signal_penalty(node_data) > 0
+            and (v, 'signal') not in seen
+        ):
             seen.add((v, 'signal'))
             out.append({"lat": lat, "lon": lon, "type": "signal", "details": {"traffic_signals": "yes"}})
 
@@ -1686,27 +1868,40 @@ def inspect_segment():
             return jsonify({"error": "No edge found"}), 404
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
 
 
 # --- LIVE TfL DISRUPTIONS ENDPOINT ---
 
+@app.route('/health', methods=['GET'])
+def health():
+    """Liveness/readiness for nginx/systemd. 200 when graph engine is loaded."""
+    ready = G is not None and NODE_KDTREE is not None
+    return jsonify({
+        "ok": True,
+        "ready": ready,
+        "routing_cache_hit": bool(_ROUTING_CACHE_HIT),
+    }), (200 if ready else 503)
+
+
 @app.route('/admin/update_tfl', methods=['POST'])
+@require_admin
 def admin_update_tfl():
     try:
         ok, message, count = live_disruptions.update_disruptions(fetch_tfl=True)
         return jsonify({"ok": ok, "message": message, "count": count})
     except Exception as e:
-        return jsonify({"ok": False, "message": str(e), "count": 0}), 500
+        return _err(e, ok=False, count=0)
 
 
 @app.route('/admin/update_tomtom', methods=['POST'])
+@require_admin
 def admin_update_tomtom():
     try:
         ok, message, count = live_disruptions.update_disruptions(fetch_tomtom=True)
         return jsonify({"ok": ok, "message": message, "count": count})
     except Exception as e:
-        return jsonify({"ok": False, "message": str(e), "count": 0}), 500
+        return _err(e, ok=False, count=0)
 
 
 @app.route('/admin/tfl_status', methods=['GET'])
@@ -1716,7 +1911,7 @@ def admin_tfl_status():
         st = live_disruptions.get_status().get("tfl", tfl_live.get_status())
         return jsonify(st)
     except Exception as e:
-        return jsonify({"error": str(e), "edge_count": 0, "last_update": None}), 500
+        return _err(e, edge_count=0, last_update=None)
 
 
 @app.route('/admin/tomtom_status', methods=['GET'])
@@ -1726,7 +1921,7 @@ def admin_tomtom_status():
         st = live_disruptions.get_status().get("tomtom", tomtom_live.get_status())
         return jsonify(st)
     except Exception as e:
-        return jsonify({"error": str(e), "edge_count": 0, "last_update": None}), 500
+        return _err(e, edge_count=0, last_update=None)
 
 
 @app.route('/tfl_disruptions', methods=['GET'])
@@ -1743,7 +1938,7 @@ def get_tfl_disruptions():
             min_lat, max_lat, min_lon, max_lon, source="tfl")
         return jsonify({"segments": segments, "limit_reached": limit_reached})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
 
 
 @app.route('/tomtom_disruptions', methods=['GET'])
@@ -1760,7 +1955,7 @@ def get_tomtom_disruptions():
             min_lat, max_lat, min_lon, max_lon, source="tomtom")
         return jsonify({"segments": segments, "limit_reached": limit_reached})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
 
 
 @app.route('/tfl_disruption_at', methods=['GET'])
@@ -1775,7 +1970,7 @@ def get_tfl_disruption_at():
         disruptions = tfl_live.get_disruptions_at(lat, lon, tolerance_deg=tolerance)
         return jsonify({"disruptions": disruptions})
     except Exception as e:
-        return jsonify({"error": str(e), "disruptions": []}), 500
+        return _err(e, disruptions=[])
 
 
 @app.route('/tomtom_disruption_at', methods=['GET'])
@@ -1790,7 +1985,7 @@ def get_tomtom_disruption_at():
         disruptions = tomtom_live.get_tomtom_disruptions_at(lat, lon, tolerance_deg=tolerance)
         return jsonify({"disruptions": disruptions})
     except Exception as e:
-        return jsonify({"error": str(e), "disruptions": []}), 500
+        return _err(e, disruptions=[])
 
 
 # --- SANTANDER CYCLE HIRE (BikePoint + walk proxy) ---
@@ -1812,13 +2007,18 @@ def santander_candidates():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
 
 
 @app.route('/santander/walk', methods=['POST'])
 def santander_walk():
     """ORS foot-walking polyline between two points. Body: {from:[lat,lon], to:[lat,lon]}."""
     try:
+        blocked = _rate_limited(
+            auth_rate_limit.check_santander_walk_allowed(client_ip_from_request(request))
+        )
+        if blocked:
+            return blocked
         body = request.get_json(silent=True) or {}
         frm = body.get("from")
         to = body.get("to")
@@ -1832,26 +2032,26 @@ def santander_walk():
         )
         return jsonify(result)
     except RuntimeError as e:
-        return jsonify({"error": str(e)}), 503
+        return _err(e, status=503)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+        return _err(e)
 
 @app.route('/admin/santander_status', methods=['GET'])
 def admin_santander_status():
     try:
         return jsonify(santander_live.get_status())
     except Exception as e:
-        return jsonify({"error": str(e), "station_count": 0}), 500
+        return _err(e, station_count=0)
 
 
 @app.route('/admin/update_santander', methods=['POST'])
+@require_admin
 def admin_update_santander():
     try:
         ok, message, count = santander_live.update_bikepoints()
         return jsonify({"ok": ok, "message": message, "count": count})
     except Exception as e:
-        return jsonify({"ok": False, "message": str(e), "count": 0}), 500
+        return _err(e, ok=False, count=0)
 
 
 # --- OVERLAY CATALOG (main app route visualization) ---
@@ -1905,7 +2105,7 @@ def list_profiles():
     try:
         return jsonify({"profiles": g.profile_store.list_profiles(g.user_id)})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
 
 
 @app.route('/profiles/<profile_id>', methods=['GET'])
@@ -1917,7 +2117,7 @@ def get_profile(profile_id):
             return err_resp, status
         return jsonify(profile)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
 
 
 # Payload sanitization: only these fields are read from the client body.
@@ -1945,7 +2145,7 @@ def create_profile():
             return jsonify({"error": err}), status
         return jsonify(profile), 201
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
 
 
 @app.route('/profiles/<profile_id>', methods=['PUT'])
@@ -1976,7 +2176,7 @@ def update_profile(profile_id):
             return jsonify({"error": err}), status
         return jsonify(profile), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
 
 
 @app.route('/profiles/<profile_id>', methods=['DELETE'])
@@ -1995,7 +2195,7 @@ def delete_profile(profile_id):
             return jsonify({"error": err or "profile not found"}), status
         return jsonify({"ok": True}), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
 
 
 # --- AUTH ACCOUNT ENDPOINTS (server-side Supabase; rate-limited) ---
@@ -2026,6 +2226,30 @@ def _quota_blocked(result):
     resp.status_code = 429
     return resp
 
+
+def _expose_error_detail() -> bool:
+    """Show exception text to clients only in local/dev unless overridden."""
+    flag = (os.environ.get("PUBLIC_ERROR_DETAIL") or "").strip().lower()
+    if flag in ("1", "true", "yes"):
+        return True
+    if flag in ("0", "false", "no"):
+        return False
+    env = (os.environ.get("FLASK_ENV") or os.environ.get("ENV") or "").strip().lower()
+    return env not in ("production", "prod")
+
+
+def _err(e, status=500, **extra):
+    """Log full exception; return safe JSON to the client in production."""
+    app.logger.exception("request failed")
+    msg = str(e) if _expose_error_detail() else "Internal server error"
+    body = {"error": msg}
+    body.update(extra)
+    return jsonify(body), status
+
+
+UNIFORM_RESET_MESSAGE = (
+    "If an account exists for that email, a reset link has been sent."
+)
 
 @app.route('/auth/login', methods=['POST'])
 def auth_login():
@@ -2100,7 +2324,7 @@ def auth_update_account():
 
 @app.route('/auth/password-reset', methods=['POST'])
 def auth_password_reset():
-    """Check email exists, then send reset mail (rate-limited)."""
+    """Send reset mail when account exists. Uniform response (no email enumeration)."""
     if not auth_admin.configured() or not auth_admin.anon_configured():
         return jsonify({"error": "auth not configured"}), 503
     body = request.get_json(silent=True) or {}
@@ -2110,19 +2334,20 @@ def auth_password_reset():
         return jsonify({"error": "valid email required"}), 400
     if not redirect_to:
         return jsonify({"error": "redirect_to required"}), 400
+    if not auth_redirect.reset_redirect_allowed(redirect_to):
+        return jsonify({"error": "redirect_to not allowed"}), 400
     ip = client_ip_from_request(request)
     blocked = _rate_limited(auth_rate_limit.check_reset_allowed(ip, email))
     if blocked:
         return blocked
     try:
-        if not auth_admin.user_exists_by_email(email):
-            return jsonify({"error": "No account found for this email address."}), 404
-        err = auth_admin.send_password_reset(email, redirect_to)
-        if err:
-            return jsonify({"error": err}), 500
-        return jsonify({"status": "sent"})
+        if auth_admin.user_exists_by_email(email):
+            err = auth_admin.send_password_reset(email, redirect_to)
+            if err:
+                app.logger.error("password-reset send failed: %s", err)
+        return jsonify({"status": "ok", "message": UNIFORM_RESET_MESSAGE})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
 
 
 @app.route('/auth/refresh', methods=['POST'])
@@ -2212,7 +2437,7 @@ def auth_set_password():
 
 @app.route('/auth/check-email', methods=['POST'])
 def auth_check_email():
-    """Return 404 when no auth.users row exists for the email (reset pre-check)."""
+    """Uniform response — does not reveal whether the email is registered."""
     if not auth_admin.configured():
         return jsonify({"error": "auth not configured"}), 503
     body = request.get_json(silent=True) or {}
@@ -2223,13 +2448,13 @@ def auth_check_email():
     blocked = _rate_limited(auth_rate_limit.check_ip_auth_budget(ip))
     if blocked:
         return blocked
+    # Touch the lookup so timing is similar whether or not the row exists,
+    # but never return existence to the client.
     try:
-        if not auth_admin.user_exists_by_email(email):
-            return jsonify({"error": "No account found for this email address."}), 404
-        return jsonify({"exists": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+        auth_admin.user_exists_by_email(email)
+    except Exception:
+        app.logger.exception("check-email lookup failed")
+    return jsonify({"ok": True, "message": UNIFORM_RESET_MESSAGE})
 
 @app.route('/auth/account', methods=['DELETE'])
 @require_auth
@@ -2248,7 +2473,32 @@ def auth_delete_account():
         auth_admin.delete_user(g.user_id)
         return jsonify({"status": "deleted"})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
+
+
+@app.route('/feedback/bug', methods=['POST'])
+def submit_bug_report():
+    """Store a user bug report (Supabase in prod, local JSON in bare-dev)."""
+    body = request.get_json(silent=True) or {}
+    ip = client_ip_from_request(request)
+    blocked = _rate_limited(
+        auth_rate_limit.check_bug_report_allowed(ip, g.get("user_id"))
+    )
+    if blocked:
+        return blocked
+    saved, err = bug_reports.submit_bug_report(
+        user_id=g.get("user_id"),
+        message=body.get("message"),
+        page_url=body.get("page_url"),
+        user_agent=body.get("user_agent") or request.headers.get("User-Agent"),
+        app_version=body.get("app_version"),
+        theme=body.get("theme"),
+        viewport=body.get("viewport"),
+    )
+    if err:
+        status = 400 if "message" in err else 500
+        return jsonify({"error": err}), status
+    return jsonify({"ok": True, **saved})
 
 
 # --- GEOCODING (Mapbox key stays server-side) ---
@@ -2293,7 +2543,7 @@ def geocode_suggest():
         mapbox_usage.record_search_session(session_token)
         return jsonify({"suggestions": data.get("suggestions") or []})
     except Exception as e:
-        return jsonify({"error": str(e)}), 502
+        return _err(e, status=502)
 
 
 @app.route('/geocode/retrieve/<path:mapbox_id>', methods=['GET'])
@@ -2340,7 +2590,7 @@ def geocode_retrieve(mapbox_id):
         mapbox_usage.record_search_session(session_token)
         return jsonify({"lat": lat, "lon": lon, "label": label})
     except Exception as e:
-        return jsonify({"error": str(e)}), 502
+        return _err(e, status=502)
 
 
 @app.route('/weather', methods=['GET'])
@@ -2361,7 +2611,7 @@ def get_weather():
         payload = weather_proxy.fetch_weather(lat, lon, at)
         return jsonify(payload)
     except Exception as e:
-        return jsonify({"error": str(e)}), 502
+        return _err(e, status=502)
 
 
 @app.route('/mapbox/quota', methods=['GET'])
@@ -2376,10 +2626,15 @@ def mapbox_map_load():
     Reserve one GL JS map load before the client initializes Map.
     Hard-cuts when MAPBOX_MAP_LOAD_LIMIT is reached (default 45k / mo).
     """
-    result = mapbox_usage.try_consume_map_load()
-    blocked = _quota_blocked(result)
+    blocked = _rate_limited(
+        auth_rate_limit.check_map_load_allowed(client_ip_from_request(request))
+    )
     if blocked:
         return blocked
+    result = mapbox_usage.try_consume_map_load()
+    quota_block = _quota_blocked(result)
+    if quota_block:
+        return quota_block
     return jsonify({
         "ok": True,
         "month": result.month,
@@ -2404,15 +2659,17 @@ def get_preset_config():
 def get_route():
     try:
         # purpose=commit (default) counts toward 5 Get-Route/IP/min.
-        # purpose=prefetch is background UI calc and is NOT rate-limited
-        # (product accepts that informed attackers could spam prefetch).
+        # purpose=prefetch is background UI calc — capped at 30/IP/min.
         purpose = (request.args.get("purpose") or "commit").strip().lower()
         if purpose not in ("commit", "prefetch"):
             purpose = "commit"
+        ip = client_ip_from_request(request)
         if purpose == "commit":
-            blocked = _rate_limited(
-                auth_rate_limit.check_route_commit_allowed(client_ip_from_request(request))
-            )
+            blocked = _rate_limited(auth_rate_limit.check_route_commit_allowed(ip))
+            if blocked:
+                return blocked
+        else:
+            blocked = _rate_limited(auth_rate_limit.check_route_prefetch_allowed(ip))
             if blocked:
                 return blocked
 
@@ -2630,7 +2887,10 @@ def get_route():
                 reconstruct_path_geometry(path_fastest), start_snap, end_snap
             )
             stats_fastest = calculate_path_stats(
-                path_fastest, speed_kmh=speed_kmh, vf_mask_allowed=vf_mask_allowed
+                path_fastest,
+                speed_kmh=speed_kmh,
+                vf_mask_allowed=vf_mask_allowed,
+                bike_type=bike_type,
             )
 
             h_opt_fwd = make_heuristic(end_node, G, cost_per_m=scale, csr=csr)
@@ -2674,6 +2934,7 @@ def get_route():
                 speed_kmh=speed_kmh,
                 vf_mask_allowed=vf_mask_allowed,
                 duration_speed_multiplier=duration_speed_multiplier_for_preset(preset),
+                bike_type=bike_type,
             )
 
             lit_chunks = get_lit_sections(path_optimized)
@@ -2842,7 +3103,7 @@ def get_route():
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _err(e)
 
 if __name__ == '__main__':
     import argparse

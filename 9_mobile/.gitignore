@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
+# Expo / Metro
+.expo/
+dist/
+web-build/
+
+# Native (generated / local)
+ios/Pods/
+ios/build/
+android/app/build/
+android/.gradle/
+*.jks
+*.keystore
+
+# Native tooling
+*.mobileprovision
+*.p8
+*.p12
+
+# Debug / OS
+npm-debug.*
+yarn-error.log
+.DS_Store
+Thumbs.db
+*.log
+
+# TypeScript
+*.tsbuildinfo
