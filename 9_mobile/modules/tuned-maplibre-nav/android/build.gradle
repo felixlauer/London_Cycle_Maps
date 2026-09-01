@@ -1,0 +1,40 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.tunedmaplibrenav'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.tunedmaplibrenav"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+  packagingOptions {
+    // Mapbox Maps (@rnmapbox) + MapLibre Nav both ship native bits.
+    pickFirst '**/libc++_shared.so'
+    pickFirst '**/libmapbox-common.so'
+    pickFirst '**/libmapbox-maps.so'
+  }
+}
+
+dependencies {
+  // Pin matched to MapLibre N0 BYOR spike (see MAPLIBRE_N0_ANDROID.md).
+  // Chrome is React Native, so the vendor navigation-ui AAR is not used —
+  // only the headless engine plus the raw MapLibre map.
+  // Exclude legacy geojson/turf (6.0.1) — navigation-core already brings geojson-jvm/turf-jvm 7.0.0-pre0
+  // (duplicate class packages org.maplibre.geojson / org.maplibre.turf).
+  implementation 'org.maplibre.navigation:navigation-core:5.0.0-pre13'
+  implementation 'org.maplibre.navigation:navigation-location-gms-android:5.0.0-pre13'
+  implementation('org.maplibre.gl:android-sdk:12.3.1') {
+    exclude group: 'org.maplibre.gl', module: 'android-sdk-geojson'
+    exclude group: 'org.maplibre.gl', module: 'android-sdk-turf'
+  }
+  implementation 'androidx.appcompat:appcompat:1.7.0'
+}
+

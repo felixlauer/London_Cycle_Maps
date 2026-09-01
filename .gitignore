@@ -38,6 +38,8 @@ __pycache__/
 # Local test-mode profile store (may contain custom profiles; not for GitHub)
 4_backend_engine/user_profiles.json
 4_backend_engine/bug_reports.json
+4_backend_engine/app_metrics.json
+4_backend_engine/app_metrics.json.tmp
 
 # --- 5_frontend: env & build (node_modules/build also in 5_frontend/.gitignore) ---
 5_frontend/.env

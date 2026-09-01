@@ -97,6 +97,34 @@
   color: #71717a;
 }
 
+.onb-boot__sub--maint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 22rem;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.onb-boot__maint-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 0;
+  color: inherit;
+}
+
+.onb-boot__maint-copy {
+  display: block;
+  min-width: 0;
+}
+
 .onb-screen[data-theme='dark'] .onb-boot__sub {
   color: #a1a1aa;
 }

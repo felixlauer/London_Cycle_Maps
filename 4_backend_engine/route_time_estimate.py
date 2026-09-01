@@ -24,13 +24,17 @@ CLIMB_SECONDS_PER_METRE_BY_BIKE = {
     "cargo": 2.58,  # no separate estimate — treat as standard (conservative)
 }
 
+# Stop seconds aligned with A* additive metres at 16 km/h (CYCLIST_SPEED_MPS).
+# signal 7.5 s → 33.3 m; crossing family (give-way / stop) half signal → 16.7 m;
+# junction danger 8 m; calming "otherwise" 10 m; soft barrier permeable cluster 15 m.
+# Does not change path search — only displayed ETA after A*.
 PENALTY_SECONDS = {
     "signal": 7.5,
-    "give_way": 6.0,
-    "stop_sign": 15.0,
-    "junction": 10.0,
-    "calming": 4.0,
-    "barrier": 20.0,
+    "give_way": 3.75,
+    "stop_sign": 3.75,
+    "junction": 1.8,
+    "calming": 2.25,
+    "barrier": 3.375,
     "climb_per_metre": CLIMB_SECONDS_PER_METRE_BY_BIKE["standard"],
 }
 

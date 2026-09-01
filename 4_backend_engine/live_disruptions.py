@@ -2,7 +2,7 @@
 Unified live disruptions: TfL + TomTom. Safe-update pattern: source-specific state
 then merged MASTER_LIVE_LOOKUP for O(1) routing. app.py and app_debug.py use this module.
 Call init(G) once; then update_disruptions(fetch_tfl=..., fetch_tomtom=...) and query get_edge_disruption(u, v).
-On startup call start_background_refresh() to fetch both sources immediately and every 10 minutes.
+On startup call start_background_refresh() to fetch both sources immediately and every 30 minutes.
 """
 import logging
 import os
@@ -233,7 +233,8 @@ def get_status():
     }
 
 
-DEFAULT_POLL_INTERVAL_S = 600
+# 30 min keeps TomTom Incident Details under the 2.5K/month free tier (~1.4K/mo).
+DEFAULT_POLL_INTERVAL_S = 1800
 
 
 def _poll_loop(interval_s: int) -> None:
@@ -252,7 +253,7 @@ def _poll_loop(interval_s: int) -> None:
 
 
 def start_background_refresh(interval_s: int | None = None) -> None:
-    """Fetch TfL + TomTom disruptions now, then refresh every interval_s (default 10 min)."""
+    """Fetch TfL + TomTom disruptions now, then refresh every interval_s (default 30 min)."""
     if not live_fetch_enabled():
         log.info("live_disruptions: fetch disabled (SKIP_DISRUPTION_FETCH / LIVE_DISRUPTIONS=0)")
         return

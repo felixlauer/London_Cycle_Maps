@@ -12,13 +12,18 @@ import React, {
   useState,
 } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
+import { API_BASE } from '../../api/flaskClient';
 import { useSidebar } from '../shell/SidebarContext';
 
 export const ONBOARDING_DONE_KEY = 'tuned_onboarding_done';
 export const TUTORIAL_DONE_KEY = 'tuned_tutorial_done';
 
 const MIN_BOOT_MS = 1600;
-const SAFETY_TIMEOUT_MS = 6000;
+/** Only soft-timeout map/auth — never bypass a cold backend. */
+const SAFETY_TIMEOUT_MS = 12000;
+const HEALTH_POLL_MS = 2500;
+/** Show warmup copy after this wait if the routing engine isn't ready yet. */
+const MAINTENANCE_HINT_MS = 2800;
 
 /** @typedef {'booting' | 'welcome' | 'signup' | 'wizard' | 'tutorial' | 'done'} OnboardingPhase */
 
@@ -59,6 +64,18 @@ function consumeOnboardingQuery() {
   }
 }
 
+async function fetchBackendReady() {
+  if (!API_BASE) return false;
+  try {
+    const res = await fetch(`${API_BASE}/health`, { cache: 'no-store' });
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => ({}));
+    return Boolean(data?.ready);
+  } catch {
+    return false;
+  }
+}
+
 const OnboardingContext = createContext(null);
 
 export function OnboardingProvider({ children }) {
@@ -75,9 +92,11 @@ export function OnboardingProvider({ children }) {
   const [authReady, setAuthReady] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [profilesReady, setProfilesReady] = useState(false);
+  const [backendReady, setBackendReady] = useState(false);
   const [minElapsed, setMinElapsed] = useState(false);
-  const [safetyFired, setSafetyFired] = useState(false);
+  const [chromeSafety, setChromeSafety] = useState(false);
   const [bootExiting, setBootExiting] = useState(false);
+  const [showMaintenanceHint, setShowMaintenanceHint] = useState(false);
 
   const bootStartRef = useRef(Date.now());
   const advancedFromBootRef = useRef(false);
@@ -107,9 +126,34 @@ export function OnboardingProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    const t = window.setTimeout(() => setSafetyFired(true), SAFETY_TIMEOUT_MS);
+    const t = window.setTimeout(() => setChromeSafety(true), SAFETY_TIMEOUT_MS);
     return () => window.clearTimeout(t);
   }, []);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (!backendReady) setShowMaintenanceHint(true);
+    }, MAINTENANCE_HINT_MS);
+    return () => window.clearTimeout(t);
+  }, [backendReady]);
+
+  useEffect(() => {
+    if (backendReady) {
+      setShowMaintenanceHint(false);
+      return undefined;
+    }
+    let cancelled = false;
+    const tick = async () => {
+      const ok = await fetchBackendReady();
+      if (!cancelled && ok) setBackendReady(true);
+    };
+    tick();
+    const id = window.setInterval(tick, HEALTH_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [backendReady]);
 
   useEffect(() => {
     if (user?.display_name) {
@@ -122,7 +166,8 @@ export function OnboardingProvider({ children }) {
   const markMapReady = useCallback(() => setMapReady(true), []);
   const markProfilesReady = useCallback(() => setProfilesReady(true), []);
 
-  const ready = (authReady && mapReady && profilesReady && minElapsed) || safetyFired;
+  const chromeReady = (authReady && mapReady && profilesReady && minElapsed) || chromeSafety;
+  const ready = Boolean(backendReady && chromeReady);
 
   const persistDone = useCallback((tutorialToo = false) => {
     writeFlag(ONBOARDING_DONE_KEY, true);
@@ -200,6 +245,8 @@ export function OnboardingProvider({ children }) {
     themeMode,
     bootExiting,
     ready,
+    backendReady,
+    showMaintenanceHint,
     user,
     markMapReady,
     markProfilesReady,
@@ -212,7 +259,8 @@ export function OnboardingProvider({ children }) {
     skipAll,
     replayTutorial,
   }), [
-    phase, isFirstTimer, displayName, onboardingTheme, themeMode, bootExiting, ready, user,
+    phase, isFirstTimer, displayName, onboardingTheme, themeMode, bootExiting, ready,
+    backendReady, showMaintenanceHint, user,
     markMapReady, markProfilesReady, chooseGuest, chooseSignIn, chooseSignup, signupDone, wizardDone,
     finishOnboarding, skipAll, replayTutorial,
   ]);

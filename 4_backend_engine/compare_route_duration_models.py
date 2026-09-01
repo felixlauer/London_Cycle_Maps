@@ -49,7 +49,7 @@ REPORT_DIR = REPO_ROOT / "0_documentation" / "testing"
 REPORT_MD = REPORT_DIR / "route_duration_models_compare.md"
 REPORT_JSON = REPORT_DIR / "route_duration_models_compare.json"
 
-SPEED_KMH = float(os.environ.get("DURATION_SPEED_KMH", "16"))
+SPEED_KMH = float(os.environ.get("DURATION_SPEED_KMH", "20"))
 # Phase B signal seconds to evaluate (comma list). Default: aggressive + hybrid.
 PHASE_B_SIGNAL_LIST = [
     float(x.strip())

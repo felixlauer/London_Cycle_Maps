@@ -278,7 +278,7 @@ export function MultiLegRouteLayers({
       attached = [];
       routeLegs.forEach((_, i) => {
         if (i === activeLegIndex) return;
-        ['safe', 'fast'].forEach((kind) => {
+        ['safe'].forEach((kind) => {
           ['casing', 'line'].forEach((part) => {
             const id = `${kind}-${i}-${part}`;
             if (!map.getLayer(id)) return;
@@ -313,17 +313,6 @@ export function MultiLegRouteLayers({
     const safest = leg?.safest || {};
     return (
       <React.Fragment key={`leg-${i}`}>
-        {leg?.fastest?.path?.length > 1 && (
-          <CasedLineSource
-            id={`fast-${i}`}
-            data={pathToLineGeoJSON(leg.fastest.path)}
-            color={theme.routeFastestCore || '#d4d4d8'}
-            casingColor={theme.routeFastestCasing || '#52525b'}
-            width={active ? 4 : 3}
-            casingWidth={active ? 8 : 6}
-            opacity={active ? 0.85 : 0.28}
-          />
-        )}
         {safest.path?.length > 1 && (
           <CasedLineSource
             id={`safe-${i}`}
@@ -374,7 +363,7 @@ export function pickInactiveLegIndex(map, point, routeLegs, activeLegIndex) {
   const layers = [];
   for (let i = 0; i < routeLegs.length; i += 1) {
     if (i === activeLegIndex) continue;
-    ['safe', 'fast'].forEach((kind) => {
+    ['safe'].forEach((kind) => {
       ['casing', 'line'].forEach((part) => {
         const id = `${kind}-${i}-${part}`;
         if (map.getLayer(id)) layers.push(id);
@@ -386,12 +375,11 @@ export function pickInactiveLegIndex(map, point, routeLegs, activeLegIndex) {
   if (!layers.length) return null;
   const hits = map.queryRenderedFeatures(point, { layers });
   if (!hits.length) return null;
-  const match = String(hits[0].layer?.id || '').match(/^(?:safe|fast)-(\d+)/);
+  const match = String(hits[0].layer?.id || '').match(/^safe-(\d+)/);
   return match ? Number(match[1]) : null;
 }
 
 export function SingleRouteLayers({
-  fastestPath,
   safestPath,
   litSegments,
   steepSegments,
@@ -406,17 +394,6 @@ export function SingleRouteLayers({
 }) {
   return (
     <>
-      {fastestPath?.length > 1 && (
-        <CasedLineSource
-          id="fast-single"
-          data={pathToLineGeoJSON(fastestPath)}
-          color={theme.routeFastestCore || '#d4d4d8'}
-          casingColor={theme.routeFastestCasing || '#52525b'}
-          width={4}
-          casingWidth={8}
-          opacity={0.85}
-        />
-      )}
       {safestPath?.length > 1 && (
         <CasedLineSource
           id="safe-single"

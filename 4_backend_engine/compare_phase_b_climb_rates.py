@@ -8,7 +8,7 @@ Compares climb s/m:
   2.58  — Miotti & Hellweg standard bike (SSRN 5050670)
   1.54  — Miotti & Hellweg e-bike
 
-Also reports cruise at bike-type speeds (standard 15 / ebike 18 km/h) with
+Also reports cruise at bike-type speeds (standard 20 / ebike 25 km/h) with
 matching climb rates (full bike-aware Phase B sketch).
 
   cd c:\\London_Cycle_Maps
@@ -38,7 +38,7 @@ import route_time_estimate as rte  # noqa: E402
 from user_profiles import BIKE_SPEEDS_KMH  # noqa: E402
 
 # Fixed cruise speed used in the aligned compare (for apples-to-apples climb-only Δ).
-ALIGNED_SPEED_KMH = 16.0
+ALIGNED_SPEED_KMH = 20.0
 CLIMB_RATES = {
     "legacy_1.0": 1.0,
     "miotti_standard_2.58": 2.58,

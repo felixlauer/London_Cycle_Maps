@@ -607,7 +607,7 @@ def make_array_cost_by_eid_optimized(
     r_min: float,
 ):
     """Return cost(eid: int) -> float matching make_array_weight_fn_optimized."""
-    from cost_masks import vf_allowed_masks
+    from cost_masks import VF_MASK_CORE, vf_allowed_masks
     from routing_heuristic import (
         green_reward,
         tfl_network_reward,
@@ -683,7 +683,9 @@ def make_array_cost_by_eid_optimized(
         speed_m = 0.0 if vehicular_free else speed_a[i] * w_speed
         m_total = max(m_min, 1.0 + risk_p + light_p + surf_p + speed_m)
 
-        if apply_live_soft:
+        # Soft live extras skip the physically separated core (same as Python
+        # make_weight_optimized). Hard closures already live in impassable[].
+        if apply_live_soft and not (edge_vf & VF_MASK_CORE):
             m_total = m_total + live_add_c[i] * w_live
             m_total *= 1.0 + live_env_e[i] * w_live_cap
             m_total *= 1.0 + live_sev_e[i] * w_live_cap

@@ -47,10 +47,11 @@
   pointer-events: none;
 }
 
-.app-root[data-theme='dark'] .santander-guide-pill {
-  background: #1d2025;
-  color: #e6e8eb;
-  border-color: #343a43;
+.app-root[data-theme='dark'] .santander-guide-pill,
+.map-shell[data-theme='dark'] .santander-guide-pill {
+  background: #1c1c1e;
+  color: #f4f4f5;
+  border-color: #3a3a3c;
 }
 
 .santander-soft-banner {
@@ -153,6 +154,22 @@
   --st-line: #e4e4e7;
   --st-surface: #fff;
   --st-ink: #3f3f46;
+  --st-confirm: #f4f4f5;
+  --st-confirm-hover: #ebebec;
+}
+
+/* Dark — match map-shell chrome / native hire cards */
+.santander-anchor[data-theme='dark'],
+.map-shell[data-theme='dark'] .santander-anchor,
+.app-root[data-theme='dark'] .santander-anchor {
+  --st-text: #f4f4f5;
+  --st-text-sub: #a1a1aa;
+  --st-muted: #71717a;
+  --st-line: #3a3a3c;
+  --st-surface: #1c1c1e;
+  --st-ink: #f4f4f5;
+  --st-confirm: #2c2c2e;
+  --st-confirm-hover: #3a3a3c;
 }
 
 /* Single drop-shadow on the combined white silhouette — no seam */
@@ -161,6 +178,12 @@
   left: 0;
   top: 0;
   filter: drop-shadow(0 3px 10px rgba(16, 24, 40, 0.18));
+}
+
+.santander-anchor[data-theme='dark'] .santander-pin-unit,
+.map-shell[data-theme='dark'] .santander-pin-unit,
+.app-root[data-theme='dark'] .santander-pin-unit {
+  filter: drop-shadow(0 3px 12px rgba(0, 0, 0, 0.55));
 }
 
 /* Tip at (0,0). Card left = tip - --beak-along so tip sits under "|". */
@@ -364,7 +387,7 @@
   padding: 7px 12px;
   border-radius: 9px;
   border: none;
-  background: #f4f4f5;
+  background: var(--st-confirm);
   color: var(--st-text);
   font-size: 12px;
   font-weight: 650;
@@ -376,7 +399,7 @@
 }
 
 .santander-confirm-btn:hover {
-  background: #ebebec;
+  background: var(--st-confirm-hover);
 }
 
 .santander-confirm-btn:active {

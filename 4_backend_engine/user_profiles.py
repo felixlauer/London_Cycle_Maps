@@ -52,7 +52,10 @@ WEIGHT_MIN = 0.0
 EPSILON = 0.0001
 
 BIKE_TYPES = ("standard", "road", "ebike", "cargo")
-BIKE_SPEEDS_KMH = {"standard": 15.0, "road": 21.0, "ebike": 18.0, "cargo": 15.0}
+# Displayed ride-time *moving* cruise (before stop/climb seconds).
+# Wizard "avg" badges and slider-minute labels stay in preset_config.json
+# (15 / 21 / 18 / 15) so the 19 June collection sequence still matches.
+BIKE_SPEEDS_KMH = {"standard": 20.0, "road": 28.0, "ebike": 25.0, "cargo": 20.0}
 DEFAULT_BIKE_TYPE = "standard"
 # Cap stored custom profile names so routing Mode pills stay tidy (C1–C3 labels).
 MAX_PROFILE_NAME_LEN = 22

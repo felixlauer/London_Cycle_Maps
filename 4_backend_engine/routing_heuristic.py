@@ -24,14 +24,49 @@ M_MIN = 0.1
 
 # Production default: bounded-suboptimal A* (cost <= (1+eps) x optimal). Verified
 # 2026-07-09: exact path match vs eps=0.5 on routes 1 and 10 (Safe preset).
-# Override with ROUTE_HEURISTIC_EPSILON env.
+# A leftover ROUTE_HEURISTIC_EPSILON=0.5 in .env is ignored so a code deploy
+# ships 0.75. Set ROUTE_HEURISTIC_EPSILON_FORCE=1 to honour the env value.
 DEFAULT_ROUTE_HEURISTIC_EPSILON = 0.75
 
 
-def get_route_heuristic_epsilon() -> float:
-    """ROUTE_HEURISTIC_EPSILON env overrides; else DEFAULT_ROUTE_HEURISTIC_EPSILON."""
+def _env_force_heuristic_epsilon() -> bool:
     import os
 
+    return os.environ.get("ROUTE_HEURISTIC_EPSILON_FORCE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def ignored_epsilon_env_note() -> str | None:
+    """Startup warning when .env still pins 0.5 but the shipped value is used."""
+    import os
+
+    if _env_force_heuristic_epsilon():
+        return None
+    raw = os.environ.get("ROUTE_HEURISTIC_EPSILON")
+    if raw is None or not str(raw).strip():
+        return None
+    try:
+        pinned = float(raw)
+    except ValueError:
+        return None
+    if abs(pinned - DEFAULT_ROUTE_HEURISTIC_EPSILON) < 1e-12:
+        return None
+    return (
+        f"Ignoring ROUTE_HEURISTIC_EPSILON={pinned:g} in the environment; "
+        f"shipped optimised epsilon is {DEFAULT_ROUTE_HEURISTIC_EPSILON}. "
+        "Set ROUTE_HEURISTIC_EPSILON_FORCE=1 to override."
+    )
+
+
+def get_route_heuristic_epsilon() -> float:
+    """Shipped 0.75 unless ROUTE_HEURISTIC_EPSILON_FORCE=1 and env is set."""
+    import os
+
+    if not _env_force_heuristic_epsilon():
+        return DEFAULT_ROUTE_HEURISTIC_EPSILON
     raw = os.environ.get("ROUTE_HEURISTIC_EPSILON")
     if raw is None or not str(raw).strip():
         return DEFAULT_ROUTE_HEURISTIC_EPSILON

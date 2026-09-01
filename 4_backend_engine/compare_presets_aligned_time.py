@@ -8,14 +8,15 @@ Routes with live app.SIGNAL_WAIT_SECONDS, then times with live Phase B:
   cd c:\\London_Cycle_Maps
   python 4_backend_engine/compare_presets_aligned_time.py
 
-Writes (default — does not overwrite the previous baseline run):
-  0_documentation/testing/presets_aligned_time_compare_phase_b_live.{md,json}
+Writes (default — dated run folder, same-day re-runs overwrite that day only):
+  0_documentation/testing/runs/YYYY-MM-DD/presets_aligned_time_compare_phase_b_live.{md,json}
 
-Previous baseline to diff against:
+Previous baseline to diff against (fixed historical file):
   0_documentation/testing/presets_aligned_time_compare.{md,json}
 
 Override output:
   set COMPARE_ALIGNED_OUT=path\\to\\out.md
+  set COMPARE_ALIGNED_RUN=YYYY-MM-DD   # pick the run folder date (default: today)
 """
 from __future__ import annotations
 
@@ -31,19 +32,27 @@ from statistics import mean
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BACKEND_DIR = REPO_ROOT / "4_backend_engine"
-REPORT_DIR = REPO_ROOT / "0_documentation" / "testing"
-# Default writes a *new* file so the previous 7.5s / climb-1.0 run stays for diff.
-REPORT_MD = Path(
-    os.environ.get(
-        "COMPARE_ALIGNED_OUT",
-        str(REPORT_DIR / "presets_aligned_time_compare_phase_b_live.md"),
-    )
-)
-REPORT_JSON = REPORT_MD.with_suffix(".json")
-PREV_JSON = REPORT_DIR / "presets_aligned_time_compare.json"
+TEST_DIR = REPO_ROOT / "0_documentation" / "testing"
+RUNS_DIR = TEST_DIR / "runs"
+PRESET_REPORT_STEM = "presets_aligned_time_compare_phase_b_live"
+PREV_JSON = TEST_DIR / "presets_aligned_time_compare.json"
 WIZARD_JS = REPO_ROOT / "5_frontend" / "src" / "wizard" / "fastSavings.js"
 
-SPEED_KMH = float(os.environ.get("DURATION_SPEED_KMH", "16"))
+SPEED_KMH = float(os.environ.get("DURATION_SPEED_KMH", "20"))
+
+
+def resolve_output_paths() -> tuple[Path, Path, Path]:
+    """Return (run_dir, report_md, report_json)."""
+    override = os.environ.get("COMPARE_ALIGNED_OUT")
+    if override:
+        md = Path(override)
+        if not md.is_absolute():
+            md = (REPO_ROOT / md).resolve()
+        return md.parent, md, md.with_suffix(".json")
+    stamp = os.environ.get("COMPARE_ALIGNED_RUN") or datetime.now().strftime("%Y-%m-%d")
+    run_dir = RUNS_DIR / stamp
+    md = run_dir / f"{PRESET_REPORT_STEM}.md"
+    return run_dir, md, md.with_suffix(".json")
 
 CORE_KEYS = [
     ("length_m", "Length (m)"),
@@ -207,6 +216,7 @@ def core_from_stats(stats: dict) -> dict:
 
 
 def main() -> int:
+    run_dir, report_md, report_json = resolve_output_paths()
     _mock_flask()
     os.chdir(BACKEND_DIR)
     import benchmark_array_costs as bac
@@ -223,6 +233,8 @@ def main() -> int:
     G = app_mod.G
     if G is None:
         raise RuntimeError("Graph failed to load.")
+
+    print(f"Output run folder: {run_dir}", flush=True)
 
     wait_s = float(app_mod.SIGNAL_WAIT_SECONDS)
     penalty_signal_s = float(rte.PENALTY_SECONDS["signal"])
@@ -383,6 +395,11 @@ def main() -> int:
                 "phase_a_live_min": round(phase_a, 2),
                 "phase_b_min": round(api, 2),
                 "phase_b_penalty_min": round(manual["penalty_min"], 2),
+                "implied_kmh": round(
+                    (float(stats["length_m"]) / 1000.0) / (api / 60.0), 2
+                )
+                if api
+                else None,
                 "phase_b_parts_s": manual["parts_s"],
                 "vf_lengths_m": manual["vf_lengths_m"],
                 "stats_duration_min": live,
@@ -572,14 +589,16 @@ def main() -> int:
         "fast_vs_safe_fails": fail_details,
         "rows": rows,
     }
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    REPORT_JSON.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    run_dir.mkdir(parents=True, exist_ok=True)
+    report_json.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     # Markdown
     lines = [
         "# Presets aligned time compare — live Phase B (Miotti + Jafari VF)",
         "",
         f"Generated: `{summary['generated_at']}`",
+        "",
+        f"Run folder: `{run_dir}`",
         "",
         f"Climb: **{rte.PENALTY_SECONDS['climb_per_metre']} s/m** · "
         f"`ROUTE_TIME_MODEL={rte.route_time_model()}` · Jafari VF cruise **on**",
@@ -686,17 +705,18 @@ def main() -> int:
     lines += [
         "## How to read",
         "",
-        "- **Cruise** = length / 16 km/h (no Fast 1.35×).",
+        "- **Cruise** = length / 20 km/h (no Fast 1.35×).",
         "- **Phase A×** = live display (Fast still ×1.35) — shown only for contrast.",
         "- **Phase B** = cruise + metric×`PENALTY_SECONDS` (canonical ETA under alignment).",
         "- Fast is *not* length-shortest; it trades distance for fewer signals/calming/climb. "
         "If the detour costs more cruise minutes than the signal seconds save, Fast loses on B.",
         "",
-        f"JSON: `{REPORT_JSON}`",
+        f"JSON: `{report_json}`",
         "",
     ]
-    REPORT_MD.write_text("\n".join(lines), encoding="utf-8")
-    print(f"\nWrote {REPORT_MD}")
+    report_md.write_text("\n".join(lines), encoding="utf-8")
+    print(f"\nWrote {report_md}")
+    print(f"Wrote {report_json}")
     print(
         f"Fast<=Safe Phase B: {wins_b}/{len(route_names)}  "
         f"cruise: {wins_cruise}/{len(route_names)}"

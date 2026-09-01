@@ -35,8 +35,6 @@ SNAP_THRESHOLD = 0.0002
 SNAP_THRESHOLD_SIGN = 0.00015
 # Kerb: only snap to these highway types (pedestrian ways)
 PEDESTRIAN_HIGHWAY_TYPES = frozenset(['footway', 'pedestrian', 'path', 'steps'])
-# Straight segment: length/straight_line_distance <= this
-STRAIGHT_RATIO_MAX = 1.05
 # Orthogonal distance (m) above which barrier_confidence = 0
 BARRIER_ORTHOGONAL_THRESHOLD_M = 4.0
 # Approx metres per degree at London (~51.5°): 111e3 for rough conversion
@@ -414,18 +412,10 @@ def main():
         return t in PEDESTRIAN_HIGHWAY_TYPES
 
     def _barrier_confidence(pt, line, threshold_m):
-        """Return 0-1 confidence: curved -> 0.5; straight -> 1 - (d_orth_m / threshold_m) clamped."""
+        """Return 0-1 confidence from orthogonal offset: 1 - (d_orth_m / threshold_m) clamped."""
         coords = list(line.coords)
         if len(coords) < 2:
-            return 0.5
-        start, end = coords[0], coords[-1]
-        d_straight = Point(start).distance(Point(end))
-        length_deg = line.length
-        if d_straight < 1e-12:
-            return 0.5
-        ratio = length_deg / d_straight
-        if ratio > STRAIGHT_RATIO_MAX:
-            return 0.5
+            return 0.0
         d_orth_deg = pt.distance(line)
         d_orth_m = d_orth_deg * DEG_TO_M
         if d_orth_m >= threshold_m:

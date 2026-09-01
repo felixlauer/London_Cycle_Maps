@@ -597,11 +597,17 @@
   }
 
   .island-expanded.is-mobile .island-expanded__chart {
-    height: 100%;
-    width: 100%;
-    overflow: hidden;
     display: flex;
+    flex-direction: column;
     align-items: stretch;
+    /* Pull slightly into island padding; keep enough inner gutter for Y labels. */
+    width: calc(100% + 20px);
+    max-width: none;
+    height: 100%;
+    min-height: 0;
+    margin-left: -10px;
+    margin-right: -10px;
+    overflow: hidden;
   }
 
   .island-expanded.is-mobile .island-expanded__chart > *,
@@ -609,7 +615,15 @@
     flex: 1;
     min-height: 0;
     width: 100%;
+    max-width: none;
     height: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    overflow: visible;
+  }
+
+  .island-expanded.is-mobile .island-chart__tick--y {
+    font-size: 9px;
   }
 
   .island-expanded__bars {
@@ -1283,14 +1297,14 @@
 
 .island-chart__gain {
   position: absolute;
-  top: 4px;
+  top: 0;
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
-  padding: 4px 10px;
+  padding: 3px 10px;
   border-radius: 999px;
   background: var(--shell-bg, #fff);
   border: 1px solid var(--shell-border, #e5e7eb);
@@ -1301,6 +1315,11 @@
   white-space: nowrap;
   pointer-events: none;
   max-width: calc(100% - 16px);
+}
+
+.island-chart__tick--y {
+  font-size: 8.5px;
+  font-weight: 550;
 }
 
 .island-chart__gain strong {

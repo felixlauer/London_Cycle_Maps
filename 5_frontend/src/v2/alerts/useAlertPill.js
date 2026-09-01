@@ -47,12 +47,13 @@ export function useAlertPill() {
       message: next.message,
       sticky,
       actions: next.actions || null,
+      help: Boolean(next.help),
       meta: next.meta || null,
     };
     alertRef.current = entry;
     setAlert(entry);
 
-    const ttl = ALERT_TTL_MS[type];
+    const ttl = next.ttl ?? ALERT_TTL_MS[type];
     if (!sticky && ttl != null) {
       timerRef.current = setTimeout(() => {
         timerRef.current = null;

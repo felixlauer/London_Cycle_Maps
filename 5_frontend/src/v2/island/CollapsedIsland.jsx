@@ -10,8 +10,6 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import {
   formatDurationParts,
   formatDistanceParts,
-  formatTimeDelta,
-  formatDistanceDelta,
 } from './metrics';
 
 /** Caption under the donut while a kind is hovered (map or local). */
@@ -91,7 +89,6 @@ function ContentSlot({ slot, safest, externalHover, onHoverChange }) {
  */
 export default function CollapsedIsland({
   safest,
-  fastest,
   slots,
   units,
   onExpand,
@@ -102,7 +99,6 @@ export default function CollapsedIsland({
   const isMobile = useIsMobile();
   const touchStartY = useRef(null);
   const sStats = safest?.stats || {};
-  const fStats = fastest?.stats || {};
   const multi = legCount > 1;
 
   const handleExpandClick = (e) => {
@@ -142,16 +138,12 @@ export default function CollapsedIsland({
           <MetricCell
             ariaLabel="Trip time"
             parts={formatDurationParts(sStats.duration_min)}
-            delta={isMobile ? null : formatTimeDelta(sStats.duration_min, fStats.duration_min)}
-            twoLineDelta={!isMobile}
           />
         </div>
         <div className="island-collapsed__cell">
           <MetricCell
             ariaLabel="Trip distance"
             parts={formatDistanceParts(sStats.length_m, units)}
-            delta={isMobile ? null : formatDistanceDelta(sStats.length_m, fStats.length_m, units)}
-            twoLineDelta={!isMobile}
           />
         </div>
         <div className="island-collapsed__cell">

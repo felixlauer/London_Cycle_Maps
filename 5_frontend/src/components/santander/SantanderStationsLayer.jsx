@@ -18,12 +18,13 @@ function StationCard({
   availabilityNeed,
   onExpand,
   onConfirm,
+  themeMode = 'light',
 }) {
   const unavailable = availabilityNeed === 'docks'
     ? !(station.nb_empty > 0)
     : !(station.nb_bikes > 0);
   const walkMin = station.walk_duration_min ?? station.walk_estimate_min ?? 1;
-  const walkLabel = station.walk_duration_min != null ? 'walk' : 'estimated walk';
+  const walkLabel = station.walk_duration_min != null ? 'walk' : 'estimated';
   const alongPx = along ?? (expanded ? BEAK_ALONG_EXPANDED : BEAK_ALONG_COMPACT);
 
   const handleClick = (e) => {
@@ -39,6 +40,7 @@ function StationCard({
   return (
     <div
       className="santander-anchor"
+      data-theme={themeMode}
       style={{ '--beak-along': `${alongPx}px` }}
       onClick={handleClick}
       onKeyDown={(e) => {
@@ -84,7 +86,7 @@ function StationCard({
                   aria-hidden
                 />
                 <div className="santander-walk-text">
-                  <strong>{walkMin} minutes</strong>
+                  <strong>{walkMin} min</strong>
                   <span>{walkLabel}</span>
                 </div>
                 {showConfirm && confirmLabel && (
@@ -130,6 +132,7 @@ function StationMarker({
   availabilityNeed,
   onExpand,
   onConfirm,
+  themeMode = 'light',
 }) {
   return (
     <Marker
@@ -151,6 +154,7 @@ function StationMarker({
           availabilityNeed={availabilityNeed}
           onExpand={onExpand}
           onConfirm={onConfirm}
+          themeMode={themeMode}
         />
       </div>
     </Marker>
@@ -189,6 +193,7 @@ export default function SantanderStationsLayer({
   onExpand,
   onConfirm,
   compact = false,
+  themeMode = 'light',
 }) {
   const maps = useMap();
   const map = maps.main || maps.current;
@@ -235,6 +240,7 @@ export default function SantanderStationsLayer({
           availabilityNeed={availabilityNeed}
           onExpand={onExpand}
           onConfirm={onConfirm}
+          themeMode={themeMode}
         />
       ))}
     </>

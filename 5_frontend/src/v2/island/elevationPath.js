@@ -28,6 +28,8 @@ export function scaleProfile(profile, {
   width,
   height,
   padX = 0,
+  padLeft,
+  padRight,
   padTop = 4,
   padBottom = 2,
   smoothWindow = 5,
@@ -49,12 +51,14 @@ export function scaleProfile(profile, {
     eMax = mid + 4;
   }
 
-  const innerW = width - padX * 2;
+  const left = padLeft != null ? padLeft : padX;
+  const right = padRight != null ? padRight : padX;
+  const innerW = width - left - right;
   const innerH = height - padTop - padBottom;
-  const xForD = (d) => padX + (Math.max(0, Math.min(dMax, d)) / dMax) * innerW;
+  const xForD = (d) => left + (Math.max(0, Math.min(dMax, d)) / dMax) * innerW;
   const yForE = (e) => padTop + (1 - (e - eMin) / (eMax - eMin)) * innerH;
   const points = ds.map((d, i) => [xForD(d), yForE(es[i])]);
-  return { points, xForD, yForE, dMax, eMin, eMax };
+  return { points, xForD, yForE, dMax, eMin, eMax, padLeft: left, padRight: right };
 }
 
 /** Catmull-Rom spline through points → SVG path "M … C …". */

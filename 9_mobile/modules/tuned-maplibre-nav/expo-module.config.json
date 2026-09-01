@@ -1,0 +1,9 @@
+{
+  "platforms": ["android", "apple", "web"],
+  "apple": {
+    "modules": ["TunedMaplibreNavModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.tunedmaplibrenav.TunedMaplibreNavModule"]
+  }
+}

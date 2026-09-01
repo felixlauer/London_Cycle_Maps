@@ -26,43 +26,6 @@ export function formatDistanceParts(metres, units = 'metric') {
   return { value: km < 10 ? km.toFixed(1) : String(Math.round(km)), unit: 'km' };
 }
 
-const COMPARE_VS = 'non-tuned';
-
-function signedDelta(sign, magnitude) {
-  return `${sign}${magnitude} vs ${COMPARE_VS}`;
-}
-
-/** Signed comparison vs non-tuned (fastest) baseline — all screen sizes. */
-export function formatTimeDelta(safestMin, fastestMin) {
-  const a = Number(safestMin);
-  const b = Number(fastestMin);
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-  const delta = Math.round(a - b);
-  if (delta === 0) return `same as ${COMPARE_VS}`;
-  const sign = delta > 0 ? '+' : '−';
-  return signedDelta(sign, `${Math.abs(delta)} min`);
-}
-
-/** Signed distance comparison vs non-tuned (fastest) baseline — all screen sizes. */
-export function formatDistanceDelta(safestM, fastestM, units = 'metric') {
-  const a = Number(safestM);
-  const b = Number(fastestM);
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-  const deltaM = a - b;
-  if (Math.abs(deltaM) < 25) return `same as ${COMPARE_VS}`;
-  const sign = deltaM > 0 ? '+' : '−';
-  const abs = Math.abs(deltaM);
-  if (units === 'imperial') {
-    const miles = abs / 1609.344;
-    if (miles < 0.1) {
-      return signedDelta(sign, `${Math.round(abs / 0.3048)} ft`);
-    }
-    return signedDelta(sign, `${miles.toFixed(1)} mi`);
-  }
-  if (abs < 1000) return signedDelta(sign, `${Math.round(abs)} m`);
-  return signedDelta(sign, `${(abs / 1000).toFixed(1)} km`);
-}
-
 /** Split walk labels for Santander metrics: time above duration, distance above length. */
 export function formatWalkParts(durationMin, distanceM, units = 'metric') {
   const mins = Number(durationMin);

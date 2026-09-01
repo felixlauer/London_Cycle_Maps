@@ -101,10 +101,11 @@ Shared infrastructure (both UIs): `src/map/` (Mapbox GL), `src/auth/`, `src/api/
 - **Architecture:** Browser never holds the Supabase anon key or Mapbox key. Password operations are **proxied and rate-limited** by Flask (`auth_rate_limit.py`): login lockout after 5 failures / 15 min, IP caps, reset/signup throttles. **Committed Get Route** (`purpose=commit`) is capped at **5 / IP / minute**; background `purpose=prefetch` is **not** counted (see §3.2a). Flask verifies JWTs in `auth_middleware.py`. `g.user_id` comes from the token `sub` claim **only**.
 - **Endpoints:** `POST /auth/login|signup|password-reset|refresh|change-password|set-password`, `DELETE /auth/account`, `POST /auth/check-email`. Geocoding: `GET /geocode/suggest`, `GET /geocode/retrieve/<id>`.
 - **Repository pattern** (`profile_store.py`): `ProfileStore` ABC with `LocalJsonStore` (`user_profiles.json`) and `SupabaseStore` (Supabase `profiles` table). Selection via `PROFILE_STORE` env (`auto | local | supabase`; auto = Supabase when configured). Validation/clamping stays in `user_profiles.py`.
-- **Tenancy:** `SupabaseStore` uses the **service role key, which bypasses RLS** — every user-row query therefore explicitly filters `.eq('user_id', user_id)` at the application layer. RLS policies (see `4_backend_engine/supabase/migrations/001_profiles.sql`) remain as defense-in-depth against direct Supabase access.
+- **Tenancy:** `SupabaseStore` uses the **service role key, which bypasses RLS** — every user-row query therefore explicitly filters `.eq('user_id', user_id)` at the application layer. RLS policies (see `4_backend_engine/supabase_sql/migrations/001_profiles.sql`) remain as defense-in-depth against direct Supabase access.
 - **Access rules:** Guest — system presets only; `POST /profiles` returns 401. Authenticated — system + own profiles; `/route` with another user's profile id returns 404 (store-scoped lookup). `POST /profiles` whitelists body fields (`name, weights, bike_type, preset, toggles`) and hardcodes `is_system=False`, `user_id=g.user_id` — client-sent `is_system` / `user_id` / `id` / `slug` are dropped.
 - **Test-mode bypass:** requests with `X-Tuned-Test-Mode: 1` skip JWT and use `LocalJsonStore`, but **only** when `ALLOW_TEST_MODE=1` **and** the request comes from localhost (`127.0.0.1` / `::1`) — a mis-set env var cannot open the bypass in production.
-- **Setup:** run `001_profiles.sql` (+ optional `002_user_email_lookup.sql`), enable Email auth, seed presets, fill `4_backend_engine/.env` (`SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `MAPBOX_API_KEY`). Also enable **Auth rate limits** in the Supabase dashboard (defence if GoTrue is hit directly).
+- **Ride reports:** `005_ride_reports.sql` adds `public.ride_reports` — `client_event_id` unique (idempotent retries), nullable `user_id` (guests report via `device_id`), `personal_only` / `simulate` flags, and snap columns the backend writes back. RLS denies everything; only the service role reads or writes. See §5.6a for how rows become routing effects.
+- **Setup:** run `001_profiles.sql` (+ optional `002_user_email_lookup.sql`, `005_ride_reports.sql`), enable Email auth, seed presets, fill `4_backend_engine/.env` (`SUPABASE_URL`, `SUPABASE_JWT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `MAPBOX_API_KEY`). Also enable **Auth rate limits** in the Supabase dashboard (defence if GoTrue is hit directly).
 - **Debug:** `/route` meta includes `auth: { mode: guest|user|test, user_id }`.
 - **Tests:** `python -m unittest test_profile_store test_auth_rate_limit test_auth_account test_route_vias -v`.
 
@@ -198,7 +199,7 @@ Shared infrastructure (both UIs): `src/map/` (Mapbox GL), `src/auth/`, `src/api/
 | GET | `/profiles` | optional `Authorization: Bearer <jwt>` | `{ profiles: [...] }` — system presets + (when authenticated) own profiles |
 | GET | `/profiles/<profile_id>` | optional `Authorization` | `{ id, name, weights, ... }` or 404; custom profiles require ownership |
 | POST | `/profiles` | `Authorization` required (or test mode); JSON `{ name, weights, bike_type, preset, toggles }` — other fields dropped | profile (201), 400 invalid, 401 guest |
-| GET | `/route` | `start_lat`, `start_lon`, `end_lat`, `end_lon`, optional **`vias`** (`lat,lon;…` max 3), optional **`purpose`** (`commit`\|`prefetch`, default `commit`), **`profile_id`** *or* explicit weight params; optional **`depart_at`** (ISO-8601 London) | See below — `legs[]` + aggregated `fastest`/`safest`; commit → 429 if IP over 5/min |
+| GET | `/route` | `start_lat`, `start_lon`, `end_lat`, `end_lon`, optional **`vias`** (`lat,lon;…` max 3), optional **`avoid_points`** (`lat,lon;…` max 5 — hard-blocked for this request only), optional **`purpose`** (`commit`\|`prefetch`, default `commit`), **`profile_id`** *or* explicit weight params; optional **`depart_at`** (ISO-8601 London) | See below — `legs[]` + aggregated `fastest`/`safest`; commit → 429 if IP over 5/min |
 | GET | `/overlay_catalog` | — | `{ version, edge: [...], point: [...] }` — **legacy** Layers FAB only (not used by v2 mode rail) |
 | GET | `/night_status` | — | London day/night / sunrise-sunset payload for appearance + light overlay gating |
 | GET | `/weather` | `lat`, `lon`, optional `at` (ISO) | Open-Meteo proxy: temp, WMO code, wind, UV, etc. Test mode: synthetic extremes (`--weather-test`) |
@@ -213,6 +214,7 @@ Shared infrastructure (both UIs): `src/map/` (Mapbox GL), `src/auth/`, `src/api/
 | POST | `/santander/walk` | JSON `{ from:[lat,lon], to:[lat,lon] }` | `{ path, duration_s, distance_m, duration_min }` — ORS foot-walking; 503 if `ORS_API_KEY` missing |
 | GET | `/admin/santander_status` | — | `{ loaded, station_count, last_update, last_error, fetch_enabled, ors_configured }` |
 | POST | `/admin/update_santander` | (none) | `{ ok, message, count }` — refresh BikePoint cache now |
+| POST | `/feedback/ride-reports` | optional `Authorization`; JSON `{ reports: [...] }` max 25. Each: `client_event_id` (uuid), `category`, `lat`, `lon`, `payload`, optional `device_id`, `simulate`, `personal_only` | `{ ok, accepted: [...], duplicates: [...], errors: [...] }` — in-ride route feedback, see §5.6a. Guests allowed; `user_id` always from the JWT. 20/user/hour, 30/IP/hour, charged per report |
 
 ### 4.1 Dynamic API data (live disruptions)
 
@@ -332,6 +334,44 @@ A_{\text{total}} = A_{\text{intersection}} + A_{\text{mini\_roundabout}} + A_{\t
 - **Incident categories:** \(M_{\text{total}} \mathrel{+}= 2.0 \times w_{\text{tfl\_live}}\).
 - **Severity multiplier:** \(M_{\text{total}} \mathrel{*}= \text{severity\_multiplier}\) where Minimal = 1.1, Low = 1.15, Moderate = 1.3, Serious = 1.5, Severe = 2.0.
 
+### 5.6a Rider feedback overlay (crowd_overlays.py)
+
+In-ride reports from the TBT **Report** flag (`ride_reports` table) become additive
+effects on the cost arrays. Two invariants hold the design together:
+
+- **The graph is never written.** Reports patch *copies* of the arrays, so OSM tags on
+  the pickle are exactly what the pipeline produced. Delete a bad report and the effect
+  vanishes on the next rebuild.
+- **The Numba kernel never changes.** Each category maps onto an array A\* already reads,
+  so `_cost_optimized` keeps its frozen signature.
+
+| Category | Effect | Scope notes |
+|----------|--------|-------------|
+| `impassable` | `shared.impassable = 1` both directions | Same path as a live closure |
+| `unlit` | `tables.unlit_base = 0.5` | Global apply also BFS-expands along the lit run (stops at an already-unlit edge, a node with `car_physical_road_count ≥ 3`, 150 m, or 12 edges) |
+| `surface` | `tables.bad_surf_base = 3.0` | Extends to same-`osm_id` edges within 40 m |
+| `dangerous` | `tables.risk += 1.0` | Snapped edge only, or all incident car-allowed edges when within 12 m of an `is_dangerous_junction` node |
+| `speeding` | `tables.speed_stress = max(cur, 0.15)` | The `SPEED_DIFF_LOW_KMH` band; extends like `surface` |
+| `general` | none | Picker timeout — stored for review only |
+
+- **Snapping** uses `tfl_live.snap_to_edge` at **40 m** (far tighter than the 1000 m route
+  snap). A miss is recorded on the row and produces no effect.
+- **Personal scope:** a signed-in rider's own reports, no corroboration needed. **Global
+  scope:** 2 distinct contributors within 90 days and 30 m (25 m for `dangerous`), or 1
+  for `impassable` when that fix was stationary (`speed_mps < 0.8`, `h_acc_m < 15`). A
+  contributor is `user_id`, or `dev:{device_id}` for guests. Rows older than 180 days
+  decay out. `simulate` and `personal_only` rows never enter a global aggregate.
+- **Patching** is `dataclasses.replace` over copy-on-write arrays, cached per
+  `(scope, version)` with an LRU of 8 — but only when `shared` is the live object, since
+  the future-`depart_at` branch builds a throwaway one. Per-request `avoid_points` are
+  never cached.
+- **Caveat:** `_cost_optimized` zeroes risk and speed stress on vehicular-free edges and
+  surface penalties on steps, so `dangerous` / `speeding` on a segregated cycleway store
+  and display but change no cost. Intended — the traffic cannot reach the rider.
+- Kill-switches: `CROWD_OVERLAYS=0` (all apply off, POSTs keep working), `CROWD_GLOBAL=0`
+  (global off, personal still works), `CROWD_REFRESH_INTERVAL_S` (default 600).
+- Tests: `python -m unittest test_crowd_overlays test_ride_reports`.
+
 ### 5.7 Hill cost H
 
 - **WORK_COEFF** = 20.0. If grade \(g > 0\): \(\text{hill\_cost} = L \times \bigl(20g + (20g)^2 \mathbf{1}_{g>0.033}\bigr)\). If grade \(< -0.033\): \(\text{hill\_cost} = L \times 1.5\). Otherwise 0. Then \(H = \text{hill\_cost} \times w_{\text{hill}}\). **Skipped on `type=steps`** (§5.9).
@@ -374,7 +414,11 @@ Route stats (`calculate_path_stats`) use the same masks for accidents, speed str
 | `4_backend_engine/user_profiles.json` | Local store: seed personas + custom profiles (test mode / dev fallback) |
 | `4_backend_engine/profile_store.py` | `ProfileStore` ABC, `LocalJsonStore`, `SupabaseStore` (service role + app-layer tenancy) |
 | `4_backend_engine/auth_middleware.py` | Supabase JWT verification, test-mode localhost gate, `g.user_id` / `g.profile_store` |
-| `4_backend_engine/supabase/migrations/001_profiles.sql` | Supabase `profiles` table + RLS policies |
+| `4_backend_engine/supabase_sql/migrations/001_profiles.sql` | Supabase `profiles` table + RLS policies |
+| `4_backend_engine/supabase_sql/migrations/005_ride_reports.sql` | Supabase `ride_reports` table (service-role-only RLS) |
+| `4_backend_engine/ride_reports.py` | Ride-report validation, idempotent upsert, local JSON fallback, snap write-back |
+| `4_backend_engine/crowd_overlays.py` | Rider feedback → copy-on-write cost-array patches, global aggregation, refresh loop (§5.6a) |
+| `9_mobile/src/feedback/` | Report picker categories, payload builder, offline JSONL queue, `useRideReport` |
 | `4_backend_engine/test_profile_store.py` | Tenancy, sanitization, and test-mode gate tests |
 | `6_verification/migrate_profiles_to_supabase.py` | Seeds system presets into Supabase |
 | `5_frontend/src/auth/` | `AuthProvider`, `AuthPanel` (v2 sidebar), `AuthModal` (legacy), recovery, `auth.css` |
@@ -412,5 +456,6 @@ Route stats (`calculate_path_stats`) use the same masks for accidents, speed str
 - **New endpoint or request params:** Update Section 4 and Section 2.2 (data flow).
 - **Change of port, graph path, or stack:** Update Section 2.
 - **v2 UI change:** Update §2.4, tick [`design/FUNCTIONALITY_CHECKLIST.md`](design/FUNCTIONALITY_CHECKLIST.md), append [`design/WORKING_NOTES_JUL2026.md`](design/WORKING_NOTES_JUL2026.md), and update locked decisions in [`development_protocols/V2_FRONTEND_REMODEL.md`](development_protocols/V2_FRONTEND_REMODEL.md) when a product decision changes.
+- **In-ride ride feedback (TBT Report flag):** Update §4 / §5.6a and [`development_protocols/Development_Protocol_2026_08_27.md`](development_protocols/Development_Protocol_2026_08_27.md). Product spec: [`feature_requests/tbt_ride_feedback.md`](feature_requests/tbt_ride_feedback.md).
 
 A reminder to update this file is in the top comment of `5_frontend/src/App.js` / `src/v2/App.jsx` and at the top of `4_backend_engine/app.py`.

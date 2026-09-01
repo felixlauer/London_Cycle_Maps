@@ -529,17 +529,14 @@
     box-shadow: var(--shell-shadow);
     cursor: default;
     padding: 0;
-    transition:
-      border-color 200ms var(--wc-ease),
-      transform 160ms var(--wc-ease);
+    transition: transform 160ms var(--wc-ease);
   }
 
-  .weather-ctl.is-accent .weather-ctl__btn {
-    border-color: var(--shell-brand, #ff0061);
-    border-width: 2px;
+  .weather-ctl.is-active .weather-ctl__btn {
     cursor: pointer;
   }
 
+  /* Same one-shot flash as .rc-pill.is-pulse (Santander bike change). */
   .weather-ctl.is-pulse .weather-ctl__btn {
     animation: weather-ctl-pulse 700ms var(--wc-ease);
   }
@@ -560,13 +557,20 @@
   }
 
   .weather-ctl__panel {
+    --island-text: #1c1c1e;
+    --island-sub: #71717a;
     margin-top: 8px;
     width: min(260px, calc(100vw - var(--shell-inset) * 2 - 56px));
     padding: 12px;
     border-radius: 14px;
     background: var(--shell-bg);
-    border: 2px solid var(--shell-brand, #ff0061);
+    border: 1px solid var(--shell-border);
     box-shadow: var(--shell-shadow);
+  }
+
+  .map-shell[data-theme='dark'] .weather-ctl__panel {
+    --island-text: #f4f4f5;
+    --island-sub: #a1a1aa;
   }
 
   .weather-ctl__panel .island-weather__hero {
@@ -580,11 +584,11 @@
 }
 
 @keyframes weather-ctl-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--shell-brand, #ff0061) 0%, transparent);
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--shell-brand, #ff0061) 35%, transparent);
   }
-  50% {
-    box-shadow: 0 0 0 6px color-mix(in srgb, var(--shell-brand, #ff0061) 22%, transparent);
+  100% {
+    box-shadow: 0 0 0 7px transparent;
   }
 }
 

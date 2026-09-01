@@ -1,9 +1,14 @@
 import React from 'react';
+import { TriangleAlert } from 'lucide-react';
 import logoUrl from '../assets/logo_transparent_bg_noshadow.svg';
 import { useOnboarding } from './OnboardingContext';
 
+const DEFAULT_SUB = "Let's find a smarter way to ride your routes";
+const MAINTENANCE_LINE_1 = 'Server is currently undergoing maintenance';
+const MAINTENANCE_LINE_2 = '(expected duration: 5 minutes)';
+
 /**
- * Boot splash — pulsing TUNE logo while auth / map / profiles warm up.
+ * Boot splash — pulsing TUNE logo while auth / map / profiles / backend warm up.
  */
 export default function OnboardingLoading() {
   const {
@@ -12,13 +17,13 @@ export default function OnboardingLoading() {
     bootExiting,
     user,
     displayName,
+    showMaintenanceHint,
   } = useOnboarding();
 
   const name = displayName
     || user?.display_name
     || (user?.email ? String(user.email).split('@')[0] : '');
 
-  const sub = "Let's find a smarter way to ride your routes";
   const showNamedWelcome = !isFirstTimer && user && name;
 
   return (
@@ -46,7 +51,18 @@ export default function OnboardingLoading() {
             'Welcome to TUNE'
           )}
         </h1>
-        <p className="onb-boot__sub">{sub}</p>
+        {showMaintenanceHint ? (
+          <p className="onb-boot__sub onb-boot__sub--maint">
+            <span className="onb-boot__maint-copy">
+              {MAINTENANCE_LINE_1}
+              <br />
+              {MAINTENANCE_LINE_2}
+            </span>
+            <TriangleAlert className="onb-boot__maint-icon" size={18} strokeWidth={2.2} aria-hidden />
+          </p>
+        ) : (
+          <p className="onb-boot__sub">{DEFAULT_SUB}</p>
+        )}
       </div>
     </div>
   );

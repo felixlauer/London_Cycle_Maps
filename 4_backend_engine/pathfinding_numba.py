@@ -208,6 +208,7 @@ def _cost_optimized(
     cargo,
     apply_live,
     vf_mask,
+    vf_core_mask,
     vf_reward,
     r_tfl,
     r_green,
@@ -235,7 +236,8 @@ def _cost_optimized(
     if m_total < m_min:
         m_total = m_min
 
-    if apply_live != 0:
+    # Soft live skips physically separated core; hard closures are in impassable[].
+    if apply_live != 0 and (edge_vf & vf_core_mask) == 0:
         m_total = m_total + live_add[eid] * w_live
         m_total *= 1.0 + live_env[eid] * w_live_cap
         m_total *= 1.0 + live_sev[eid] * w_live_cap
@@ -308,6 +310,7 @@ def _astar_core(
     cargo,
     apply_live,
     vf_mask,
+    vf_core_mask,
     vf_reward,
     r_tfl,
     r_green,
@@ -411,6 +414,7 @@ def _astar_core(
                     cargo,
                     apply_live,
                     vf_mask,
+                    vf_core_mask,
                     vf_reward,
                     r_tfl,
                     r_green,
@@ -445,7 +449,7 @@ def _astar_core(
 
 def pack_optimized_scalars(w: dict, shared, hard_cost: float, m_min: float, r_min: float):
     """Python-side scalars for Numba optimized cost (mirrors make_array_cost_by_eid_optimized)."""
-    from cost_masks import vf_allowed_masks
+    from cost_masks import VF_MASK_CORE, vf_allowed_masks
     from routing_heuristic import (
         green_reward,
         tfl_network_reward,
@@ -499,6 +503,7 @@ def pack_optimized_scalars(w: dict, shared, hard_cost: float, m_min: float, r_mi
         "cargo": cargo,
         "apply_live": apply_live,
         "vf_mask": int(vf_mask),
+        "vf_core_mask": int(VF_MASK_CORE),
         "vf_reward": int(vf_reward),
         "r_tfl": float(r_tfl),
         "r_green": float(r_green),
@@ -594,6 +599,7 @@ def astar_numba_unidirectional(
             "cargo": cargo,
             "apply_live": 0,
             "vf_mask": 0,
+            "vf_core_mask": 0,
             "vf_reward": 0,
             "r_tfl": 1.0,
             "r_green": 1.0,
@@ -654,6 +660,7 @@ def astar_numba_unidirectional(
         int(sc["cargo"]),
         int(sc["apply_live"]),
         int(sc["vf_mask"]),
+        int(sc.get("vf_core_mask", 0)),
         int(sc["vf_reward"]),
         float(sc["r_tfl"]),
         float(sc["r_green"]),

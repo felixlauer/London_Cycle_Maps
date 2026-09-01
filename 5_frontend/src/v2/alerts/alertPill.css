@@ -5,20 +5,26 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  /* left/right come from .shell-zone--alert (--alert-pad-*) */
-  margin-left: auto;
-  margin-right: auto;
+  /* Viewport-centred: left+width:max-content ignores `right` and biases LTR.
+     Anchor at 50% and cap width with equal --alert-pad-* clearances. */
+  left: 50% !important;
+  right: auto !important;
+  margin-left: 0;
+  margin-right: 0;
   min-height: 0 !important;
   height: auto;
   padding: 0;
   width: max-content !important;
-  max-width: 100%;
+  max-width: calc(
+    100% - var(--alert-pad-left, var(--shell-inset))
+      - var(--alert-pad-right, var(--shell-inset))
+  );
   border: none;
   box-shadow: none;
   background: transparent;
   pointer-events: none;
   opacity: 0;
-  transform: translateY(-6px) scale(0.97);
+  transform: translateX(-50%) translateY(-6px) scale(0.97);
   transition:
     opacity 260ms cubic-bezier(0.23, 1, 0.32, 1),
     transform 260ms cubic-bezier(0.23, 1, 0.32, 1);
@@ -27,7 +33,7 @@
 .shell-zone--alert.alert-pill.is-visible {
   pointer-events: auto;
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateX(-50%) translateY(0) scale(1);
   padding: 8px 10px 8px 16px;
   min-height: 40px;
   background: var(--shell-bg);
@@ -50,8 +56,26 @@
   min-width: 0;
 }
 
-.alert-pill:not(.has-actions) .alert-pill__text {
+.alert-pill:not(.has-actions):not(.has-help) .alert-pill__text {
   text-align: center;
+}
+
+.alert-pill__help {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.alert-pill__help:hover {
+  opacity: 0.75;
 }
 
 /* Inline Cancel / Proceed — stays inside the pill */
@@ -138,18 +162,18 @@
 
 @media (max-width: 767px) {
   .shell-zone--alert.alert-pill.is-visible {
-    transform: translateY(0) scale(1);
+    transform: translateX(-50%) translateY(0) scale(1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .shell-zone--alert.alert-pill {
-    transform: none;
+    transform: translateX(-50%);
     transition: opacity 200ms ease;
   }
 
   .shell-zone--alert.alert-pill.is-visible {
-    transform: none;
+    transform: translateX(-50%);
   }
 
   .alert-pill__btn:active {

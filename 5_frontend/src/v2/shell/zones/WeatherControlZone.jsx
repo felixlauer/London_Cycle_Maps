@@ -6,7 +6,8 @@ import cloudy from '@meteocons/svg-static/fill/cloudy.svg';
 
 /**
  * Mobile-only extreme weather control — top-left under the routing panel.
- * Non-interactive until an extreme warning fires; then accent border + expand.
+ * Active when an extreme warning is present; one-shot pulse on first detect
+ * (same flash as Santander bike change), no lasting pink ring.
  */
 export default function WeatherControlZone({
   visible = false,
@@ -17,7 +18,9 @@ export default function WeatherControlZone({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [hadExtreme, setHadExtreme] = useState(false);
+  const [pulse, setPulse] = useState(false);
   const notifiedKind = useRef(null);
+  const pulseTimer = useRef(0);
 
   const enabled = visible && !santander && Boolean(startCoord);
   const { data: weather, ready: weatherReady } = useRouteWeather({
@@ -32,16 +35,22 @@ export default function WeatherControlZone({
     return resolveExtremeWarning(weather);
   }, [weatherReady, weather]);
 
+  useEffect(() => () => {
+    if (pulseTimer.current) window.clearTimeout(pulseTimer.current);
+  }, []);
+
   useEffect(() => {
     if (!visible) {
       setExpanded(false);
       setHadExtreme(false);
+      setPulse(false);
       notifiedKind.current = null;
       return;
     }
     if (!extremeWarning) {
       setHadExtreme(false);
       setExpanded(false);
+      setPulse(false);
       notifiedKind.current = null;
       return;
     }
@@ -49,6 +58,10 @@ export default function WeatherControlZone({
     if (notifiedKind.current !== extremeWarning.kind) {
       notifiedKind.current = extremeWarning.kind;
       onExtremeDetected?.(extremeWarning);
+      // One-shot flash like the Santander bike pill — not a lingering pink ring.
+      setPulse(true);
+      if (pulseTimer.current) window.clearTimeout(pulseTimer.current);
+      pulseTimer.current = window.setTimeout(() => setPulse(false), 600);
     }
   }, [visible, extremeWarning, onExtremeDetected]);
 
@@ -61,8 +74,8 @@ export default function WeatherControlZone({
   return (
     <div
       className={
-        `weather-ctl is-accent` +
-        (extremeWarning ? ' is-pulse' : '') +
+        `weather-ctl is-active` +
+        (pulse ? ' is-pulse' : '') +
         (expanded ? ' is-expanded' : '')
       }
       data-zone="weather-control"

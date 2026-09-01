@@ -28,6 +28,8 @@ import {
 import { profileWantsLight } from './island/resolveIslandSlots';
 import { pickInactiveLegIndex } from '../map/RouteLayers';
 import { DEFAULT_VIEW } from '../map/styles';
+import { exportGpxTrack } from './export/gpx';
+import GpxHelpOverlay from './export/GpxHelpOverlay';
 import './tailwind.css';
 import './alerts/alertPill.css';
 import './shell/shell.css';
@@ -43,13 +45,15 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     openAuthPanel,
     open: sidebarOpen,
   } = useSidebar();
-  const { markMapReady, markProfilesReady, phase, onboardingTheme } = useOnboarding();
+  const { markMapReady, markProfilesReady, phase, onboardingTheme, backendReady } = useOnboarding();
   /** Map + shell follow light during onboarding/tutorial so the walkthrough stays readable. */
   const shellThemeMode = phase !== 'done' ? onboardingTheme : themeMode;
   const theme = useMemo(() => themeForMode(shellThemeMode), [shellThemeMode]);
   const tutorialPhaseRef = useRef(phase);
   const { alert, push: pushAlert, dismiss: dismissAlert } = useAlertPill();
   const lastFlownLocationKey = useRef(null);
+  const lastGpxExportRef = useRef(null);
+  const [gpxHelpOpen, setGpxHelpOpen] = useState(false);
 
   useEffect(() => {
     if (!authNotice) return;
@@ -126,7 +130,6 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
   const [routeRevealed, setRouteRevealed] = useState(false);
   /** True only while a user-initiated Get Route (or hire start) is in flight. */
   const [commitPending, setCommitPending] = useState(false);
-  const [fastestData, setFastestData] = useState(null);
   const [safestData, setSafestData] = useState(null);
   const [routeLegs, setRouteLegs] = useState(null);
   const [activeLegIndex, setActiveLegIndex] = useState(0);
@@ -165,13 +168,6 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     }
     return safestData;
   }, [routeLegs, activeLegIndex, safestData]);
-
-  const activeFastest = useMemo(() => {
-    if (routeLegs && routeLegs.length > 1) {
-      return routeLegs[activeLegIndex]?.fastest || fastestData;
-    }
-    return fastestData;
-  }, [routeLegs, activeLegIndex, fastestData]);
 
   const legCount = routeLegs?.length > 1 ? routeLegs.length : 1;
   const viaCount = vias.filter((v) => v.coord).length;
@@ -238,7 +234,6 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
   }, [activeSafest, pushAlert]);
 
   const clearRouteData = useCallback(() => {
-    setFastestData(null);
     setSafestData(null);
     setRouteLegs(null);
     setWalkStartPath(null);
@@ -448,15 +443,15 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
   }, [triggerBikePulse, pushAlert]);
 
   useEffect(() => {
-    if (!authReady) return;
+    if (!authReady || !backendReady) return;
     loadProfileList();
-  }, [authReady, loadProfileList, user?.id]);
+  }, [authReady, backendReady, loadProfileList, user?.id]);
 
   useEffect(() => {
-    if (!authReady || !activeProfileId) return;
+    if (!authReady || !backendReady || !activeProfileId) return;
     localStorage.setItem('activeProfileId', activeProfileId);
     loadActiveProfile(activeProfileId);
-  }, [authReady, activeProfileId, loadActiveProfile, user?.id]);
+  }, [authReady, backendReady, activeProfileId, loadActiveProfile, user?.id]);
 
   const handleSelectProfile = useCallback((id) => {
     pendingProfileBikeAlertRef.current = true;
@@ -760,7 +755,6 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
         return;
       }
       if (data.status === 'success') {
-        setFastestData(data.fastest);
         setSafestData(data.safest);
         const legs = Array.isArray(data.legs) && data.legs.length ? data.legs : null;
         setRouteLegs(legs);
@@ -943,7 +937,6 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
       ]);
       const data = await routeRes.json();
       if (data.status === 'success') {
-        setFastestData(data.fastest);
         setSafestData(data.safest);
         setWalkStartPath(walkA?.path || [start, [pickupStation.lat, pickupStation.lon]]);
         setWalkEndPath(walkB?.path || [[station.lat, station.lon], end]);
@@ -1041,6 +1034,54 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     }
   }, [dismissAlert, commitPickup, commitDropoff]);
 
+  const handleAlertHelp = useCallback(() => {
+    dismissAlert();
+    setGpxHelpOpen(true);
+  }, [dismissAlert]);
+
+  const handleExportGpx = useCallback(async () => {
+    const path = safestData?.path;
+    const pathKey = Array.isArray(path) && path.length
+      ? `${path.length}:${path[0]?.[0]},${path[0]?.[1]}:${path[path.length - 1]?.[0]},${path[path.length - 1]?.[1]}`
+      : '';
+    if (pathKey && lastGpxExportRef.current?.key === pathKey) {
+      pushAlert({
+        type: 'info',
+        message: lastGpxExportRef.current.message,
+        help: true,
+      });
+      return;
+    }
+    try {
+      const result = await exportGpxTrack({
+        path,
+        startLabel,
+        endLabel,
+      });
+      if (result.aborted) return;
+      if (!result.ok) {
+        pushAlert({
+          type: 'error',
+          message: "Couldn't export the route.",
+          help: true,
+        });
+        return;
+      }
+      lastGpxExportRef.current = { key: pathKey, message: result.message };
+      pushAlert({
+        type: 'info',
+        message: result.message,
+        help: true,
+      });
+    } catch {
+      pushAlert({
+        type: 'error',
+        message: "Couldn't export the route.",
+        help: true,
+      });
+    }
+  }, [safestData, startLabel, endLabel, pushAlert]);
+
   const handleGetRoute = useCallback(async () => {
     const effectiveStart = start || (geo.active && geo.location
       ? [geo.location.lat, geo.location.lon]
@@ -1117,6 +1158,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
         themeMode={shellThemeMode}
         alert={alert}
         onAlertAction={handleAlertAction}
+        onAlertHelp={handleAlertHelp}
         sidebarProfiles={profiles}
         activeProfileId={activeProfileId}
         onSelectProfile={handleSelectProfile}
@@ -1162,6 +1204,8 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           onMapPickTargetChange: setMapPickTarget,
           locationAsStart: Boolean(!start && geo.active && geo.location),
           routeStart,
+          showExport: Boolean(routeRevealed && safestData),
+          onExportGpx: handleExportGpx,
         }}
         mapProps={{
           themeMode,
@@ -1173,8 +1217,6 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           routeRevealed,
           routeLegs,
           activeLegIndex,
-          fastestPath: fastestData?.path || null,
-          fastestStats: (activeFastest || fastestData)?.stats || null,
           safestPath: safestData?.path || null,
           safestData,
           walkStartPath,
@@ -1198,7 +1240,6 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
         islandProps={{
           visible: Boolean(routeRevealed && safestData),
           safest: activeSafest || safestData,
-          fastest: activeFastest || fastestData,
           overlayMode,
           bikeType: sessionBikeType,
           isDarkOutside: isDarkForRouting,
@@ -1252,6 +1293,11 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
       <OnboardingLayer
         tutorialSignals={tutorialSignals}
         onProfileCreated={handleProfileCreated}
+      />
+      <GpxHelpOverlay
+        open={gpxHelpOpen}
+        onClose={() => setGpxHelpOpen(false)}
+        themeMode={shellThemeMode}
       />
       {passwordRecoveryPending && <PasswordRecoveryModal themeMode={themeMode} />}
     </>

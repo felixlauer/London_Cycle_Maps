@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
 import ModeBikeSantanderRow from '../../routing/ModeBikeSantanderRow';
 import WaypointFields from '../../routing/WaypointFields';
 import GetRouteButton from '../../routing/GetRouteButton';
@@ -56,6 +56,8 @@ export default function RoutingCoreZone(props) {
     favouriteOrder,
     onEditFavourites,
     onMapPickTargetChange,
+    showExport = false,
+    onExportGpx,
   } = props;
 
   const isMobile = useIsMobile();
@@ -206,13 +208,23 @@ export default function RoutingCoreZone(props) {
           </div>
         </div>
 
-        <div className={`rc-subrow${depart.disabled ? ' is-depart-disabled' : ''}`}>
+        <div className={`rc-subrow${depart.disabled ? ' is-depart-disabled' : ''}${showExport ? ' is-exporting' : ''}`}>
           <DepartAtTrigger
             linkLabel={depart.linkLabel}
             open={depart.open}
             disabled={depart.disabled}
             onToggle={depart.toggleOpen}
           />
+          {showExport && (
+            <button
+              type="button"
+              className="rc-textlink rc-subrow__export"
+              onClick={onExportGpx}
+            >
+              <Download size={14} strokeWidth={2.2} aria-hidden />
+              <span>Export GPX</span>
+            </button>
+          )}
           <button
             type="button"
             className={`rc-textlink rc-subrow__add${addStopBlocked ? ' is-disabled' : ''}`}

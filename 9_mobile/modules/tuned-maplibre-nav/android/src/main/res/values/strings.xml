@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Free MapLibre-compatible styles (same as MapLibre Nav Android sample). -->
+  <string name="tuned_nav_map_style_light" translatable="false">https://tiles.versatiles.org/assets/styles/colorful/style.json</string>
+  <string name="tuned_nav_map_style_dark" translatable="false">https://tiles.versatiles.org/assets/styles/eclipse/style.json</string>
+  <!-- Spoken once when a replan starts; the new next-turn follows immediately. -->
+  <string name="tuned_nav_rerouting_announcement">Rerouting</string>
+</resources>

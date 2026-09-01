@@ -20,7 +20,6 @@ import '../../island/island.css';
 export default function DynamicIslandZone({
   visible = false,
   safest = null,
-  fastest = null,
   overlayMode = null,
   bikeType = 'standard',
   isDarkOutside = false,
@@ -140,7 +139,6 @@ export default function DynamicIslandZone({
         <div className="island-layer island-layer--collapsed" aria-hidden={expanded}>
           <CollapsedIsland
             safest={safest}
-            fastest={fastest}
             slots={slots}
             units={units}
             onExpand={() => onExpandedChange?.(true)}
@@ -155,7 +153,6 @@ export default function DynamicIslandZone({
           {expanded && (
             <ExpandedIsland
               safest={safest}
-              fastest={fastest}
               units={units}
               overlayMode={overlayMode}
               barModes={slots.bars}

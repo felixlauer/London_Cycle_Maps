@@ -33,6 +33,7 @@ from routing_heuristic import (
     get_route_algorithm,
     get_route_fastest_heuristic_epsilon,
     get_route_heuristic_epsilon,
+    ignored_epsilon_env_note,
     green_reward,
     make_backward_heuristic,
     make_heuristic,
@@ -45,6 +46,7 @@ import edge_cost_arrays
 import graph_csr
 import pathfinding_numba
 import mapbox_usage
+import app_metrics
 import weather_proxy
 from signal_clusters import (
     apply_signal_clusters,
@@ -67,6 +69,7 @@ from cost_masks import (
     vf_allowed_masks,
     vf_flags,
     VF_MASK_ALL,
+    VF_MASK_CORE,
 )
 import night_time
 import translation_layer
@@ -76,8 +79,14 @@ import auth_admin
 import auth_middleware
 import auth_rate_limit
 import bug_reports
+import ride_reports
+import crowd_overlays
 import route_vias
 from cycleway_clusters import classify_cycleway_edge
+from maneuvers.directions_response import to_directions_response
+from maneuvers.osrm_export import build_osrm_navigation
+from maneuvers.voice import normalise_units
+from maneuvers.path_edges import concatenate_node_paths, graph_path_to_edges
 from auth_middleware import require_auth, require_admin, assert_profile_access, extract_bearer_token
 from auth_rate_limit import client_ip_from_request
 import auth_redirect
@@ -208,6 +217,17 @@ def bootstrap_routing_engine():
             print(f"--> Live disruption index: {time.perf_counter() - t0:.1f}s")
         santander_live.start_background_refresh()
 
+    # Rider feedback overlay. Must follow tfl_live init — it snaps on that tree.
+    crowd_overlays.init(G)
+    crowd_overlays.start_background_refresh()
+
+    print(
+        f"--> A* epsilon: optimised={get_route_heuristic_epsilon()} "
+        f"fastest={get_route_fastest_heuristic_epsilon()}"
+    )
+    _eps_note = ignored_epsilon_env_note()
+    if _eps_note:
+        print(f"--> {_eps_note}")
     print(f"--- Early bootstrap complete in {time.perf_counter() - t_boot:.1f}s ---")
 
 
@@ -260,8 +280,8 @@ BAD_SURFACES = frozenset([
 BAD_SMOOTHNESS = frozenset(['bad', 'very_bad', 'horrible', 'impassable'])
 
 # --- BASE PHYSICS (implementation.md) ---
-CYCLIST_SPEED_MPS = 16.0 / 3.6   # ~4.44 m/s (16 km/h) - penalty physics reference speed
-DEFAULT_STATS_SPEED_KMH = 16.0   # duration_min fallback when no bike type given
+CYCLIST_SPEED_MPS = 16.0 / 3.6   # ~4.44 m/s (16 km/h) - A* wait→metres; not displayed cruise
+DEFAULT_STATS_SPEED_KMH = 20.0   # duration_min fallback = standard-bike moving cruise
 WIDTH_STD_M = 1.5                # narrow stats/overlay threshold (width_weight removed from cost)
 SIGNAL_WAIT_SECONDS = 7.5        # Hybrid calib (~15% trip-share); was 20 (over-avoided lights)
 SPEED_DIFF_NEGLIGIBLE_KMH = 20
@@ -871,6 +891,38 @@ def parse_depart_at_arg(raw: str | None):
         return park_opening_hours.london_now()
 
 
+MAX_AVOID_POINTS = 5
+
+
+def parse_avoid_points_arg(raw: str | None):
+    """
+    "lat,lon;lat,lon" -> [(lat, lon)]. Returns (points, error).
+
+    Hard-blocks those edges for this request only. Used by the in-ride
+    "impassable" replan, which knows a place but not an edge id.
+    """
+    if not raw or not str(raw).strip():
+        return [], None
+    points = []
+    for chunk in str(raw).split(";"):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        parts = chunk.split(",")
+        if len(parts) != 2:
+            return [], "avoid_points must be 'lat,lon;lat,lon'"
+        try:
+            lat, lon = float(parts[0]), float(parts[1])
+        except ValueError:
+            return [], "avoid_points must be 'lat,lon;lat,lon'"
+        if not (math.isfinite(lat) and math.isfinite(lon)):
+            return [], "avoid_points must be finite"
+        points.append((lat, lon))
+    if len(points) > MAX_AVOID_POINTS:
+        return [], f"at most {MAX_AVOID_POINTS} avoid_points"
+    return points, None
+
+
 def is_future_depart_at(at_time: datetime, now: datetime | None = None) -> bool:
     """True when at_time is more than 30 minutes ahead of London now."""
     now = now or park_opening_hours.london_now()
@@ -1022,21 +1074,25 @@ def make_weight_optimized(w, hours_map, fallback_open, apply_live: bool = True):
         if disruption:
             # Soft jam/works penalties scale with tfl_live_weight (jam-comfort
             # question); closures were already hard-blocked above.
-            if disruption.get('is_diversion'):
-                M_total += 5.0 * w_tfl_live
-            cat = disruption.get('category', '')
-            if cat == 'Works':
-                M_total += 3.0 * w_tfl_live
-            elif cat in ('Collisions', 'Emergency service incidents',
-                         'Traffic Incidents', 'Network delays'):
-                M_total += 2.0 * w_tfl_live
-            if disruption.get('temporary_bad_surface'):
-                M_total += 3.0 * w_tfl_live
-            if disruption.get('environmental_hazard'):
-                M_total *= 1.0 + 0.3 * min(w_tfl_live, 1.0)
-            sev_mult = disruption.get('severity_multiplier', 1.0)
-            if sev_mult > 1.0:
-                M_total *= 1.0 + (sev_mult - 1.0) * min(w_tfl_live, 1.0)
+            # Physically separated core (VF_MASK_CORE) skips soft live extras so a
+            # carriageway jam matched onto a protected track is not charged as mixed
+            # traffic. Shared path / bus / painted lane still take soft live.
+            if not (int(edge_vf or 0) & VF_MASK_CORE):
+                if disruption.get('is_diversion'):
+                    M_total += 5.0 * w_tfl_live
+                cat = disruption.get('category', '')
+                if cat == 'Works':
+                    M_total += 3.0 * w_tfl_live
+                elif cat in ('Collisions', 'Emergency service incidents',
+                             'Traffic Incidents', 'Network delays'):
+                    M_total += 2.0 * w_tfl_live
+                if disruption.get('temporary_bad_surface'):
+                    M_total += 3.0 * w_tfl_live
+                if disruption.get('environmental_hazard'):
+                    M_total *= 1.0 + 0.3 * min(w_tfl_live, 1.0)
+                sev_mult = disruption.get('severity_multiplier', 1.0)
+                if sev_mult > 1.0:
+                    M_total *= 1.0 + (sev_mult - 1.0) * min(w_tfl_live, 1.0)
 
         M_highway = _highway_type_multiplier(d, ped_highway_m)
         return (length * M_total * M_highway * R) + A_total + H
@@ -2501,6 +2557,45 @@ def submit_bug_report():
     return jsonify({"ok": True, **saved})
 
 
+@app.route('/feedback/ride-reports', methods=['POST'])
+def submit_ride_reports():
+    """
+    Store a batch of in-ride route reports (TBT Report flag).
+
+    Auth is optional: guests may report, and their rows carry `device_id` so
+    global corroboration can still count distinct people. Any `user_id` comes
+    from the verified JWT, never the body.
+    """
+    body = request.get_json(silent=True) or {}
+    reports = body.get("reports")
+    if not isinstance(reports, list) or not reports:
+        return jsonify({"error": "reports must be a non-empty list"}), 400
+    if len(reports) > ride_reports.MAX_REPORTS_PER_BATCH:
+        return jsonify({
+            "error": (
+                f"at most {ride_reports.MAX_REPORTS_PER_BATCH} reports per request"
+            ),
+        }), 400
+
+    ip = client_ip_from_request(request)
+    blocked = _rate_limited(
+        auth_rate_limit.check_ride_report_allowed(
+            ip, g.get("user_id"), count=len(reports)
+        )
+    )
+    if blocked:
+        return blocked
+
+    saved, err = ride_reports.submit_ride_reports(
+        reports,
+        user_id=g.get("user_id"),
+    )
+    if err:
+        status = 500 if err.startswith("could not save") else 400
+        return jsonify({"error": err}), status
+    return jsonify({"ok": True, **saved})
+
+
 # --- GEOCODING (Mapbox key stays server-side) ---
 
 LONDON_BBOX = "-0.51,51.28,0.33,51.69"
@@ -2635,6 +2730,8 @@ def mapbox_map_load():
     quota_block = _quota_blocked(result)
     if quota_block:
         return quota_block
+    # Website open ≈ successful map load (same event as Mapbox map-load billing).
+    app_metrics.record_session()
     return jsonify({
         "ok": True,
         "month": result.month,
@@ -2678,9 +2775,26 @@ def get_route():
         end_lat = float(request.args.get('end_lat'))
         end_lon = float(request.args.get('end_lon'))
 
+        navigate = (request.args.get("navigate") or "").strip().lower() in (
+            "1", "true", "yes",
+        )
+        navigate_debug = (request.args.get("navigate_debug") or "").strip().lower() in (
+            "1", "true", "yes",
+        )
+        # Spoken units follow the client preference (Mapbox `voice_units`).
+        voice_units = normalise_units(request.args.get("voice_units"))
+        # Dual A* baseline (grey "fastest") is opt-in. Default is optimised only.
+        include_fastest = (request.args.get("include_fastest") or "").strip().lower() in (
+            "1", "true", "yes",
+        )
+
         vias, via_err = route_vias.parse_vias_arg(request.args.get("vias"))
         if via_err:
             return jsonify({"error": via_err}), 400
+
+        avoid_points, avoid_err = parse_avoid_points_arg(request.args.get("avoid_points"))
+        if avoid_err:
+            return jsonify({"error": avoid_err}), 400
 
         profile_id = (request.args.get('profile_id') or '').strip() or None
         active_profile_id = None
@@ -2729,7 +2843,7 @@ def get_route():
             bike_type = bt_arg
 
         w["bike_type"] = bike_type
-        speed_kmh = user_profiles.BIKE_SPEEDS_KMH.get(bike_type, 15.0)
+        speed_kmh = user_profiles.BIKE_SPEEDS_KMH.get(bike_type, 20.0)
         vf_mask_allowed, _ = vf_allowed_masks(
             shared_path=bool(w.get("vf_shared_path", True)),
             bus_lane=bool(w.get("vf_bus_lane", True)),
@@ -2768,6 +2882,13 @@ def get_route():
             shared = edge_cost_arrays.build_shared_overlays(
                 tables, hours_map, fallback_open, G=G, include_live=False
             )
+        # Rider feedback rides on copies of the arrays above. Single injection
+        # point: everything downstream (weight fns, cost-by-eid, numba_kwargs)
+        # reads whatever `tables`/`shared` name, so nothing else needs to know.
+        avoid_eids = crowd_overlays.snap_avoid_points(avoid_points) if avoid_points else ()
+        tables, shared, crowd_meta = crowd_overlays.apply(
+            tables, shared, user_id=g.get("user_id"), avoid_eids=avoid_eids
+        )
         use_arrays = (
             edge_cost_arrays.array_costs_enabled()
             and tables is not None
@@ -2776,10 +2897,8 @@ def get_route():
         csr = graph_csr.get_csr()
         cost_fast_eid = None
         cost_opt_eid = None
+        weight_fastest = None
         if use_arrays:
-            weight_fastest = edge_cost_arrays.make_array_weight_fn_fastest(
-                tables, BARRIER_HARD_COST, shared, bike_type=bike_type
-            )
             weight_optimized = edge_cost_arrays.make_array_weight_fn_optimized(
                 tables,
                 w,
@@ -2787,9 +2906,6 @@ def get_route():
                 hard_cost=BARRIER_HARD_COST,
                 m_min=M_MIN,
                 r_min=R_MIN,
-            )
-            cost_fast_eid = edge_cost_arrays.make_array_cost_by_eid_fastest(
-                tables, BARRIER_HARD_COST, shared, bike_type=bike_type
             )
             cost_opt_eid = edge_cost_arrays.make_array_cost_by_eid_optimized(
                 tables,
@@ -2799,13 +2915,21 @@ def get_route():
                 m_min=M_MIN,
                 r_min=R_MIN,
             )
+            if include_fastest:
+                weight_fastest = edge_cost_arrays.make_array_weight_fn_fastest(
+                    tables, BARRIER_HARD_COST, shared, bike_type=bike_type
+                )
+                cost_fast_eid = edge_cost_arrays.make_array_cost_by_eid_fastest(
+                    tables, BARRIER_HARD_COST, shared, bike_type=bike_type
+                )
         else:
-            weight_fastest = make_weight_fastest(
-                hours_map, fallback_open, apply_live=live_applied
-            )
             weight_optimized = make_weight_optimized(
                 w, hours_map, fallback_open, apply_live=live_applied
             )
+            if include_fastest:
+                weight_fastest = make_weight_fastest(
+                    hours_map, fallback_open, apply_live=live_applied
+                )
 
         route_alg = (request.args.get("alg") or get_route_algorithm()).strip().lower()
         if route_alg not in ("bi", "uni"):
@@ -2816,8 +2940,8 @@ def get_route():
             and use_arrays
             and graph_csr.csr_astar_enabled()
             and csr is not None
-            and cost_fast_eid is not None
             and cost_opt_eid is not None
+            and (not include_fastest or cost_fast_eid is not None)
         )
         use_numba = (
             use_csr
@@ -2839,6 +2963,7 @@ def get_route():
 
         legs_out = []
         leg_timings = []
+        opt_paths_for_nav = [] if navigate else None
         t_fast_total = 0.0
         t_opt_total = 0.0
         exp_fast_total = 0
@@ -2852,46 +2977,51 @@ def get_route():
             start_node = start_snap.anchor_node
             end_node = end_snap.anchor_node
 
-            h_fast_fwd = make_heuristic(end_node, G, cost_per_m=scale_fast, csr=csr)
-            h_fast_bwd = make_backward_heuristic(start_node, G, cost_per_m=scale_fast, csr=csr)
-            t0 = time.perf_counter()
-            path_fastest, stats_fast = pathfinding.run_astar(
-                G,
-                start_node,
-                end_node,
-                algorithm=route_alg,
-                heuristic_fwd=h_fast_fwd,
-                heuristic_bwd=h_fast_bwd,
-                weight_fn=weight_fastest,
-                csr=csr if use_csr else None,
-                cost_by_eid=cost_fast_eid if use_csr else None,
-                cost_per_m=scale_fast if use_csr else None,
-                numba_kwargs=(
-                    {
-                        "csr": csr,
-                        "source": start_node,
-                        "target": end_node,
-                        "tables": tables,
-                        "shared": shared,
-                        "mode": "fastest",
-                        "cost_per_m": scale_fast,
-                        "hard_cost": BARRIER_HARD_COST,
-                        "bike_type": bike_type,
-                    }
-                    if use_numba
-                    else None
-                ),
-            )
-            t_fast = time.perf_counter() - t0
-            coords_fastest = apply_endpoint_stubs(
-                reconstruct_path_geometry(path_fastest), start_snap, end_snap
-            )
-            stats_fastest = calculate_path_stats(
-                path_fastest,
-                speed_kmh=speed_kmh,
-                vf_mask_allowed=vf_mask_allowed,
-                bike_type=bike_type,
-            )
+            t_fast = 0.0
+            stats_fast = {"expansions": 0, "edge_relaxations": 0}
+            coords_fastest = None
+            stats_fastest = None
+            if include_fastest:
+                h_fast_fwd = make_heuristic(end_node, G, cost_per_m=scale_fast, csr=csr)
+                h_fast_bwd = make_backward_heuristic(start_node, G, cost_per_m=scale_fast, csr=csr)
+                t0 = time.perf_counter()
+                path_fastest, stats_fast = pathfinding.run_astar(
+                    G,
+                    start_node,
+                    end_node,
+                    algorithm=route_alg,
+                    heuristic_fwd=h_fast_fwd,
+                    heuristic_bwd=h_fast_bwd,
+                    weight_fn=weight_fastest,
+                    csr=csr if use_csr else None,
+                    cost_by_eid=cost_fast_eid if use_csr else None,
+                    cost_per_m=scale_fast if use_csr else None,
+                    numba_kwargs=(
+                        {
+                            "csr": csr,
+                            "source": start_node,
+                            "target": end_node,
+                            "tables": tables,
+                            "shared": shared,
+                            "mode": "fastest",
+                            "cost_per_m": scale_fast,
+                            "hard_cost": BARRIER_HARD_COST,
+                            "bike_type": bike_type,
+                        }
+                        if use_numba
+                        else None
+                    ),
+                )
+                t_fast = time.perf_counter() - t0
+                coords_fastest = apply_endpoint_stubs(
+                    reconstruct_path_geometry(path_fastest), start_snap, end_snap
+                )
+                stats_fastest = calculate_path_stats(
+                    path_fastest,
+                    speed_kmh=speed_kmh,
+                    vf_mask_allowed=vf_mask_allowed,
+                    bike_type=bike_type,
+                )
 
             h_opt_fwd = make_heuristic(end_node, G, cost_per_m=scale, csr=csr)
             h_opt_bwd = make_backward_heuristic(start_node, G, cost_per_m=scale, csr=csr)
@@ -2925,6 +3055,8 @@ def get_route():
                 ),
             )
             t_opt = time.perf_counter() - t0
+            if opt_paths_for_nav is not None:
+                opt_paths_for_nav.append(list(path_optimized))
             coords_optimized = apply_endpoint_stubs(
                 reconstruct_path_geometry(path_optimized), start_snap, end_snap
             )
@@ -2960,11 +3092,10 @@ def get_route():
                 "fastest_astar": round(t_fast * 1000, 1),
                 "optimized_astar": round(t_opt * 1000, 1),
             })
-            legs_out.append({
+            leg_out = {
                 "index": leg_i,
                 "from": _snap_meta(start_snap),
                 "to": _snap_meta(end_snap),
-                "fastest": {"path": coords_fastest, "stats": stats_fastest},
                 "safest": {
                     "path": coords_optimized,
                     "stats": stats_optimized,
@@ -2978,7 +3109,10 @@ def get_route():
                     "elevation_profile": elevation_profile,
                     **overlay_typed,
                 },
-            })
+            }
+            if include_fastest:
+                leg_out["fastest"] = {"path": coords_fastest, "stats": stats_fastest}
+            legs_out.append(leg_out)
 
         t_compute = t_snap + t_fast_total + t_opt_total
         if os.environ.get("ROUTE_BENCHMARK", "").lower() in ("1", "true", "yes"):
@@ -2988,6 +3122,7 @@ def get_route():
             print(
                 f"ROUTE_BENCHMARK alg={route_alg} array_costs={use_arrays} "
                 f"csr={use_csr} numba={use_numba} legs={len(legs_out)} "
+                f"include_fastest={include_fastest} "
                 f"snap={t_snap*1000:.1f}ms "
                 f"fastest={t_fast_total*1000:.1f}ms(exp={exp_fast_total}) "
                 f"optimized={t_opt_total*1000:.1f}ms(exp={exp_opt_total}) "
@@ -2996,18 +3131,21 @@ def get_route():
                 f"impassable={_imp} live={bool(shared and getattr(shared, 'has_live', False)) if use_arrays else 'n/a'}"
             )
 
-        coords_fastest_all = route_vias.concatenate_paths(
-            [leg["fastest"]["path"] for leg in legs_out]
-        )
         coords_opt_all = route_vias.concatenate_paths(
             [leg["safest"]["path"] for leg in legs_out]
-        )
-        stats_fastest_all = route_vias.aggregate_path_stats(
-            [leg["fastest"]["stats"] for leg in legs_out]
         )
         stats_optimized_all = route_vias.aggregate_path_stats(
             [leg["safest"]["stats"] for leg in legs_out]
         )
+        coords_fastest_all = None
+        stats_fastest_all = None
+        if include_fastest:
+            coords_fastest_all = route_vias.concatenate_paths(
+                [leg["fastest"]["path"] for leg in legs_out]
+            )
+            stats_fastest_all = route_vias.aggregate_path_stats(
+                [leg["fastest"]["stats"] for leg in legs_out]
+            )
 
         def _merge_chunks(key):
             out = []
@@ -3032,7 +3170,63 @@ def get_route():
                     offset += prof[-1]["d_m"]
             return out
 
-        return jsonify({
+        # Product metrics: commit Get-Route only (not prefetch); optimised length.
+        if purpose == "commit":
+            app_metrics.record_route(
+                optimized_distance_m=float(
+                    stats_optimized_all.get("length_m") or 0.0
+                ),
+                client_ip=ip,
+            )
+
+        navigation = None
+        directions = None
+        if navigate and opt_paths_for_nav:
+            try:
+                nav_nodes = concatenate_node_paths(opt_paths_for_nav)
+                nav_edges = graph_path_to_edges(
+                    G,
+                    nav_nodes,
+                    extract_segment_geometry=extract_segment_geometry,
+                )
+                navigation = build_osrm_navigation(
+                    nav_edges,
+                    route_coords_latlon=coords_opt_all,
+                    duration_min=float(
+                        stats_optimized_all.get("duration_min") or 0.0
+                    ),
+                    include_debug=navigate_debug,
+                    voice_units=voice_units,
+                )
+                if not navigation.get("error"):
+                    # MapLibre DirectionsResponse.fromJson (polyline6 + snake_case routeOptions)
+                    origin_ll = (
+                        list(coords_opt_all[0])
+                        if coords_opt_all
+                        else [start_lat, start_lon]
+                    )
+                    dest_ll = (
+                        list(coords_opt_all[-1])
+                        if coords_opt_all
+                        else [end_lat, end_lon]
+                    )
+                    directions = to_directions_response(
+                        navigation,
+                        origin_latlon=origin_ll,
+                        destination_latlon=dest_ll,
+                        voice_units=voice_units,
+                    )
+            except Exception as nav_err:
+                # Non-fatal: planning path still returned
+                navigation = {
+                    "error": f"navigation build failed: {nav_err}",
+                    "distance": 0.0,
+                    "duration": 0.0,
+                    "legs": [{"steps": []}],
+                }
+                directions = None
+
+        payload = {
             "status": "success",
             "meta": {
                 "cost_per_m_lower_bound": round(scale, 4),
@@ -3050,8 +3244,12 @@ def get_route():
                 "translation_clamps": translation_clamps,
                 "light_gated_off": light_gated_off,
                 "is_dark": is_dark_at,
+                "crowd": crowd_meta,
                 "leg_count": len(legs_out),
                 "purpose": purpose,
+                "include_fastest": include_fastest,
+                "navigate": bool(navigation is not None),
+                "voice_units": voice_units,
                 "timing_ms": {
                     "snap": round(t_snap * 1000, 1),
                     "fastest_astar": round(t_fast_total * 1000, 1),
@@ -3081,7 +3279,6 @@ def get_route():
                 "geom_preparse": edge_cost_arrays.get_geom_preparse_state(),
             },
             "legs": legs_out,
-            "fastest": {"path": coords_fastest_all, "stats": stats_fastest_all},
             "safest": {
                 "path": coords_opt_all,
                 "stats": stats_optimized_all,
@@ -3100,7 +3297,14 @@ def get_route():
                 "light_typed": _merge_chunks("light_typed"),
                 "disruption_typed": _merge_chunks("disruption_typed"),
             },
-        })
+        }
+        if include_fastest:
+            payload["fastest"] = {"path": coords_fastest_all, "stats": stats_fastest_all}
+        if navigation is not None:
+            payload["navigation"] = navigation
+        if directions is not None:
+            payload["directions"] = directions
+        return jsonify(payload)
 
     except Exception as e:
         return _err(e)

@@ -56,7 +56,6 @@ export default function CycleMap({
   activeLegIndex,
   overlayVisibility,
   lightingActive,
-  fastestPath,
   safestPath,
   litSegments,
   steepSegments,
@@ -151,7 +150,6 @@ export default function CycleMap({
             ) : (
               routeRevealed && (
                 <SingleRouteLayers
-                  fastestPath={fastestPath}
                   safestPath={safestPath}
                   litSegments={litSegments}
                   steepSegments={steepSegments}

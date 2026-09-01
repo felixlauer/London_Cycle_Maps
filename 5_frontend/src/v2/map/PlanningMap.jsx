@@ -6,7 +6,6 @@ import { themeForMode } from './theme';
 import MapApiBridge from './MapApiBridge';
 import UserLocationMarker from './UserLocationMarker';
 import V2OverlayLayers from './V2OverlayLayers';
-import NonTunedRouteHint from './NonTunedRouteHint';
 
 const noop = () => {};
 
@@ -23,8 +22,6 @@ export default function PlanningMap({
   routeRevealed = false,
   routeLegs = null,
   activeLegIndex = 0,
-  fastestPath = null,
-  fastestStats = null,
   safestPath = null,
   safestData = null,
   walkStartPath = null,
@@ -59,20 +56,6 @@ export default function PlanningMap({
     return safestData;
   }, [routeLegs, activeLegIndex, safestData]);
 
-  const activeFastestPath = useMemo(() => {
-    if (routeLegs && routeLegs.length > 1) {
-      return routeLegs[activeLegIndex]?.fastest?.path || fastestPath;
-    }
-    return fastestPath;
-  }, [routeLegs, activeLegIndex, fastestPath]);
-
-  const activeFastestStats = useMemo(() => {
-    if (routeLegs && routeLegs.length > 1) {
-      return routeLegs[activeLegIndex]?.fastest?.stats || fastestStats;
-    }
-    return fastestStats;
-  }, [routeLegs, activeLegIndex, fastestStats]);
-
   return (
     <CycleMap
       theme={theme}
@@ -87,7 +70,6 @@ export default function PlanningMap({
       activeLegIndex={activeLegIndex}
       overlayVisibility={overlayVisibility}
       lightingActive={false}
-      fastestPath={fastestPath}
       safestPath={safestPath}
       litSegments={null}
       steepSegments={null}
@@ -113,22 +95,13 @@ export default function PlanningMap({
           onHoverChange={onRouteHoverChange}
         />
       )}
-      {routeRevealed && (
-        <NonTunedRouteHint
-          path={activeFastestPath}
-          stats={activeFastestStats}
-          units={units}
-          routeLegs={routeLegs}
-          activeLegIndex={activeLegIndex}
-          enabled={routeRevealed}
-        />
-      )}
       {hireStep === 'dropoff' && pickupStation && (
         <SantanderStationsLayer
           stations={[pickupStation]}
           expandedId={null}
           showConfirm={false}
           availabilityNeed="bikes"
+          themeMode={themeMode}
         />
       )}
       {showCandidates && (
@@ -140,12 +113,14 @@ export default function PlanningMap({
           confirmLabel={hireStep === 'pickup' ? 'Pick up here' : 'Drop off here'}
           showConfirm
           availabilityNeed={hireNeed}
+          themeMode={themeMode}
         />
       )}
       {hireStep === 'done' && (pickupStation || dropoffStation) && (
         <SantanderStationsLayer
           stations={[pickupStation, dropoffStation].filter(Boolean)}
           compact
+          themeMode={themeMode}
         />
       )}
     </CycleMap>

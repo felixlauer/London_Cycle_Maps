@@ -23,7 +23,7 @@ export function islandModeMeta(modeId) {
   if (modeId === 'traffic') {
     return {
       id: 'traffic',
-      label: TRAFFIC_OVERLAY.label,
+      label: 'Incidents',
       hub: TRAFFIC_OVERLAY.hub,
       typedKey: TRAFFIC_OVERLAY.typedKey,
     };

@@ -1,22 +1,28 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Fence, RectangleEllipsis, TrafficCone } from 'lucide-react';
 import useMeasure from './useMeasure';
 import { scaleProfile, smoothLinePath, areaPathFromLine } from './elevationPath';
 import { ELEVATION_ACCENT } from './ElevationSparkline';
 import { formatDistance, formatElevation } from '../units';
 import { OVERLAY_KIND_META } from '../map/overlayModes';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
-const AXIS_H = 24;
+const AXIS_H = 22;
+/** Left gutter for elevation Y ticks — keep room for "NN m" end-anchored labels. */
+const AXIS_Y_W = 30;
+const AXIS_Y_W_MOBILE = 28;
 const TRAFFIC_COLOR = '#F18805';
-/** Expanded chart only — elevation line/area use the bottom 75% (slices stay full height). */
-const ELEV_PLOT_Y_FRAC = 0.75;
+/** Match native: plot uses mid band so the line clears node icons on the axis. */
+const ELEV_PLOT_Y_FRAC = 0.40;
 const NODE_SIZE = 24;
 const NODE_ICON = 14;
+/** Clear the node discs (centred on the axis) — was undershooting and hiding the trough. */
+const ELEV_BOTTOM_PAD = NODE_SIZE + 4;
 
-function remapPointsToYBand(points, chartH, fillFrac) {
+function remapPointsToYBand(points, chartH, fillFrac, bottomPad = 0) {
   if (!points?.length) return points;
-  const plotBottom = chartH;
-  const plotTop = chartH * (1 - fillFrac);
+  const plotBottom = Math.max(8, chartH - bottomPad);
+  const plotTop = Math.min(plotBottom - 8, chartH * (1 - fillFrac));
   const ys = points.map((p) => p[1]);
   const yPeak = Math.min(...ys);
   const yTrough = Math.max(...ys);
@@ -80,6 +86,7 @@ export default function ElevationChart({
   onSegmentHover,
   onScrub,
 }) {
+  const isMobile = useIsMobile();
   const [wrapRef, { width, height }] = useMeasure();
   const [scrubD, setScrubD] = useState(null);
   const [hoveredKey, setHoveredKey] = useState(null);
@@ -90,25 +97,51 @@ export default function ElevationChart({
   const touchMode = useRef(null); // 'scrub' | 'page' | null
 
   const chartH = Math.max(0, height - AXIS_H);
+  const plotLeft = isMobile ? AXIS_Y_W_MOBILE : AXIS_Y_W;
+  const plotRight = isMobile ? 2 : 4;
   const gainM = useMemo(() => totalElevationGainM(profile), [profile]);
   const gainLabel = formatElevation(gainM, units);
 
   const geo = useMemo(() => {
     if (!(width > 10 && chartH > 10)) return null;
     const base = scaleProfile(profile, {
-      width, height: chartH, padX: 4, padTop: 10, padBottom: 6, smoothWindow: 7,
+      width,
+      height: chartH,
+      padLeft: plotLeft,
+      padRight: plotRight,
+      padTop: 14,
+      padBottom: 6,
+      smoothWindow: 15,
     });
     if (!base) return null;
     return {
       ...base,
-      points: remapPointsToYBand(base.points, chartH, ELEV_PLOT_Y_FRAC),
+      points: remapPointsToYBand(base.points, chartH, ELEV_PLOT_Y_FRAC, ELEV_BOTTOM_PAD),
     };
-  }, [profile, width, chartH]);
+  }, [profile, width, chartH, plotLeft, plotRight]);
+
+  const yTicks = useMemo(() => {
+    if (!geo) return [];
+    const { eMin, eMax, yForE } = geo;
+    const mid = (eMin + eMax) / 2;
+    const plotBottom = Math.max(8, chartH - ELEV_BOTTOM_PAD);
+    const plotTop = Math.min(plotBottom - 8, chartH * (1 - ELEV_PLOT_Y_FRAC));
+    const yPeak = Math.min(...geo.points.map((p) => p[1]));
+    const yTrough = Math.max(...geo.points.map((p) => p[1]));
+    const span = yTrough - yPeak || 1;
+    const bandY = (rawY) => plotTop + ((rawY - yPeak) / span) * (plotBottom - plotTop);
+    return [
+      { elev: eMax, y: bandY(yForE(eMax)) },
+      { elev: mid, y: bandY(yForE(mid)) },
+      { elev: eMin, y: bandY(yForE(eMin)) },
+    ];
+  }, [geo, chartH]);
 
   const line = useMemo(() => (geo ? smoothLinePath(geo.points) : ''), [geo]);
+  const plotBottom = Math.max(8, chartH - ELEV_BOTTOM_PAD);
   const area = useMemo(
-    () => (geo ? areaPathFromLine(line, geo.points, chartH) : ''),
-    [geo, line, chartH],
+    () => (geo ? areaPathFromLine(line, geo.points, plotBottom) : ''),
+    [geo, line, plotBottom],
   );
 
   const xForD = useCallback(
@@ -173,26 +206,33 @@ export default function ElevationChart({
     setHoveredKey(null);
   }, [onScrub, onSegmentHover]);
 
-  const handleTouchMove = useCallback((e) => {
-    if (!e.touches?.[0] || !touchOrigin.current) return;
-    const t = e.touches[0];
-    const dx = t.clientX - touchOrigin.current.x;
-    const dy = t.clientY - touchOrigin.current.y;
-    if (!touchMode.current) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      // Clear horizontal swipe → let the island page pager own the gesture.
-      if (Math.abs(dx) > Math.abs(dy) * 1.15 && Math.abs(dx) > 18) {
-        touchMode.current = 'page';
-        setScrubD(null);
-        onScrub?.(null);
-        return;
+  // React registers touchmove as passive — attach our own non-passive listener
+  // so scrub can call preventDefault without console spam.
+  useEffect(() => {
+    const el = wrapEl.current;
+    if (!el) return undefined;
+    const onMove = (e) => {
+      if (!e.touches?.[0] || !touchOrigin.current) return;
+      const t = e.touches[0];
+      const dx = t.clientX - touchOrigin.current.x;
+      const dy = t.clientY - touchOrigin.current.y;
+      if (!touchMode.current) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        if (Math.abs(dx) > Math.abs(dy) * 1.15 && Math.abs(dx) > 18) {
+          touchMode.current = 'page';
+          setScrubD(null);
+          onScrub?.(null);
+          return;
+        }
+        touchMode.current = 'scrub';
       }
-      touchMode.current = 'scrub';
-    }
-    if (touchMode.current !== 'scrub') return;
-    e.preventDefault();
-    scrubFromClientX(t.clientX, e.currentTarget);
-  }, [scrubFromClientX, onScrub]);
+      if (touchMode.current !== 'scrub') return;
+      if (e.cancelable) e.preventDefault();
+      scrubFromClientX(t.clientX, el);
+    };
+    el.addEventListener('touchmove', onMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onMove);
+  }, [wrapEl, scrubFromClientX, onScrub]);
 
   const handleTouchEnd = useCallback(() => {
     touchOrigin.current = null;
@@ -247,7 +287,8 @@ export default function ElevationChart({
         }}
         onClick={(e) => activateSlice(slice, e)}
         onTouchEnd={(e) => {
-          e.preventDefault();
+          // Don't cancel non-cancelable touchend during scroll.
+          if (e.cancelable) e.preventDefault();
           activateSlice(slice, e.changedTouches?.[0] || e);
         }}
       />
@@ -269,14 +310,13 @@ export default function ElevationChart({
         touchMode.current = null;
         scrubFromClientX(t.clientX, e.currentTarget);
       }}
-      onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       {geo && gainM > 0 && (
-        <div className="island-chart__gain" aria-label={`Total elevation gain ${gainLabel}`}>
-          <span className="island-chart__gain-label">Total elevation gain:</span>
+        <div className="island-chart__gain" aria-label={`Elevation gain ${gainLabel}`}>
+          <span className="island-chart__gain-label">Elevation</span>
           {' '}
-          <strong style={{ color: ELEVATION_ACCENT }}>{gainLabel}</strong>
+          <strong style={{ color: ELEVATION_ACCENT }}>+{gainLabel}</strong>
         </div>
       )}
 
@@ -320,10 +360,34 @@ export default function ElevationChart({
             pointerEvents="none"
           />
 
+          {/* Left Y-axis — elevation */}
           <line
-            x1={0}
+            x1={plotLeft + 0.5}
+            y1={4}
+            x2={plotLeft + 0.5}
+            y2={chartH}
+            stroke="var(--island-axis, #e4e4e7)"
+            strokeWidth="1"
+            pointerEvents="none"
+          />
+          {yTicks.map((t) => (
+            <text
+              key={`y-${t.elev}`}
+              x={plotLeft - 2}
+              y={t.y + 3}
+              textAnchor="end"
+              className="island-chart__tick island-chart__tick--y"
+              pointerEvents="none"
+            >
+              {formatElevation(t.elev, units)}
+            </text>
+          ))}
+
+          {/* Bottom X-axis — distance */}
+          <line
+            x1={plotLeft}
             y1={chartH + 0.5}
-            x2={width}
+            x2={width - plotRight}
             y2={chartH + 0.5}
             stroke="var(--island-axis, #e4e4e7)"
             strokeWidth="1"
@@ -331,8 +395,11 @@ export default function ElevationChart({
           {ticks.map((t) => (
             <text
               key={t.f}
-              x={Math.min(Math.max(t.f * width, 14), width - 20)}
-              y={height - 6}
+              x={Math.min(
+                Math.max(plotLeft + t.f * (width - plotLeft - plotRight), plotLeft + 2),
+                width - plotRight - 2,
+              )}
+              y={height - 5}
               textAnchor={t.f === 0 ? 'start' : t.f === 1 ? 'end' : 'middle'}
               className="island-chart__tick"
             >

@@ -36,6 +36,7 @@ export default function MapShell({
   themeMode = 'light',
   alert,
   onAlertAction,
+  onAlertHelp,
   routingProps,
   mapProps,
   mapControlsProps,
@@ -93,23 +94,40 @@ export default function MapShell({
         }
       }
 
-      const weather = shell.querySelector('[data-zone="weather-control"]');
-      if (weather) {
-        const r = weather.getBoundingClientRect();
-        if (r.width > 2 && r.height > 2) {
-          leftPad = Math.max(leftPad, Math.round(r.right - shellRect.left + ALERT_SIDE_GAP));
-        }
-      }
-
       if (isMobile) {
-        const mapCtl = shell.querySelector('[data-zone="map-controls"]');
-        if (mapCtl) {
-          const r = mapCtl.getBoundingClientRect();
+        // Measure each side's chrome, then use the larger clearance on BOTH
+        // sides so the pill stays viewport-centered (via CSS translateX(-50%))
+        // and never hits controls. Prefer the solid control surface, not empty
+        // zone chrome, so packed zoom/nav doesn't inflate width wrongly.
+        let leftClear = inset;
+        let rightClear = inset;
+        const weather = shell.querySelector('[data-zone="weather-control"]');
+        if (weather) {
+          const btn = weather.querySelector('button, .weather-ctl__btn') || weather;
+          const r = btn.getBoundingClientRect();
           if (r.width > 2 && r.height > 2) {
-            rightPad = Math.max(rightPad, Math.round(shellRect.right - r.left + ALERT_SIDE_GAP));
+            leftClear = Math.max(leftClear, Math.round(r.right - shellRect.left + ALERT_SIDE_GAP));
           }
         }
+        const mapCtl = shell.querySelector('[data-zone="map-controls"]');
+        if (mapCtl) {
+          const solid = mapCtl.querySelector('.map-ctl, .map-ctl__stack') || mapCtl;
+          const r = solid.getBoundingClientRect();
+          if (r.width > 2 && r.height > 2) {
+            rightClear = Math.max(rightClear, Math.round(shellRect.right - r.left + ALERT_SIDE_GAP));
+          }
+        }
+        const side = Math.max(leftClear, rightClear);
+        leftPad = side;
+        rightPad = side;
       } else {
+        const weather = shell.querySelector('[data-zone="weather-control"]');
+        if (weather) {
+          const r = weather.getBoundingClientRect();
+          if (r.width > 2 && r.height > 2) {
+            leftPad = Math.max(leftPad, Math.round(r.right - shellRect.left + ALERT_SIDE_GAP));
+          }
+        }
         const profile = shell.querySelector('[data-zone="profile"]');
         if (profile) {
           const r = profile.getBoundingClientRect();
@@ -178,7 +196,7 @@ export default function MapShell({
 
       <div className="map-shell__chrome">
         <RoutingCoreZone {...routingProps} />
-        <AlertPillZone alert={alert} onAction={onAlertAction} />
+        <AlertPillZone alert={alert} onAction={onAlertAction} onHelp={onAlertHelp} />
         <ProfileZone />
         {isMobile && (
           <WeatherControlZone {...(weatherControlProps || {})} />

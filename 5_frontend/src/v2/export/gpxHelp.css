@@ -1,0 +1,128 @@
+/* GPX help overlay — same family as bug-report: dimmed portal, solid card. */
+
+.gpx-help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  background: rgba(16, 24, 40, 0.4);
+  animation: gpx-help-fade 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes gpx-help-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.gpx-help-modal {
+  --gh-bg: #ffffff;
+  --gh-bg-soft: #f4f4f5;
+  --gh-text: #1c1c1e;
+  --gh-text-sub: #71717a;
+  --gh-border: #e5e7eb;
+
+  width: min(440px, 100%);
+  max-height: min(90dvh, 640px);
+  overflow: auto;
+  border-radius: 16px;
+  border: 1px solid var(--gh-border);
+  background: var(--gh-bg);
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.2);
+  color: var(--gh-text);
+  padding: 18px 20px 20px;
+  box-sizing: border-box;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  animation: gpx-help-pop 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.gpx-help-modal[data-theme='dark'] {
+  --gh-bg: #1c1c1e;
+  --gh-bg-soft: #2c2c2e;
+  --gh-text: #f4f4f5;
+  --gh-text-sub: #a1a1aa;
+  --gh-border: #3a3a3c;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+@keyframes gpx-help-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.gpx-help-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.gpx-help-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.gpx-help-modal__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--gh-text-sub);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .gpx-help-modal__close:hover {
+    background: var(--gh-bg-soft);
+    color: var(--gh-text);
+  }
+}
+
+.gpx-help-modal__lede {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--gh-text-sub);
+}
+
+.gpx-help-modal__steps {
+  margin: 0 0 14px;
+  padding-left: 1.25em;
+  font-size: 13.5px;
+  font-weight: 550;
+  line-height: 1.5;
+  color: var(--gh-text);
+}
+
+.gpx-help-modal__steps li + li {
+  margin-top: 8px;
+}
+
+.gpx-help-modal__aside {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--gh-text-sub);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gpx-help-overlay,
+  .gpx-help-modal {
+    animation: none;
+  }
+}

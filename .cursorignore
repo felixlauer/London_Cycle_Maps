@@ -1,0 +1,22 @@
+﻿# Ignore the whole app by default; keep only thesis-relevant paths.
+# 
+# *
+# !.cursorignore
+# 
+# # Documentation
+# !0_documentation/
+# !0_documentation/**
+# 
+# # Pipeline
+# !3_pipeline/
+# !3_pipeline/**
+# 
+# # Verification
+# !6_verification/
+# !6_verification/**
+# 
+# # Specific Flask entrypoints only (not the rest of 4_backend_engine)
+# !4_backend_engine/
+# 4_backend_engine/**
+# !4_backend_engine/app.py
+# !4_backend_engine/app_debug.py

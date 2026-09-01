@@ -72,6 +72,13 @@ BUG_REPORT_IP_MAX = 8
 BUG_REPORT_USER_WINDOW_S = 60 * 60
 BUG_REPORT_USER_MAX = 12
 
+# In-ride route feedback. Looser than bug reports: a single ride past roadworks
+# can legitimately be several taps, and the batch arrives as one request.
+RIDE_REPORT_IP_WINDOW_S = 60 * 60
+RIDE_REPORT_IP_MAX = 30
+RIDE_REPORT_USER_WINDOW_S = 60 * 60
+RIDE_REPORT_USER_MAX = 20
+
 _lock = threading.Lock()
 _ip_hits: dict[str, list[float]] = {}
 _email_fails: dict[str, list[float]] = {}
@@ -87,6 +94,8 @@ _map_load_ip_hits: dict[str, list[float]] = {}
 _santander_walk_ip_hits: dict[str, list[float]] = {}
 _bug_report_ip_hits: dict[str, list[float]] = {}
 _bug_report_user_hits: dict[str, list[float]] = {}
+_ride_report_ip_hits: dict[str, list[float]] = {}
+_ride_report_user_hits: dict[str, list[float]] = {}
 
 
 def _prune(timestamps: list[float], window_s: float, now: float) -> list[float]:
@@ -361,6 +370,54 @@ def check_bug_report_allowed(ip: str, user_id: str | None = None) -> RateLimitRe
     return RateLimitResult(True)
 
 
+def check_ride_report_allowed(
+    ip: str,
+    user_id: str | None = None,
+    count: int = 1,
+) -> RateLimitResult:
+    """
+    Hourly caps per IP and (when signed in) per user for in-ride reports.
+
+    `count` is the number of reports in the batch: an offline queue flushing 25
+    taps costs 25, not 1, so batching cannot be used to dodge the cap.
+    """
+    charge = max(1, int(count))
+    now = time.monotonic()
+    with _lock:
+        ip_hits = _prune(_ride_report_ip_hits.get(ip, []), RIDE_REPORT_IP_WINDOW_S, now)
+        user_hits: list[float] | None = None
+        uid = str(user_id) if user_id else None
+
+        if len(ip_hits) + charge > RIDE_REPORT_IP_MAX:
+            oldest = ip_hits[0] if ip_hits else now
+            retry = max(1, int(RIDE_REPORT_IP_WINDOW_S - (now - oldest)) + 1)
+            return RateLimitResult(
+                False,
+                retry,
+                f"Too many ride reports. Try again in {retry} seconds.",
+            )
+        if uid:
+            user_hits = _prune(
+                _ride_report_user_hits.get(uid, []), RIDE_REPORT_USER_WINDOW_S, now
+            )
+            if len(user_hits) + charge > RIDE_REPORT_USER_MAX:
+                oldest = user_hits[0] if user_hits else now
+                retry = max(1, int(RIDE_REPORT_USER_WINDOW_S - (now - oldest)) + 1)
+                return RateLimitResult(
+                    False,
+                    retry,
+                    f"Too many ride reports. Try again in {retry} seconds.",
+                )
+
+        # Both buckets have room — charge them together so neither drifts.
+        ip_hits.extend([now] * charge)
+        _ride_report_ip_hits[ip] = ip_hits
+        if uid and user_hits is not None:
+            user_hits.extend([now] * charge)
+            _ride_report_user_hits[uid] = user_hits
+    return RateLimitResult(True)
+
+
 def reset_for_tests() -> None:
     """Clear all buckets — unit tests only."""
     with _lock:
@@ -378,3 +435,5 @@ def reset_for_tests() -> None:
         _santander_walk_ip_hits.clear()
         _bug_report_ip_hits.clear()
         _bug_report_user_hits.clear()
+        _ride_report_ip_hits.clear()
+        _ride_report_user_hits.clear()

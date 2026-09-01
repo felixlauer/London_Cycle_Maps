@@ -449,7 +449,7 @@
   color: var(--rc-text-sub);
 }
 
-/* ---------- Sub-row: Leave now (left) + Add stop (right) ---------- */
+/* ---------- Sub-row: Leave now | Export GPX | Add stop ---------- */
 
 .rc-subrow {
   display: flex;
@@ -459,9 +459,43 @@
   min-height: 24px;
 }
 
+/* Centre Export in the leftover gap (≈ panel-centre when the sides are short). */
+.rc-subrow.is-exporting {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content);
+  align-items: center;
+  column-gap: 8px;
+}
+
+.rc-subrow.is-exporting .rc-depart__trigger {
+  justify-self: start;
+}
+
+.rc-subrow__export {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.rc-subrow.is-exporting .rc-subrow__export {
+  justify-self: center;
+}
+
+.rc-subrow .rc-depart__trigger {
+  min-width: 0;
+}
+
+.rc-subrow .rc-depart__trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .rc-subrow__add {
   flex-shrink: 0;
-  margin-left: auto;
+}
+
+.rc-subrow.is-exporting .rc-subrow__add {
+  justify-self: end;
 }
 
 .rc-subrow.is-depart-disabled .rc-depart__trigger {

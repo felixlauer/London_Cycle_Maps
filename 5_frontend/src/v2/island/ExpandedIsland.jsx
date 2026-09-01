@@ -15,8 +15,6 @@ import { useOnboarding } from '../onboarding/OnboardingContext';
 import {
   formatDurationParts,
   formatDistanceParts,
-  formatTimeDelta,
-  formatDistanceDelta,
   formatWalkParts,
 } from './metrics';
 
@@ -54,7 +52,6 @@ function nodeLabel(n) {
  */
 export default function ExpandedIsland({
   safest,
-  fastest,
   units,
   overlayMode,
   barModes,
@@ -91,7 +88,6 @@ export default function ExpandedIsland({
   }, [page, onPageChange]);
 
   const sStats = safest?.stats || {};
-  const fStats = fastest?.stats || {};
   const totalM = index?.totalM || Number(sStats.length_m) || 0;
 
   const chartHover = sheetHover || externalHover || null;
@@ -170,8 +166,6 @@ export default function ExpandedIsland({
         <MetricCell
           ariaLabel="Trip time"
           parts={formatDurationParts(sStats.duration_min)}
-          delta={formatTimeDelta(sStats.duration_min, fStats.duration_min)}
-          twoLineDelta={!isMobile}
         />
       </div>
       <div className="island-expanded__metric-block">
@@ -179,8 +173,6 @@ export default function ExpandedIsland({
         <MetricCell
           ariaLabel="Trip distance"
           parts={formatDistanceParts(sStats.length_m, units)}
-          delta={formatDistanceDelta(sStats.length_m, fStats.length_m, units)}
-          twoLineDelta={!isMobile}
         />
       </div>
     </div>
