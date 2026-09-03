@@ -37,6 +37,7 @@ class EdgeCostTables:
     speed_stress: np.ndarray
     is_tfl: np.ndarray
     is_green: np.ndarray
+    is_canal: np.ndarray
     m_highway: np.ndarray
     barrier_base: np.ndarray
     calming_base: np.ndarray
@@ -318,6 +319,7 @@ def build_edge_cost_tables(
     speed = np.empty(n, dtype=np.float64)
     is_tfl = np.empty(n, dtype=np.uint8)
     is_green = np.empty(n, dtype=np.uint8)
+    is_canal = np.empty(n, dtype=np.uint8)
     m_hw = np.empty(n, dtype=np.float64)
     barrier_b = np.empty(n, dtype=np.float64)
     calm_b = np.empty(n, dtype=np.float64)
@@ -358,6 +360,7 @@ def build_edge_cost_tables(
         speed[i] = float(speed_stress_fn(d))
         is_tfl[i] = 1 if is_tfl_fn(d) else 0
         is_green[i] = 1 if has_attraction_fn(d) else 0
+        is_canal[i] = 1 if is_yes_fn(d.get("is_canal")) else 0
         m_hw[i] = float(highway_mult_fn(d))
         barrier_b[i] = float(barrier_penalty_fn(d))
         give_b[i] = float(give_way_fn(d))
@@ -425,6 +428,7 @@ def build_edge_cost_tables(
         speed_stress=speed,
         is_tfl=is_tfl,
         is_green=is_green,
+        is_canal=is_canal,
         m_highway=m_hw,
         barrier_base=barrier_b,
         calming_base=calm_b,
@@ -621,6 +625,8 @@ def make_array_cost_by_eid_optimized(
     w_tfl = float(w.get("tfl_cycleway_weight", 0.0))
     w_speed = float(w.get("speed_weight", 0.0))
     w_green = float(w.get("green_weight", 0.0))
+    avoid_canals = bool(w.get("avoid_canals", False))
+    canal_mult = float(w.get("_canal_avoidance_multiplier", 4.0))
     w_barrier = float(w.get("barrier_weight", 0.0))
     w_calming = float(w.get("calming_weight", 0.0))
     w_junction = float(w.get("junction_weight", 0.0))
@@ -651,6 +657,7 @@ def make_array_cost_by_eid_optimized(
     speed_a = tables.speed_stress
     tfl_a = tables.is_tfl
     green_a = tables.is_green
+    canal_a = tables.is_canal
     mhw_a = tables.m_highway
     bar_a = tables.barrier_base
     junc_a = tables.junction_base
@@ -697,6 +704,8 @@ def make_array_cost_by_eid_optimized(
             r *= r_green
         if vf_on and (edge_vf & vf_reward):
             r *= r_vf
+        if avoid_canals and canal_a[i]:
+            r *= canal_mult
         r = max(r_min, r)
 
         a_total = (

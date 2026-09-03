@@ -28,6 +28,7 @@ export default function PresetWizard({ themeMode, testMode = false, onClose, onC
     light_night: false,
     surface: false,
     jam_comfort: true,
+    avoid_canals: false,
     vf_infrastructure: { shared_path: true, bus_lane: true, painted_lane: false },
   });
   const [name, setName] = useState('');

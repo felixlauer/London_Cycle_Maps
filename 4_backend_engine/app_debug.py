@@ -170,10 +170,11 @@ STOP_POINTS = []
 # TfL cycle routes (edges with tfl_cycle_programme); programme = first category for color
 TFL_ROUTES_CACHE = []  # [{id, p, b, programme, route}, ...]
 
-# Attraction / green mode (is_park, is_river, is_sight on graph edges)
+# Attraction / green mode (is_park, is_river, is_sight, is_canal on graph edges)
 ATTRACTION_PARK_CACHE = []   # [{id, p, b, name, opening_hours}, ...]
 ATTRACTION_RIVER_CACHE = []
 ATTRACTION_SIGHT_CACHE = []
+ATTRACTION_CANAL_CACHE = []
 
 MAX_SEGMENTS_LIMIT = 20000
 GRAPH_NETWORK_LIMIT = 15000
@@ -216,10 +217,11 @@ def _is_yes_attr(val) -> bool:
 
 def build_all_debug_caches():
     """One pass over edges for overlay caches, graph network, and edge point features."""
-    global GRAPH_NETWORK_CACHE, ATTRACTION_PARK_CACHE, ATTRACTION_RIVER_CACHE, ATTRACTION_SIGHT_CACHE
+    global GRAPH_NETWORK_CACHE, ATTRACTION_PARK_CACHE, ATTRACTION_RIVER_CACHE, ATTRACTION_SIGHT_CACHE, ATTRACTION_CANAL_CACHE
     ATTRACTION_PARK_CACHE = []
     ATTRACTION_RIVER_CACHE = []
     ATTRACTION_SIGHT_CACHE = []
+    ATTRACTION_CANAL_CACHE = []
     print("--- PRE-PROCESSING GRAPH FOR DEBUGGING (single edge pass) ---")
     print(f"--> Scanning {G.number_of_edges()} edges...")
     steep_ignored = 0
@@ -231,7 +233,7 @@ def build_all_debug_caches():
     tc_points = 0
     jn_points = 0
     tfl_count = 0
-    attr_park = attr_river = attr_sight = 0
+    attr_park = attr_river = attr_sight = attr_canal = 0
     n_barrier = n_gw = n_stop = n_tc_pt = 0
     seen_physical = set()
     GRAPH_NETWORK_CACHE = []
@@ -395,6 +397,14 @@ def build_all_debug_caches():
                 attr_sight += 1
                 ATTRACTION_SIGHT_CACHE.append({
                     "id": f"sight-{u}-{v}", "p": coords, "b": make_bounds(coords), "name": name,
+                })
+        if _is_yes_attr(data.get("is_canal")):
+            if coords is None:
+                coords = get_edge_coords(u, v, data)
+            if coords:
+                attr_canal += 1
+                ATTRACTION_CANAL_CACHE.append({
+                    "id": f"canal-{u}-{v}", "p": coords, "b": make_bounds(coords), "name": name,
                 })
 
         # Graph network: one segment per physical road (dedupe u,v and v,u)
@@ -940,13 +950,13 @@ def attraction_zone_preview():
     try:
         body = request.get_json() or {}
         rtype = str(body.get("type", "")).strip().lower()
-        if rtype not in ("park", "river", "sight"):
-            return jsonify({"error": "type must be park, river, or sight"}), 400
+        if rtype not in ("park", "river", "sight", "canal"):
+            return jsonify({"error": "type must be park, river, sight, or canal"}), 400
         geometry = body.get("geometry")
         if not geometry or not geometry.get("type"):
             return jsonify({"error": "geometry required"}), 400
         region = {"type": rtype, "geometry": geometry}
-        if rtype == "river" and geometry.get("type") == "LineString":
+        if rtype in ("river", "canal") and geometry.get("type") == "LineString":
             region["buffer_m"] = float(body.get("buffer_m") or 200)
         if rtype == "sight":
             region["radius_m"] = float(body.get("radius_m") or 200)
@@ -990,8 +1000,8 @@ def modify_attraction_add_region():
     try:
         body = request.get_json() or {}
         rtype = str(body.get("type", "")).strip().lower()
-        if rtype not in ("park", "river", "sight"):
-            return jsonify({"error": "type must be park, river, or sight"}), 400
+        if rtype not in ("park", "river", "sight", "canal"):
+            return jsonify({"error": "type must be park, river, sight, or canal"}), 400
         geometry = body.get("geometry")
         if not geometry or not geometry.get("type"):
             return jsonify({"error": "geometry required"}), 400
@@ -1002,7 +1012,7 @@ def modify_attraction_add_region():
             "name": name,
             "geometry": geometry,
         }
-        if rtype == "river" and geometry.get("type") == "LineString":
+        if rtype in ("river", "canal") and geometry.get("type") == "LineString":
             region["buffer_m"] = float(body.get("buffer_m") or 200)
         if rtype == "sight":
             region["radius_m"] = float(body.get("radius_m") or 200)
@@ -1263,6 +1273,7 @@ _ATTRACTION_LAYER_POOLS = {
     "park": lambda: ATTRACTION_PARK_CACHE,
     "river": lambda: ATTRACTION_RIVER_CACHE,
     "sight": lambda: ATTRACTION_SIGHT_CACHE,
+    "canal": lambda: ATTRACTION_CANAL_CACHE,
 }
 
 

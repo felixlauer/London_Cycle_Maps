@@ -564,6 +564,7 @@ export default function TutorialController({ signals }) {
   }, [
     step, cameraSettled,
     signals.safestPath, signals.start, signals.end, signals.mapApiRef,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     signals.islandExpanded, signals.islandPage,
   ]);
 

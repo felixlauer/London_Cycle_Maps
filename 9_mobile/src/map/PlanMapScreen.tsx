@@ -139,6 +139,10 @@ export function PlanMapScreen() {
   const [bikeType, setBikeType] = useState<BikeTypeId>('standard');
   const [departMode, setDepartMode] = useState<DepartMode>('now');
   const [departAtIso, setDepartAtIso] = useState<string | null>(null);
+  const departModeRef = useRef(departMode);
+  const departAtIsoRef = useRef(departAtIso);
+  useEffect(() => { departModeRef.current = departMode; }, [departMode]);
+  useEffect(() => { departAtIsoRef.current = departAtIso; }, [departAtIso]);
   const [departIsDark, setDepartIsDark] = useState<boolean | null>(null);
   const [safest, setSafest] = useState<RouteVariant | null>(null);
   const [routeLegs, setRouteLegs] = useState<RouteLeg[] | null>(null);
@@ -286,17 +290,22 @@ export function PlanMapScreen() {
       return undefined;
     }
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiFetch(`/night_status?at=${encodeURIComponent(departAtIso)}`);
-        const data = await res.json().catch(() => ({}));
-        if (cancelled || !res.ok) return;
-        setDepartIsDark(Boolean(data.is_dark));
-      } catch {
-        if (!cancelled) setDepartIsDark(null);
-      }
-    })();
-    return () => { cancelled = true; };
+    const t = setTimeout(() => {
+      (async () => {
+        try {
+          const res = await apiFetch(`/night_status?at=${encodeURIComponent(departAtIso)}`);
+          const data = await res.json().catch(() => ({}));
+          if (cancelled || !res.ok) return;
+          setDepartIsDark(Boolean(data.is_dark));
+        } catch {
+          if (!cancelled) setDepartIsDark(null);
+        }
+      })();
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
   }, [departMode, departAtIso]);
 
   const overlayTouchedRef = useRef(false);
@@ -647,7 +656,7 @@ export function PlanMapScreen() {
         vias: viaList.map((v) => v.coord),
         profileId,
         bikeType,
-        departAtIso: departMode === 'depart_at' ? departAtIso : null,
+        departAtIso: departModeRef.current === 'depart_at' ? departAtIsoRef.current : null,
         purpose: 'commit',
       });
       if (!result.ok) {
@@ -667,8 +676,8 @@ export function PlanMapScreen() {
       setOverlayMode(DEFAULT_OVERLAY_MODE);
       maybeAlertFarSnap(result.data.meta as Record<string, unknown> | undefined);
       maybeAlertTraffic(nextSafe);
-      if (departMode === 'depart_at' && departAtIso) {
-        const t = new Date(departAtIso).getTime();
+      if (departModeRef.current === 'depart_at' && departAtIsoRef.current) {
+        const t = new Date(departAtIsoRef.current).getTime();
         if (Number.isFinite(t) && t - Date.now() > 30 * 60_000) {
           pushAlert({ type: 'warning', message: 'Live traffic not applied for future departures' });
         }
@@ -689,7 +698,7 @@ export function PlanMapScreen() {
       setBusy(false);
     }
   }, [
-    profileId, bikeType, departMode, departAtIso, fitRoute, clearRouteData,
+    profileId, bikeType, fitRoute, clearRouteData,
     pushAlert, dismissAlert, maybeAlertFarSnap, maybeAlertTraffic,
   ]);
 
@@ -1559,9 +1568,12 @@ export function PlanMapScreen() {
               pushAlert({ type: 'warning', message: BLOCKED.departNeedsNoSantander });
               return;
             }
+            const modeChanged = mode !== departMode;
             setDepartMode(mode);
             setDepartAtIso(iso);
-            clearRouteData();
+            departModeRef.current = mode;
+            departAtIsoRef.current = iso;
+            if (modeChanged) clearRouteData();
           }}
           onGetRoute={onGetRoute}
           isCalculating={busy || hireStep === 'routing'}

@@ -19,6 +19,7 @@ export default function AdvancedStep({
   timeSavingFraming = false,
 }) {
   const [open, setOpen] = useState(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const sliders = config.sliders || {};
   const exemplary = config.exemplary_route || {};
   const bikeRules = config.bike_types?.[bikeType]?.rules || {};

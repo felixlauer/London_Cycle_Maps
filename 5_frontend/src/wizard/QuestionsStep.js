@@ -76,6 +76,7 @@ export default function QuestionsStep({
         )}
         {row('jam_comfort', cfg.jam_comfort?.question, cfg.jam_comfort?.help,
           'Road closures are always avoided either way.')}
+        {cfg.avoid_canals && row('avoid_canals', cfg.avoid_canals.question, cfg.avoid_canals.help)}
       </div>
 
       <div className="wiz-panel">

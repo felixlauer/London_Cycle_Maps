@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Clock, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { BLOCKED } from './constants';
+import { formatDepartHm, maskTimeDigits, parseDepartTime } from './departTime';
 
 const STEP_MIN = 15;
 const DAY_COUNT = 7;
+const TIME_COMMIT_MS = 280;
 
 function londonParts(d = new Date()) {
   const parts = Object.fromEntries(
@@ -53,14 +55,14 @@ function roundUpToStep(minute, step = STEP_MIN) {
   return Math.ceil(minute / step) * step;
 }
 
-function clampToNotBeforeNow(dayIndex, hour, minute) {
+function clampToNotBeforeNow(dayIndex, hour, minute, step = 1) {
   if (dayIndex !== 0) return { hour, minute };
   const now = londonParts();
   const nowTotal = now.hour * 60 + now.minute;
   let total = hour * 60 + minute;
   if (total < nowTotal) {
-    total = roundUpToStep(nowTotal, STEP_MIN);
-    if (total >= 24 * 60) return { hour: 23, minute: 45 };
+    total = roundUpToStep(nowTotal, step);
+    if (total >= 24 * 60) return { hour: 23, minute: 59 };
   }
   return { hour: Math.floor(total / 60), minute: total % 60 };
 }
@@ -80,7 +82,7 @@ function buildDayOptions() {
 }
 
 function formatHm(hour, minute) {
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  return formatDepartHm(hour, minute);
 }
 
 function toLondonIso(year, month, day, hour, minute) {
@@ -150,7 +152,7 @@ export function useDepartAtControl({
         (x) => x.year === p.year && x.month === p.month && x.day === p.day,
       );
       if (dayIndex < 0) dayIndex = 0;
-      const clamped = clampToNotBeforeNow(dayIndex, p.hour, p.minute - (p.minute % STEP_MIN));
+      const clamped = clampToNotBeforeNow(dayIndex, p.hour, p.minute);
       const day = days[dayIndex];
       return {
         dayIndex,
@@ -166,25 +168,118 @@ export function useDepartAtControl({
   const [dayIndex, setDayIndex] = useState(slotFromIso.dayIndex);
   const [hour, setHour] = useState(slotFromIso.hour);
   const [minute, setMinute] = useState(slotFromIso.minute);
+  const [timeText, setTimeText] = useState(() => formatHm(slotFromIso.hour, slotFromIso.minute));
+  const [timeFocused, setTimeFocused] = useState(false);
+  const timeFocusedRef = useRef(false);
+  const timeCommitRef = useRef(null);
+  const timeEnterCommittedRef = useRef(false);
+  const dayIndexRef = useRef(slotFromIso.dayIndex);
+  const hourRef = useRef(slotFromIso.hour);
+  const minuteRef = useRef(slotFromIso.minute);
 
   useEffect(() => {
     setDayIndex(slotFromIso.dayIndex);
     setHour(slotFromIso.hour);
     setMinute(slotFromIso.minute);
+    dayIndexRef.current = slotFromIso.dayIndex;
+    hourRef.current = slotFromIso.hour;
+    minuteRef.current = slotFromIso.minute;
+    if (!timeFocusedRef.current) {
+      setTimeText(formatHm(slotFromIso.hour, slotFromIso.minute));
+    }
   }, [slotFromIso.dayIndex, slotFromIso.hour, slotFromIso.minute]);
 
   useEffect(() => {
     if (disabled) setOpen(false);
   }, [disabled]);
 
-  const emitDepartAt = (nextDay, nextHour, nextMinute) => {
-    const clamped = clampToNotBeforeNow(nextDay, nextHour, nextMinute);
+  useEffect(() => () => {
+    if (timeCommitRef.current) clearTimeout(timeCommitRef.current);
+  }, []);
+
+  const emitDepartAt = (nextDay, nextHour, nextMinute, step = 1) => {
+    const clamped = clampToNotBeforeNow(nextDay, nextHour, nextMinute, step);
     const day = days[nextDay] || days[0];
     const iso = toLondonIso(day.year, day.month, day.day, clamped.hour, clamped.minute);
     setDayIndex(nextDay);
     setHour(clamped.hour);
     setMinute(clamped.minute);
+    dayIndexRef.current = nextDay;
+    hourRef.current = clamped.hour;
+    minuteRef.current = clamped.minute;
+    if (!timeFocusedRef.current) setTimeText(formatHm(clamped.hour, clamped.minute));
     onChange({ mode: 'depart_at', departAtIso: iso });
+    return clamped;
+  };
+
+  const applyParsedTime = (raw, { revert = false } = {}) => {
+    const parsed = parseDepartTime(raw);
+    if (!parsed) {
+      if (revert) setTimeText(formatHm(hour, minute));
+      return false;
+    }
+    // When the typed time is before London now, clamp forward to the next 15-min slot.
+    // For future times, the step does not affect the minute.
+    const clamped = emitDepartAt(dayIndex, parsed.hour, parsed.minute, STEP_MIN);
+    setTimeText(formatHm(clamped.hour, clamped.minute));
+    return true;
+  };
+
+  const handleTimeText = (next) => {
+    const masked = maskTimeDigits(next);
+    setTimeText(masked);
+    if (timeCommitRef.current) clearTimeout(timeCommitRef.current);
+    const digits = masked.replace(/\D/g, '');
+    if (digits.length !== 4) return;
+    const parsed = parseDepartTime(masked, { hourOnlyOnShort: false });
+    if (!parsed) return;
+    timeCommitRef.current = setTimeout(() => {
+      timeCommitRef.current = null;
+      emitDepartAt(dayIndex, parsed.hour, parsed.minute, STEP_MIN);
+    }, TIME_COMMIT_MS);
+  };
+
+  const onTimeFocus = (e) => {
+    timeFocusedRef.current = true;
+    setTimeFocused(true);
+    e.target.select();
+  };
+
+  const onTimeBlur = () => {
+    const revert = !timeEnterCommittedRef.current;
+    timeEnterCommittedRef.current = false;
+    timeFocusedRef.current = false;
+    setTimeFocused(false);
+    if (timeCommitRef.current) {
+      clearTimeout(timeCommitRef.current);
+      timeCommitRef.current = null;
+    }
+    applyParsedTime(timeText, { revert });
+  };
+
+  const onTimeKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      timeEnterCommittedRef.current = true;
+      // If the draft is incomplete/invalid, keep it as-is instead of snapping back.
+      applyParsedTime(timeText, { revert: false });
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setTimeText(formatHm(hour, minute));
+      e.currentTarget.blur();
+    }
+  };
+
+  const commitDraft = () => {
+    if (!timeFocusedRef.current) return;
+    if (timeCommitRef.current) {
+      clearTimeout(timeCommitRef.current);
+      timeCommitRef.current = null;
+    }
+    timeFocusedRef.current = false;
+    setTimeFocused(false);
+    applyParsedTime(timeText, { revert: true });
   };
 
   const linkLabel = useMemo(() => {
@@ -195,29 +290,41 @@ export function useDepartAtControl({
   }, [mode, departAtIso, days, dayIndex, hour, minute]);
 
   const nudgeTime = (dir) => {
-    let total = hour * 60 + minute + dir * STEP_MIN;
-    let nextDay = dayIndex;
-    if (total < 0) {
-      if (dayIndex === 0) {
-        emitDepartAt(0, 0, 0);
-        return;
-      }
-      nextDay = dayIndex - 1;
-      total = 24 * 60 - STEP_MIN;
-    } else if (total >= 24 * 60) {
-      if (dayIndex >= DAY_COUNT - 1) {
-        emitDepartAt(dayIndex, 23, 45);
-        return;
-      }
-      nextDay = dayIndex + 1;
-      total = 0;
+    commitDraft();
+    const baseTotal = hourRef.current * 60 + minuteRef.current;
+    const rem = baseTotal % STEP_MIN;
+    // Chevron rules:
+    // - If already on a 15-min slot, +/- moves to the next/previous slot.
+    // - If not on a slot, +/- moves to the nearest upcoming/past slot.
+    let total;
+    if (dir > 0) {
+      total = rem === 0 ? baseTotal + STEP_MIN : Math.ceil(baseTotal / STEP_MIN) * STEP_MIN;
+    } else {
+      total = rem === 0 ? baseTotal - STEP_MIN : Math.floor(baseTotal / STEP_MIN) * STEP_MIN;
     }
-    emitDepartAt(nextDay, Math.floor(total / 60), total % 60);
+    let nextDay = dayIndexRef.current;
+    if (total < 0) {
+      if (nextDay === 0) {
+        emitDepartAt(0, 0, 0, STEP_MIN);
+        return;
+      }
+      nextDay -= 1;
+      total += 24 * 60;
+    } else if (total >= 24 * 60) {
+      if (nextDay >= DAY_COUNT - 1) {
+        emitDepartAt(nextDay, 23, 45, STEP_MIN);
+        return;
+      }
+      nextDay += 1;
+      total -= 24 * 60;
+    }
+    emitDepartAt(nextDay, Math.floor(total / 60), total % 60, STEP_MIN);
   };
 
   const nudgeDay = (dir) => {
-    const next = Math.max(0, Math.min(DAY_COUNT - 1, dayIndex + dir));
-    emitDepartAt(next, hour, minute);
+    commitDraft();
+    const next = Math.max(0, Math.min(DAY_COUNT - 1, dayIndexRef.current + dir));
+    emitDepartAt(next, hourRef.current, minuteRef.current, STEP_MIN);
   };
 
   const toggleOpen = () => {
@@ -225,10 +332,14 @@ export function useDepartAtControl({
       onBlocked?.(BLOCKED.departNeedsNoSantander);
       return;
     }
+    if (open) commitDraft();
     setOpen((v) => !v);
   };
 
-  const collapse = () => setOpen(false);
+  const collapse = () => {
+    commitDraft();
+    setOpen(false);
+  };
 
   return {
     open,
@@ -239,12 +350,19 @@ export function useDepartAtControl({
     dayIndex,
     hour,
     minute,
+    timeText,
+    timeFocused,
     toggleOpen,
     collapse,
+    commitDraft,
     onChange,
     emitDepartAt,
     nudgeDay,
     nudgeTime,
+    handleTimeText,
+    onTimeFocus,
+    onTimeBlur,
+    onTimeKeyDown,
   };
 }
 
@@ -278,12 +396,15 @@ export function DepartAtPanel({
   mode,
   days,
   dayIndex,
-  hour,
-  minute,
+  timeText,
   onChange,
   emitDepartAt,
   nudgeDay,
   nudgeTime,
+  handleTimeText,
+  onTimeFocus,
+  onTimeBlur,
+  onTimeKeyDown,
 }) {
   return (
     <div className="rc-depart__inline">
@@ -300,7 +421,7 @@ export function DepartAtPanel({
           className={mode === 'depart_at' ? 'is-active' : ''}
           onClick={() => {
             const slot = defaultDepartSlot();
-            emitDepartAt(slot.dayIndex, slot.hour, slot.minute);
+            emitDepartAt(slot.dayIndex, slot.hour, slot.minute, STEP_MIN);
           }}
         >
           Depart at
@@ -321,7 +442,21 @@ export function DepartAtPanel({
             <button type="button" onClick={() => nudgeTime(-1)} aria-label="Earlier">
               <ChevronLeft size={15} strokeWidth={2} />
             </button>
-            <span className="rc-depart__time">{formatHm(hour, minute)}</span>
+            <input
+              className="rc-depart__time rc-depart__time-input"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              spellCheck="false"
+              maxLength={5}
+              aria-label="Departure time, 24-hour"
+              placeholder="HH:MM"
+              value={timeText}
+              onChange={(e) => handleTimeText(e.target.value)}
+              onFocus={onTimeFocus}
+              onBlur={onTimeBlur}
+              onKeyDown={onTimeKeyDown}
+            />
             <button type="button" onClick={() => nudgeTime(1)} aria-label="Later">
               <ChevronRight size={15} strokeWidth={2} />
             </button>

@@ -1,6 +1,7 @@
 /**
- * Mapbox Search Box helpers — requests go through Flask so the Mapbox API
- * key never appears in the browser bundle / inspector.
+ * Place search via Flask /geocode/* (HERE Autosuggest + Lookup).
+ * The Mapbox-shaped JSON (mapbox_id, session_token) is unchanged so
+ * the API key never appears in the browser bundle / inspector.
  */
 import { API_BASE } from './api/flaskClient';
 

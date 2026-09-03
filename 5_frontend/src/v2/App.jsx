@@ -34,6 +34,11 @@ import './tailwind.css';
 import './alerts/alertPill.css';
 import './shell/shell.css';
 
+/** Pause after the last waypoint / depart-at change before background /route. */
+const ROUTE_PREFETCH_DEBOUNCE_MS = 450;
+/** Pause after depart-at edits before /night_status. */
+const NIGHT_STATUS_DEBOUNCE_MS = 400;
+
 function AppV2Inner({ mapApiRef, isDarkOutside }) {
   const { user, isLoading: authLoading, passwordRecoveryPending, authNotice } = useAuth();
   const {
@@ -123,6 +128,12 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
 
   const [departMode, setDepartMode] = useState('now');
   const [departAtIso, setDepartAtIso] = useState(null);
+  const departModeRef = useRef(departMode);
+  const departAtIsoRef = useRef(departAtIso);
+  const prefetchTimerRef = useRef(null);
+  const commitPendingRef = useRef(false);
+  useEffect(() => { departModeRef.current = departMode; }, [departMode]);
+  useEffect(() => { departAtIsoRef.current = departAtIso; }, [departAtIso]);
   /** 'start' | 'end' | null — map click only places a point while a field is focused. */
   const [mapPickTarget, setMapPickTarget] = useState(null);
   const [departIsDark, setDepartIsDark] = useState(null);
@@ -305,10 +316,11 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
         if (!cancelled) setDepartIsDark(null);
       }
     };
-    load();
+    const start = setTimeout(load, NIGHT_STATUS_DEBOUNCE_MS);
     const t = setInterval(load, 5 * 60 * 1000);
     return () => {
       cancelled = true;
+      clearTimeout(start);
       clearInterval(t);
     };
   }, [departMode, departAtIso]);
@@ -743,7 +755,9 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     if (viasStr) params.set('vias', viasStr);
     if (activeProfileId) params.set('profile_id', activeProfileId);
     if (sessionBikeType) params.set('bike_type', sessionBikeType);
-    if (departMode === 'depart_at' && departAtIso) params.set('depart_at', departAtIso);
+    if (departModeRef.current === 'depart_at' && departAtIsoRef.current) {
+      params.set('depart_at', departAtIsoRef.current);
+    }
 
     try {
       const response = await apiFetch(`/route?${params}`, { testMode: false, signal: controller.signal });
@@ -759,7 +773,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
         const legs = Array.isArray(data.legs) && data.legs.length ? data.legs : null;
         setRouteLegs(legs);
         setActiveLegIndex(0);
-        if (typeof data.meta?.is_dark === 'boolean' && departMode === 'depart_at') {
+        if (typeof data.meta?.is_dark === 'boolean' && departModeRef.current === 'depart_at') {
           setDepartIsDark(data.meta.is_dark);
         }
         if (purpose === 'commit') {
@@ -767,7 +781,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           setOverlayMode(DEFAULT_OVERLAY_MODE);
           maybeAlertTraffic(data.safest);
           maybeAlertFarSnap(data.meta);
-          if (departMode === 'depart_at' && isFutureDepartAt(departAtIso)) {
+          if (departModeRef.current === 'depart_at' && isFutureDepartAt(departAtIsoRef.current)) {
             pushAlert({ type: 'warning', message: 'Live traffic not applied for future departures' });
           }
           fitRouteBounds([
@@ -784,7 +798,7 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
       pushAlert({ type: 'error', message: 'Backend error' });
     }
   }, [
-    start, end, vias, activeProfileId, sessionBikeType, departMode, departAtIso,
+    start, end, vias, activeProfileId, sessionBikeType,
     bumpRouteRequest, encodeViasParam, pushAlert, maybeAlertTraffic, maybeAlertFarSnap,
     fitRouteBounds,
   ]);
@@ -795,11 +809,19 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
         setRouteRevealed(false);
         clearRouteData();
       }
-      return;
+      return undefined;
     }
-    if (vias.some((v) => !v.coord)) return;
-    setRouteRevealed(false);
-    fetchRoutes(start, end, vias, 'prefetch');
+    if (vias.some((v) => !v.coord)) return undefined;
+    if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    prefetchTimerRef.current = setTimeout(() => {
+      prefetchTimerRef.current = null;
+      if (commitPendingRef.current) return;
+      setRouteRevealed(false);
+      fetchRoutes(start, end, vias, 'prefetch');
+    }, ROUTE_PREFETCH_DEBOUNCE_MS);
+    return () => {
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [start, end, vias, activeProfileId, sessionBikeType, santanderMode, departMode, departAtIso]);
 
@@ -1098,9 +1120,11 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     }
     if (santanderMode) {
       setCommitPending(true);
+      commitPendingRef.current = true;
       try {
         await beginPickupStep(effectiveStart);
       } finally {
+        commitPendingRef.current = false;
         setCommitPending(false);
       }
       return;
@@ -1108,9 +1132,15 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
     // Always show Get Route busy state (incl. long-route copy / dots), even when
     // a prefetch response is already cached.
     setCommitPending(true);
+    commitPendingRef.current = true;
+    if (prefetchTimerRef.current) {
+      clearTimeout(prefetchTimerRef.current);
+      prefetchTimerRef.current = null;
+    }
     try {
       await fetchRoutes(effectiveStart, end, vias, 'commit');
     } finally {
+      commitPendingRef.current = false;
       setCommitPending(false);
     }
   }, [
@@ -1191,7 +1221,8 @@ function AppV2Inner({ mapApiRef, isDarkOutside }) {
           onDepartChange: ({ mode, departAtIso: iso }) => {
             setDepartMode(mode);
             setDepartAtIso(iso);
-            setRouteRevealed(false);
+            departModeRef.current = mode;
+            departAtIsoRef.current = iso;
             overlayTouchedRef.current = false;
           },
           onGetRoute: handleGetRoute,

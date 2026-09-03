@@ -310,7 +310,7 @@ const TOMTOM_DISRUPTION_COLORS = {
 };
 const getTomtomDisruptionColor = (type) => TOMTOM_DISRUPTION_COLORS[String(type).toLowerCase()] || '#757575';
 
-const ATTRACTION_TYPE_COLORS = { park: '#2E7D32', river: '#1565C0', sight: '#6A1B9A' };
+const ATTRACTION_TYPE_COLORS = { park: '#2E7D32', river: '#1565C0', sight: '#6A1B9A', canal: '#00838F' };
 const PARK_HOURS_OPEN_COLOR = '#00C853';
 const PARK_HOURS_CLOSED_COLOR = '#D50000';
 
@@ -347,6 +347,7 @@ const DebugPanel = ({
     attractionParkOn, setAttractionParkOn,
     attractionRiverOn, setAttractionRiverOn,
     attractionSightOn, setAttractionSightOn,
+    attractionCanalOn, setAttractionCanalOn,
     attractionParkHoursOn, setAttractionParkHoursOn,
     attractionLimitReached,
     tflDisruptionsOn, setTflDisruptionsOn, onRefreshTfl, tflDisruptionStatus,
@@ -529,6 +530,7 @@ const DebugPanel = ({
                             <Subtoggle label="Park (is_park)" isOn={attractionParkOn} setIsOn={setAttractionParkOn} />
                             <Subtoggle label="River (is_river)" isOn={attractionRiverOn} setIsOn={setAttractionRiverOn} />
                             <Subtoggle label="Sight (is_sight)" isOn={attractionSightOn} setIsOn={setAttractionSightOn} />
+                            <Subtoggle label="Canal (is_canal)" isOn={attractionCanalOn} setIsOn={setAttractionCanalOn} />
                             {attractionParkOn && (
                                 <Subtoggle
                                     label="Park hours (open/closed)"
@@ -561,6 +563,10 @@ const DebugPanel = ({
                             <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
                                 <div style={{ width: 10, height: 10, background: ATTRACTION_TYPE_COLORS.sight, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
                                 Sight
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+                                <div style={{ width: 10, height: 10, background: ATTRACTION_TYPE_COLORS.canal, borderRadius: 1, marginRight: 5, flexShrink: 0 }}></div>
+                                Canal
                             </div>
                             {attractionLimitReached && (
                                 <div style={{ marginTop: '6px', color: '#c62828' }}>20k limit — zoom in</div>
@@ -910,7 +916,7 @@ const ModifyAttractionsPanel = ({
                             </div>
                             <div style={{ marginBottom: '8px', fontSize: '11px', color: '#555', lineHeight: 1.4 }}>
                                 Park / River: click polygon corners (≥3), then Complete. River uses the drawn box as the tagging zone.
-                                Sight: one click saves a 200 m radius. Faint fill = tagging zone. Light green = OSM parks.
+                                Sight: one click saves a 200 m radius. Canal/River: draw polygon (≥3 clicks) or line. Faint fill = tagging zone. Light green = OSM parks.
                             </div>
                             <div style={{ fontWeight: 'bold', fontSize: '11px', marginBottom: '4px' }}>Name (used for all new regions):</div>
                             <input
@@ -922,7 +928,7 @@ const ModifyAttractionsPanel = ({
                             />
                             <div style={{ fontWeight: 'bold', fontSize: '11px', marginBottom: '6px' }}>Type:</div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
-                                {['park', 'river', 'sight'].map((t) => (
+                                {['park', 'river', 'canal', 'sight'].map((t) => (
                                     <button
                                         key={t}
                                         type="button"
@@ -942,7 +948,7 @@ const ModifyAttractionsPanel = ({
                                     </button>
                                 ))}
                             </div>
-                            {(attractionType === 'park' || attractionType === 'river') && (
+                            {(attractionType === 'park' || attractionType === 'river' || attractionType === 'canal') && (
                                 <button
                                     type="button"
                                     onClick={() => onCompleteGeometry && onCompleteGeometry()}
@@ -1259,7 +1265,7 @@ const AttractionsLayer = ({ isOn, layers, parkHoursOn, setSegmentsByKind, setLim
         const bounds = map.getBounds();
         const q = `min_lat=${bounds.getSouth()}&max_lat=${bounds.getNorth()}&min_lon=${bounds.getWest()}&max_lon=${bounds.getEast()}`;
         setStatus("Loading attraction edges...");
-        const order = ['park', 'river', 'sight'];
+        const order = ['park', 'river', 'sight', 'canal'];
         const active = order.filter(k => layers[k]);
         if (active.length === 0) {
             setSegmentsByKind({});
@@ -1312,7 +1318,7 @@ const AttractionsLayer = ({ isOn, layers, parkHoursOn, setSegmentsByKind, setLim
             setSegmentsByKind({});
             if (typeof setLimitReached === 'function') setLimitReached(false);
         }
-    }, [isOn, layers.park, layers.river, layers.sight, parkHoursOn]);
+    }, [isOn, layers.park, layers.river, layers.sight, layers.canal, parkHoursOn]);
 
     return null;
 };
@@ -1761,6 +1767,7 @@ function App() {
     const [attractionParkOn, setAttractionParkOn] = useState(true);
     const [attractionRiverOn, setAttractionRiverOn] = useState(true);
     const [attractionSightOn, setAttractionSightOn] = useState(true);
+    const [attractionCanalOn, setAttractionCanalOn] = useState(true);
     const [attractionParkHoursOn, setAttractionParkHoursOn] = useState(false);
     const [attractionLimitReached, setAttractionLimitReached] = useState(false);
     const [attractionSegmentsByKind, setAttractionSegmentsByKind] = useState({});
@@ -1896,7 +1903,7 @@ function App() {
             return;
         }
         const pts = attractionScratchPoints;
-        if ((attractionType === 'park' || attractionType === 'river') && pts.length >= 3) {
+        if ((attractionType === 'park' || attractionType === 'river' || attractionType === 'canal') && pts.length >= 3) {
             setAttractionScratchZonePositions([[...pts, pts[0]]]);
             return;
         }
@@ -1941,7 +1948,7 @@ function App() {
 
     const handleAttractionCompleteGeometry = () => {
         const pts = attractionScratchPoints;
-        if (attractionType !== 'park' && attractionType !== 'river') return;
+        if (attractionType !== 'park' && attractionType !== 'river' && attractionType !== 'canal') return;
         if (pts.length < 3) return;
         const ring = pts.map(([la, lo]) => [lo, la]);
         if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
@@ -2074,6 +2081,7 @@ function App() {
                 attractionParkOn={attractionParkOn} setAttractionParkOn={setAttractionParkOn}
                 attractionRiverOn={attractionRiverOn} setAttractionRiverOn={setAttractionRiverOn}
                 attractionSightOn={attractionSightOn} setAttractionSightOn={setAttractionSightOn}
+                attractionCanalOn={attractionCanalOn} setAttractionCanalOn={setAttractionCanalOn}
                 attractionParkHoursOn={attractionParkHoursOn} setAttractionParkHoursOn={setAttractionParkHoursOn}
                 attractionLimitReached={attractionLimitReached}
                 tflDisruptionsOn={tflDisruptionsOn} setTflDisruptionsOn={setTflDisruptionsOn}
@@ -2172,7 +2180,7 @@ function App() {
                 <TflRoutesLayer isOn={tflRoutesOn || modifyTflOn} setSegments={setTflRoutesSegments} setStatus={setStatus} />
                 <AttractionsLayer
                     isOn={attractionsOn}
-                    layers={{ park: attractionParkOn, river: attractionRiverOn, sight: attractionSightOn }}
+                    layers={{ park: attractionParkOn, river: attractionRiverOn, sight: attractionSightOn, canal: attractionCanalOn }}
                     parkHoursOn={attractionParkHoursOn}
                     setSegmentsByKind={setAttractionSegmentsByKind}
                     setLimitReached={setAttractionLimitReached}

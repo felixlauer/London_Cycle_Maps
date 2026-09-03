@@ -16,6 +16,7 @@ const DEFAULT_TOGGLES = {
   light_night: false,
   surface: false,
   jam_comfort: true,
+  avoid_canals: false,
   vf_infrastructure: { shared_path: true, bus_lane: true, painted_lane: false },
 };
 

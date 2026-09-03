@@ -603,11 +603,13 @@ function AppInner() {
     }
   }, [resetHireState, bumpRouteRequest]);
 
+  // eslint-disable-next-line no-unused-vars
   const handleStartSearchSelect = useCallback(({ lat, lon, label }) => {
     setStartPoint(lat, lon, label);
     setFlyTarget([lat, lon]);
   }, [setStartPoint]);
 
+  // eslint-disable-next-line no-unused-vars
   const handleEndSearchSelect = useCallback(({ lat, lon, label }) => {
     setEndPoint(lat, lon, label);
     setFlyTarget([lat, lon]);

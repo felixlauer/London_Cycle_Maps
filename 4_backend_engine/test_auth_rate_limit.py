@@ -54,6 +54,15 @@ class AuthRateLimitTests(unittest.TestCase):
             self.assertTrue(rl.check_signup_allowed(ip).allowed)
         self.assertFalse(rl.check_signup_allowed(ip).allowed)
 
+    def test_here_search_ip_cap(self):
+        ip = "203.0.113.8"
+        for _ in range(rl.HERE_SEARCH_IP_MAX):
+            self.assertTrue(rl.check_here_search_allowed(ip).allowed)
+        blocked = rl.check_here_search_allowed(ip)
+        self.assertFalse(blocked.allowed)
+        self.assertGreaterEqual(blocked.retry_after_s, 1)
+        self.assertTrue(rl.check_here_search_allowed("203.0.113.9").allowed)
+
     def test_route_commit_ip_cap(self):
         ip = "203.0.113.6"
         for _ in range(rl.ROUTE_COMMIT_IP_MAX):

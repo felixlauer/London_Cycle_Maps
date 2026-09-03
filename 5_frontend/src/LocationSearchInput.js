@@ -7,7 +7,7 @@ import {
 } from './mapboxGeocoding';
 
 const DEBOUNCE_MS = 300;
-const MIN_QUERY_LEN = 2;
+const MIN_QUERY_LEN = 3;
 
 /** Map-picked labels look like "51.5074, -0.1278" — never send those to suggest. */
 export function looksLikeCoordinates(text) {

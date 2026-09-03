@@ -99,6 +99,15 @@ export function QuestionsStep({
           onChange={(v) => onToggleChange('jam_comfort', v)}
           c={c}
         />
+        {cfg.avoid_canals && (
+          <ToggleRow
+            label={cfg.avoid_canals.question || 'Avoid canal towpaths'}
+            help={cfg.avoid_canals.help}
+            value={toggles.avoid_canals}
+            onChange={(v) => onToggleChange('avoid_canals', v)}
+            c={c}
+          />
+        )}
       </View>
 
       <View style={[styles.panel, { borderColor: c.line, backgroundColor: c.surface }]}>

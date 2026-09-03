@@ -29,6 +29,29 @@ DEG_TO_M_APPROX = 111000.0
 DEFAULT_RIVER_BUFFER_M = 200.0
 DEFAULT_SIGHT_RADIUS_M = 200.0
 
+# Canal tagging should avoid bridge/road overlap.
+# In the built routing graph, canal towpaths are typically modelled as
+# pedestrian/cycle path-like edges, while bridge spans appear as regular
+# carriageways. The filter keeps manual canal tagging focused on towpaths.
+CANAL_ALLOWED_HIGHWAY_TYPES = frozenset({
+    "path",
+    "footway",
+    "pedestrian",
+    "bridleway",
+    "cycleway",
+})
+
+
+def _is_canal_towpath_edge(d: dict) -> bool:
+    highway = str(d.get("type", "")).strip().lower()
+    if highway in CANAL_ALLOWED_HIGHWAY_TYPES:
+        return True
+    if highway == "service":
+        # Rare but possible: towpath-like access edges can be represented as
+        # service=alley in the graph.
+        return str(d.get("service", "")).strip().lower() == "alley"
+    return False
+
 
 def _length_m_float(data: dict) -> float:
     try:
@@ -131,6 +154,7 @@ def _tag_edges_in_zone(
     set_park: bool = False,
     set_river: bool = False,
     set_sight: bool = False,
+    set_canal: bool = False,
     name: str = "",
     opening_hours: str = "",
     threshold: float = ALIGNMENT_THRESHOLD,
@@ -154,6 +178,8 @@ def _tag_edges_in_zone(
         if not G.has_edge(u, v):
             continue
         ed = G.edges[u, v]
+        if set_canal and not _is_canal_towpath_edge(ed):
+            continue
         if set_park:
             ed["is_park"] = "yes"
             _set_park_hours_on_edge(ed, opening_hours, overlap, name)
@@ -161,6 +187,8 @@ def _tag_edges_in_zone(
             ed["is_river"] = "yes"
         if set_sight:
             ed["is_sight"] = "yes"
+        if set_canal:
+            ed["is_canal"] = "yes"
         merge_attraction_name(ed, name)
         tagged += 1
     return tagged
@@ -200,6 +228,47 @@ def tag_river_polygon(
     return _tag_edges_in_zone(
         G, edge_list, tree, polygon_wgs84,
         set_river=True, name=name, threshold=threshold,
+    )
+
+
+def tag_canal_polygon(
+    G: nx.DiGraph,
+    polygon_wgs84,
+    *,
+    edge_list: list[tuple] | None = None,
+    tree: STRtree | None = None,
+    name: str = "",
+    threshold: float = ALIGNMENT_THRESHOLD,
+) -> int:
+    if edge_list is None or tree is None:
+        edge_list = edge_geometries(G)
+        tree, edge_list = build_edge_strtree(edge_list)
+    return _tag_edges_in_zone(
+        G, edge_list, tree, polygon_wgs84,
+        set_canal=True, name=name, threshold=threshold,
+    )
+
+
+def tag_canal_line(
+    G: nx.DiGraph,
+    line_wgs84: LineString,
+    buffer_m: float,
+    *,
+    edge_list: list[tuple] | None = None,
+    tree: STRtree | None = None,
+    name: str = "",
+    threshold: float = ALIGNMENT_THRESHOLD,
+) -> int:
+    if line_wgs84 is None or line_wgs84.is_empty or len(line_wgs84.coords) < 2:
+        return 0
+    bng_line = _to_bng(line_wgs84)
+    zone = _buffer_wgs84_from_bng(bng_line, buffer_m)
+    if edge_list is None or tree is None:
+        edge_list = edge_geometries(G)
+        tree, edge_list = build_edge_strtree(edge_list)
+    return _tag_edges_in_zone(
+        G, edge_list, tree, zone,
+        set_canal=True, name=name, threshold=threshold,
     )
 
 
@@ -280,13 +349,13 @@ def region_tagging_zone(region: dict):
     if not geom_dict:
         return None
 
-    if rtype in ("park", "river"):
+    if rtype in ("park", "river", "canal"):
         geom = geometry_from_geojson(geom_dict)
         if geom is None or geom.is_empty:
             return None
         if geom.geom_type in ("Polygon", "MultiPolygon"):
             return geom
-        if rtype == "river" and geom.geom_type == "LineString":
+        if rtype in ("river", "canal") and geom.geom_type == "LineString":
             buffer_m = float(region.get("buffer_m") or DEFAULT_RIVER_BUFFER_M)
             bng_line = _to_bng(geom)
             return _buffer_wgs84_from_bng(bng_line, buffer_m)
@@ -332,7 +401,7 @@ def zone_to_leaflet_rings(zone_geom) -> list[list[list[float]]]:
 
 
 def clear_manual_river_sight_tags(G: nx.DiGraph) -> tuple[int, int]:
-    """Clear is_river and is_sight on all edges before re-applying manual regions JSON."""
+    """Clear is_river, is_sight, and is_canal on all edges before re-applying manual regions JSON."""
     rivers = sights = 0
     for _u, _v, d in G.edges(data=True):
         if str(d.get("is_river", "")).strip().lower() == "yes":
@@ -341,6 +410,8 @@ def clear_manual_river_sight_tags(G: nx.DiGraph) -> tuple[int, int]:
         if str(d.get("is_sight", "")).strip().lower() == "yes":
             d["is_sight"] = ""
             sights += 1
+        if str(d.get("is_canal", "")).strip().lower() == "yes":
+            d["is_canal"] = ""
     return rivers, sights
 
 
@@ -373,6 +444,6 @@ def compile_park_hours_catalog(G: nx.DiGraph) -> list[str]:
 def init_attraction_attrs(G: nx.DiGraph) -> None:
     """Ensure attraction keys exist on every edge."""
     for _u, _v, d in G.edges(data=True):
-        for key in ("is_park", "is_river", "is_sight", "attraction_name", "opening_hours"):
+        for key in ("is_park", "is_river", "is_sight", "is_canal", "attraction_name", "opening_hours"):
             if key not in d:
                 d[key] = ""

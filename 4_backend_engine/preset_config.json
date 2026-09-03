@@ -559,6 +559,11 @@
       "comfortable_value": 0.1,
       "cautious_value": 0.4
     },
+    "avoid_canals": {
+      "question": "Avoid canal towpaths (e.g. Regent's Canal)?",
+      "help": "Canal towpaths are narrow, shared with pedestrians, and offer few escape routes. Enabling this applies a strong penalty so the route stays on the road network except when there is no practical alternative.",
+      "weight_key": null
+    },
     "vf_infrastructure": {
       "question": "Which cycling infrastructure do you feel safe on?",
       "help": "Controls what counts as 'car-free' for the car-free corridors preference. Segregated tracks always count; shared paths, painted on-road lanes, and shared bus lanes are your call.",

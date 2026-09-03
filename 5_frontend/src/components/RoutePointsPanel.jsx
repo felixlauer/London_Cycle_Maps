@@ -38,7 +38,9 @@ export function toWaypointList(start, startLabel, vias, end, endLabel) {
 }
 
 export function fromWaypointList(list) {
+  // eslint-disable-next-line no-unused-vars
   const startWp = list.find((w) => w.role === 'start') || list[0];
+  // eslint-disable-next-line no-unused-vars
   const endWp = list.find((w) => w.role === 'end') || list[list.length - 1];
   // After drag, roles may have moved — treat first as start, last as end, middle as vias.
   const ordered = list;

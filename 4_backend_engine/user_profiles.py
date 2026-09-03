@@ -64,6 +64,7 @@ DEFAULT_TOGGLES = {
     "light_night": False,
     "surface": False,
     "jam_comfort": True,
+    "avoid_canals": False,
     "vf_infrastructure": {"shared_path": True, "bus_lane": True, "painted_lane": False},
 }
 
@@ -128,6 +129,7 @@ def _normalize_toggles(toggles: Any) -> dict:
         "light_night": bool((toggles or {}).get("light_night", False)),
         "surface": bool((toggles or {}).get("surface", False)),
         "jam_comfort": bool((toggles or {}).get("jam_comfort", True)),
+        "avoid_canals": bool((toggles or {}).get("avoid_canals", False)),
     }
     vf = (toggles or {}).get("vf_infrastructure") or {}
     out["vf_infrastructure"] = {

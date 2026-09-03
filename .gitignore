@@ -35,6 +35,8 @@ __pycache__/
 4_backend_engine/run_command.txt
 4_backend_engine/mapbox_usage.json
 4_backend_engine/mapbox_usage.json.tmp
+4_backend_engine/here_usage.json
+4_backend_engine/here_usage.json.tmp
 # Local test-mode profile store (may contain custom profiles; not for GitHub)
 4_backend_engine/user_profiles.json
 4_backend_engine/bug_reports.json

@@ -46,6 +46,8 @@ import edge_cost_arrays
 import graph_csr
 import pathfinding_numba
 import mapbox_usage
+import here_usage
+import here_geocode
 import app_metrics
 import weather_proxy
 from signal_clusters import (
@@ -288,6 +290,9 @@ SPEED_DIFF_NEGLIGIBLE_KMH = 20
 SPEED_DIFF_LOW_KMH = 30
 M_MIN = 0.1   # Ensure edge weight never zero/negative for A*
 R_MIN = 0.1   # Reward multiplier minimum (rewards implemented as R < 1, not negative penalty)
+# Canal avoidance: applied as a length multiplier when avoid_canals=True in the profile toggle.
+# A value of 4.0 makes a canal towpath equivalent to a 4× longer road segment.
+CANAL_AVOIDANCE_MULTIPLIER = 4.0
 
 # Highway-type length multipliers (cost ∝ length × M_highway × …)
 PEDESTRIAN_HIGHWAY_M = 4.0
@@ -394,6 +399,10 @@ def _has_attraction_edge(d):
         or _is_yes_attr(d.get('is_river'))
         or _is_yes_attr(d.get('is_sight'))
     )
+
+def _has_canal_edge(d):
+    """Canal towpath edges tagged is_canal=yes."""
+    return _is_yes_attr(d.get('is_canal'))
 
 
 def _is_green_edge(d):
@@ -971,6 +980,7 @@ def make_weight_optimized(w, hours_map, fallback_open, apply_live: bool = True):
     w_signal = w.get('signal_weight', 0.0)
     w_tfl_live = w.get('tfl_live_weight', 0.0)
     w_vf = w.get('vehicular_free_weight', 0.0)
+    avoid_canals = bool(w.get('avoid_canals', False))
     calming_src = w.get('calming_source', 'way')
     bike_type = str(w.get('bike_type', 'standard'))
     tfl_cw_on = w_tfl_cw > 0
@@ -1033,6 +1043,8 @@ def make_weight_optimized(w, hours_map, fallback_open, apply_live: bool = True):
             R *= r_green
         if vf_on and (edge_vf & vf_reward_allowed):
             R *= r_vf
+        if avoid_canals and _has_canal_edge(d):
+            R *= CANAL_AVOIDANCE_MULTIPLIER
         R = max(R_MIN, R)
 
         node_v = G.nodes[v] if v in G.nodes else {}
@@ -1521,11 +1533,13 @@ def _attraction_label(d, kind):
         return "Park"
     if kind == "sight":
         return "Attraction"
+    if kind == "canal":
+        return "Canal"
     return kind
 
 
 def get_typed_green_sections(path_nodes):
-    """Park / river / sight runs (park wins). Connected same-name runs merged."""
+    """Park / river / sight / canal runs (park wins). Connected same-name runs merged."""
     edges = []
     for i in range(len(path_nodes) - 1):
         u, v = path_nodes[i], path_nodes[i + 1]
@@ -1537,6 +1551,8 @@ def get_typed_green_sections(path_nodes):
             kind = "river"
         elif _is_yes_attr(d.get("is_sight")):
             kind = "sight"
+        elif _is_yes_attr(d.get("is_canal")):
+            kind = "canal"
         if not kind:
             continue
         name = _attraction_label(d, kind)
@@ -1545,7 +1561,7 @@ def get_typed_green_sections(path_nodes):
             "run_key": (kind, name.lower()),
             "kind": kind,
             "name": name,
-            "label": name if kind != "river" else "River",
+            "label": name if kind not in ("river", "canal") else _attraction_label(d, kind),
             "path": extract_segment_geometry(u, v),
             "length_m": _edge_length_m(d),
         })
@@ -2269,11 +2285,11 @@ def _rate_limited(result):
 
 
 def _quota_blocked(result):
-    """Return a 429 when mapbox_usage.QuotaResult.allowed is False."""
+    """Return a 429 when a monthly usage QuotaResult.allowed is False."""
     if result.allowed:
         return None
     resp = jsonify({
-        "error": result.message or "Mapbox quota exceeded",
+        "error": result.message or "Search quota exceeded",
         "month": result.month,
         "used": result.used,
         "limit": result.limit,
@@ -2596,94 +2612,56 @@ def submit_ride_reports():
     return jsonify({"ok": True, **saved})
 
 
-# --- GEOCODING (Mapbox key stays server-side) ---
-
-LONDON_BBOX = "-0.51,51.28,0.33,51.69"
+# --- GEOCODING (HERE key stays server-side; clients keep Mapbox-shaped JSON) ---
 
 
 @app.route('/geocode/suggest', methods=['GET'])
 def geocode_suggest():
-    token = (os.environ.get("MAPBOX_API_KEY") or "").strip()
-    if not token:
+    if not here_geocode.configured():
         return jsonify({"error": "geocoding not configured"}), 503
     q = (request.args.get("q") or "").strip()
     session_token = (request.args.get("session_token") or "").strip()
     if not q or not session_token:
         return jsonify({"error": "q and session_token required"}), 400
+    if len(q) < 3:
+        return jsonify({"suggestions": []})
     ip = client_ip_from_request(request)
-    blocked = _rate_limited(auth_rate_limit.check_geocode_allowed(ip))
+    blocked = _rate_limited(auth_rate_limit.check_here_search_allowed(ip))
     if blocked:
         return blocked
-    quota_block = _quota_blocked(mapbox_usage.check_search_session(session_token))
+    quota_block = _quota_blocked(here_usage.try_consume(1))
     if quota_block:
         return quota_block
-    import urllib.parse
-    import urllib.request
-
-    params = urllib.parse.urlencode({
-        "q": q,
-        "session_token": session_token,
-        "access_token": token,
-        "limit": "5",
-        "language": "en",
-        "types": "address,poi,place",
-        "country": "GB",
-        "bbox": LONDON_BBOX,
-    })
-    url = f"https://api.mapbox.com/search/searchbox/v1/suggest?{params}"
     try:
-        with urllib.request.urlopen(url, timeout=10) as resp:
-            import json
-            data = json.loads(resp.read().decode("utf-8"))
-        mapbox_usage.record_search_session(session_token)
-        return jsonify({"suggestions": data.get("suggestions") or []})
+        suggestions = here_geocode.autosuggest(q, limit=5)
+        return jsonify({"suggestions": suggestions})
+    except here_geocode.HereGeocodeError as e:
+        return jsonify({"error": str(e)}), e.status
     except Exception as e:
         return _err(e, status=502)
 
 
 @app.route('/geocode/retrieve/<path:mapbox_id>', methods=['GET'])
 def geocode_retrieve(mapbox_id):
-    token = (os.environ.get("MAPBOX_API_KEY") or "").strip()
-    if not token:
+    if not here_geocode.configured():
         return jsonify({"error": "geocoding not configured"}), 503
     session_token = (request.args.get("session_token") or "").strip()
     if not session_token:
         return jsonify({"error": "session_token required"}), 400
     ip = client_ip_from_request(request)
-    blocked = _rate_limited(auth_rate_limit.check_geocode_allowed(ip))
+    blocked = _rate_limited(auth_rate_limit.check_here_search_allowed(ip))
     if blocked:
         return blocked
-    quota_block = _quota_blocked(mapbox_usage.check_search_session(session_token))
+    cached = here_geocode.cache_get((mapbox_id or "").strip())
+    if cached:
+        return jsonify(cached)
+    quota_block = _quota_blocked(here_usage.try_consume(1))
     if quota_block:
         return quota_block
-    import urllib.parse
-    import urllib.request
-    import json
-
-    params = urllib.parse.urlencode({
-        "session_token": session_token,
-        "access_token": token,
-    })
-    url = (
-        f"https://api.mapbox.com/search/searchbox/v1/retrieve/"
-        f"{urllib.parse.quote(mapbox_id, safe='')}?{params}"
-    )
     try:
-        with urllib.request.urlopen(url, timeout=10) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        feature = (data.get("features") or [None])[0]
-        if not feature or not feature.get("geometry", {}).get("coordinates"):
-            return jsonify({"error": "No coordinates in retrieve response"}), 404
-        lon, lat = feature["geometry"]["coordinates"]
-        props = feature.get("properties") or {}
-        label = (
-            props.get("full_address")
-            or props.get("name")
-            or props.get("place_formatted")
-            or f"{lat:.4f}, {lon:.4f}"
-        )
-        mapbox_usage.record_search_session(session_token)
-        return jsonify({"lat": lat, "lon": lon, "label": label})
+        return jsonify(here_geocode.lookup(mapbox_id))
+    except here_geocode.HereGeocodeError as e:
+        return jsonify({"error": str(e)}), e.status
     except Exception as e:
         return _err(e, status=502)
 
@@ -2713,6 +2691,12 @@ def get_weather():
 def mapbox_quota():
     """Monthly Mapbox usage vs hard cutoffs (file-backed)."""
     return jsonify(mapbox_usage.snapshot())
+
+
+@app.route('/here/quota', methods=['GET'])
+def here_quota():
+    """Monthly HERE search transactions vs hard cutoff (file-backed)."""
+    return jsonify(here_usage.snapshot())
 
 
 @app.route('/mapbox/map_load', methods=['POST'])
@@ -2833,6 +2817,8 @@ def get_route():
             w["vf_shared_path"] = bool(vf_sel.get("shared_path", True))
             w["vf_bus_lane"] = bool(vf_sel.get("bus_lane", True))
             w["vf_painted_lane"] = bool(vf_sel.get("painted_lane", False))
+            w["avoid_canals"] = bool(toggles.get("avoid_canals", False))
+            w["_canal_avoidance_multiplier"] = CANAL_AVOIDANCE_MULTIPLIER
         else:
             w = user_profiles.build_weight_dict_from_request(request.args)
             toggles = {}

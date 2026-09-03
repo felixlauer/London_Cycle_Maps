@@ -13,6 +13,7 @@ export type WizardToggles = {
   light_night: boolean;
   surface: boolean;
   jam_comfort: boolean;
+  avoid_canals: boolean;
   vf_infrastructure: VfInfra;
 };
 
@@ -20,6 +21,7 @@ export const DEFAULT_TOGGLES: WizardToggles = {
   light_night: false,
   surface: false,
   jam_comfort: true,
+  avoid_canals: false,
   vf_infrastructure: { shared_path: true, bus_lane: true, painted_lane: false },
 };
 
@@ -58,6 +60,7 @@ export type PresetConfig = {
       comfortable_value?: number;
       cautious_value?: number;
     };
+    avoid_canals?: { question?: string; help?: string; weight_key?: string | null };
     vf_infrastructure?: {
       question?: string;
       help?: string;
@@ -87,6 +90,7 @@ export function togglesFromProfile(
     jam_comfort: stored.jam_comfort ?? (
       Math.abs(tfl - comfortable) <= Math.abs(tfl - cautious)
     ),
+    avoid_canals: stored.avoid_canals ?? false,
     vf_infrastructure: {
       ...DEFAULT_TOGGLES.vf_infrastructure,
       ...(stored.vf_infrastructure || {}),

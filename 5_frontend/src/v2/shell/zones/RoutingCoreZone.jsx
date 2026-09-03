@@ -109,6 +109,7 @@ export default function RoutingCoreZone(props) {
       onBlocked?.(BLOCKED.getRouteNeedsStops);
       return;
     }
+    depart.commitDraft();
     if (isMobile) {
       depart.collapse();
       if (hasVias) setViasCollapsed(true);

@@ -665,9 +665,9 @@
 }
 
 .rc-depart__pickers {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .rc-depart__row {
@@ -679,18 +679,52 @@
   padding: 0 2px;
   border-radius: 8px;
   background: var(--rc-surface);
+  min-width: 0;
 }
 
 .rc-depart__row > span {
   flex: 1;
+  min-width: 0;
   text-align: center;
   font-size: 12px;
   font-weight: 650;
   color: var(--rc-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rc-depart__time {
   font-variant-numeric: tabular-nums;
+}
+
+.rc-depart__time-input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  margin: 0;
+  padding: 0 2px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rc-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  outline: none;
+  appearance: none;
+}
+
+.rc-depart__time-input::placeholder {
+  color: var(--rc-text-sub);
+  opacity: 0.7;
+}
+
+.rc-depart__time-input:focus {
+  background: var(--rc-inset);
+  box-shadow: inset 0 0 0 1px var(--rc-line);
 }
 
 .rc-depart__row button {

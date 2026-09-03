@@ -25,7 +25,7 @@ The main app (**Tuned Cycling**) is the production cycling route planner for Lon
 ### 2.2 Data flow
 
 1. On load, frontend restores the Supabase session (`AuthProvider`), then fetches `GET /profiles` and the active profile (`GET /profiles/:id`) through `flaskClient` (fresh JWT per request); selection persisted in `localStorage`. Profile fetches are deferred until the session check resolves (no guest flash / double fetch).
-2. User sets **start**, optional **vias**, and **end** via map click **or** Mapbox text search (Routing Core in v2 / left panel in legacy); both update the same `[lat, lon]` state. Search selection flies the map to the chosen place; map clicks do not.
+2. User sets **start**, optional **vias**, and **end** via map click **or** HERE text search (Flask `/geocode/*`, Routing Core in v2 / left panel in legacy); both update the same `[lat, lon]` state. Search selection flies the map to the chosen place; map clicks do not. HERE Autosuggest is capped at 40 requests/IP/min and 225,000 transactions/UTC month (`here_usage.json`, ~10% under the 250k free tier). Map loads still use Mapbox GL JS (`POST /mapbox/map_load`).
 3. When both points exist, frontend prefetches routes in the background; user clicks **Get Route** to reveal results (`routeRevealed` in v2).
 4. **Profile mode (default):** frontend calls `GET /route` with coordinates and `profile_id` (plus optional session `bike_type` override in v2); backend loads weights via the active `ProfileStore` (Supabase in production, local JSON otherwise — see §2.5).
 5. **Test Mode (legacy only):** top-bar master toggle bypasses Supabase — no JWT is sent, requests carry `X-Tuned-Test-Mode: 1`, and Flask uses `LocalJsonStore`. Profiles still work normally (system + local custom via `user_profiles.json`; wizard enabled without login). **Manual weights (level 2):** a nested sub-toggle inside the Test panel hides profile selection and sends raw weight query params (no `profile_id`). **Not exposed in v2.**
@@ -98,7 +98,7 @@ Shared infrastructure (both UIs): `src/map/` (Mapbox GL), `src/auth/`, `src/api/
 
 ### 2.5 Auth + profile storage (Supabase)
 
-- **Architecture:** Browser never holds the Supabase anon key or Mapbox key. Password operations are **proxied and rate-limited** by Flask (`auth_rate_limit.py`): login lockout after 5 failures / 15 min, IP caps, reset/signup throttles. **Committed Get Route** (`purpose=commit`) is capped at **5 / IP / minute**; background `purpose=prefetch` is **not** counted (see §3.2a). Flask verifies JWTs in `auth_middleware.py`. `g.user_id` comes from the token `sub` claim **only**.
+- **Architecture:** Browser never holds the Supabase anon key or Mapbox key. Password operations are **proxied and rate-limited** by Flask (`auth_rate_limit.py`): login lockout after 5 failures / 15 min, IP caps, reset/signup throttles. **Committed Get Route** (`purpose=commit`) is capped at **5 / IP / minute**; background `purpose=prefetch` is capped at **30 / IP / minute** (see §3.2a). The v2 UI debounces prefetch so stepping through Depart-at times does not burn the budget. Flask verifies JWTs in `auth_middleware.py`. `g.user_id` comes from the token `sub` claim **only**.
 - **Endpoints:** `POST /auth/login|signup|password-reset|refresh|change-password|set-password`, `DELETE /auth/account`, `POST /auth/check-email`. Geocoding: `GET /geocode/suggest`, `GET /geocode/retrieve/<id>`.
 - **Repository pattern** (`profile_store.py`): `ProfileStore` ABC with `LocalJsonStore` (`user_profiles.json`) and `SupabaseStore` (Supabase `profiles` table). Selection via `PROFILE_STORE` env (`auto | local | supabase`; auto = Supabase when configured). Validation/clamping stays in `user_profiles.py`.
 - **Tenancy:** `SupabaseStore` uses the **service role key, which bypasses RLS** — every user-row query therefore explicitly filters `.eq('user_id', user_id)` at the application layer. RLS policies (see `4_backend_engine/supabase_sql/migrations/001_profiles.sql`) remain as defense-in-depth against direct Supabase access.
@@ -133,7 +133,7 @@ Shared infrastructure (both UIs): `src/map/` (Mapbox GL), `src/auth/`, `src/api/
 - **Display:** full multi-leg route always drawn; **active leg emphasized** (others dimmed). Edge/point **overlays follow the active analysis leg only** (not merged onto the full path). Stats panel uses [`LegAnalysisPager.jsx`](../5_frontend/src/components/LegAnalysisPager.jsx) (chevrons + swipe) with per-leg metrics.
 - **Race safety:** each fetch bumps `routeRequestId` + optional `AbortController`; obsolete HTTP responses are discarded. Mid-flight Numba A* is not abortable — worker may finish unused.
 - **Santander:** mutual exclusion with vias (same pattern as Depart-at). Turning Santander on clears vias; adding a via forces Santander off. **TODO(later):** allow vias on the station→station bike leg.
-- **Get Route rate limit:** `purpose=commit` (default if omitted) → **5 requests / client IP / minute** (`check_route_commit_allowed`). `purpose=prefetch` does **not** count — background calc stays uncapped so the UI feels snappy; scripted prefetch abuse is an accepted risk for now.
+- **Get Route rate limit:** `purpose=commit` (default if omitted) → **5 requests / client IP / minute** (`check_route_commit_allowed`). `purpose=prefetch` → **30 / IP / minute** (`check_route_prefetch_allowed`). The v2 Routing Core waits **450 ms** after the last waypoint / profile / depart-at change before prefetching, so clicking through time increments does not emit one `/route` per click.
 
 ### 3.3 Park opening hours (hard constraint)
 
@@ -169,7 +169,8 @@ Shared infrastructure (both UIs): `src/map/` (Mapbox GL), `src/auth/`, `src/api/
 
 ### 3.5b Leave now / Depart at
 
-- Control under waypoints in Routing Core ([`v2/routing/DepartAtControl.jsx`](../5_frontend/src/v2/routing/DepartAtControl.jsx); legacy twin under Route points): Leave now (default) or Depart at (next 7 London weekdays, 15-min steps).
+- Control under waypoints in Routing Core ([`v2/routing/DepartAtControl.jsx`](../5_frontend/src/v2/routing/DepartAtControl.jsx); mobile twin [`9_mobile/src/ui/DepartAtControl.tsx`](../9_mobile/src/ui/DepartAtControl.tsx); legacy twin under Route points): Leave now (default) or Depart at (next 7 London weekdays). Time is a typed **HH:MM** field (24-hour; digits auto-colon, e.g. `1430` → `14:30`) with optional 15-minute chevrons. Typed times keep 1-minute precision; a time before London now on Today is clamped forward.
+- Chevrons and typing update local UI immediately. Background `/route?purpose=prefetch` and `/night_status` wait until the value settles (~400–450 ms). **Get Route** flushes a typed draft in the same tick so the committed request uses the time on screen.
 - Sends `GET /route?depart_at=…` when Depart at is selected. Future (&gt;30 min): parks @ that time; live traffic off — **alert pill** “Live traffic not applied for future departures.” See §3.3.
 
 ### 3.5c Route weather (v2)
@@ -456,6 +457,6 @@ Route stats (`calculate_path_stats`) use the same masks for accidents, speed str
 - **New endpoint or request params:** Update Section 4 and Section 2.2 (data flow).
 - **Change of port, graph path, or stack:** Update Section 2.
 - **v2 UI change:** Update §2.4, tick [`design/FUNCTIONALITY_CHECKLIST.md`](design/FUNCTIONALITY_CHECKLIST.md), append [`design/WORKING_NOTES_JUL2026.md`](design/WORKING_NOTES_JUL2026.md), and update locked decisions in [`development_protocols/V2_FRONTEND_REMODEL.md`](development_protocols/V2_FRONTEND_REMODEL.md) when a product decision changes.
-- **In-ride ride feedback (TBT Report flag):** Update §4 / §5.6a and [`development_protocols/Development_Protocol_2026_08_27.md`](development_protocols/Development_Protocol_2026_08_27.md). Product spec: [`feature_requests/tbt_ride_feedback.md`](feature_requests/tbt_ride_feedback.md).
+- **In-ride ride feedback (TBT Report flag):** Update §4 / §5.6a and [`development_protocols/Development_Protocol_2026_08_22-27.md`](development_protocols/Development_Protocol_2026_08_22-27.md). Product spec: [`feature_requests/tbt_ride_feedback.md`](feature_requests/tbt_ride_feedback.md).
 
 A reminder to update this file is in the top comment of `5_frontend/src/App.js` / `src/v2/App.jsx` and at the top of `4_backend_engine/app.py`.

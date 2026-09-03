@@ -2,8 +2,8 @@
 Persistent Mapbox usage counters (monthly UTC) with hard cutoffs.
 
 Tracks:
-  * Search Box sessions — unique session_token values that hit Flask /geocode/*
-    (matches Mapbox Search Box session billing: one UUID focus session).
+  * Search Box sessions — leftover counter (place search now uses HERE; see
+    here_usage.py). Mapbox Search Box is no longer called from /geocode/*.
   * Web map loads — client reports when the planning Map mounts (matches
     Mapbox GL JS "map load" when our app actually initializes Map).
 

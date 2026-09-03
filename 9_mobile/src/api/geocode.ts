@@ -1,5 +1,6 @@
 /**
- * Mapbox Search Box via Flask — same contract as web mapboxGeocoding.js.
+ * Place search via Flask /geocode/* (HERE Autosuggest + Lookup).
+ * Same Mapbox-shaped contract as web mapboxGeocoding.js.
  * Token stays on the server; mobile only sends session_token + query.
  */
 import { apiFetch } from './flaskClient';

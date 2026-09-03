@@ -168,6 +168,7 @@ export function RoutingCore({
       onBlocked?.(BLOCKED.getRouteNeedsStops);
       return;
     }
+    depart.commitDraft();
     depart.collapse();
     if (hasVias) setViasCollapsed(true);
     onGetRoute();

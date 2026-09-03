@@ -37,7 +37,7 @@ log = logging.getLogger("routing_cache")
 # v3: signal_cluster_id + signal_entry/exit edge stamps).
 CACHE_FORMAT_VERSION = 3
 # Bump when edge-cost / junction / heuristic-floor / signal-cluster formulas change.
-FORMULA_ID = "2026-07-27-signal-cluster-postmerge-v5.1"
+FORMULA_ID = "2026-09-03-canal-tag-v5.2"
 
 TABLE_ARRAY_NAMES = (
     "length",
@@ -47,6 +47,7 @@ TABLE_ARRAY_NAMES = (
     "speed_stress",
     "is_tfl",
     "is_green",
+    "is_canal",
     "m_highway",
     "barrier_base",
     "calming_base",
@@ -465,6 +466,7 @@ def bundle_to_tables(bundle: RoutingCacheBundle):
         speed_stress=a["speed_stress"],
         is_tfl=a["is_tfl"],
         is_green=a["is_green"],
+        is_canal=a["is_canal"],
         m_highway=a["m_highway"],
         barrier_base=a["barrier_base"],
         calming_base=a["calming_base"],

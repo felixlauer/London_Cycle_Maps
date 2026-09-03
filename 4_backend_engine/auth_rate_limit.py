@@ -46,9 +46,14 @@ SIGNUP_IP_MAX = 5
 USER_SENSITIVE_WINDOW_S = 15 * 60
 USER_SENSITIVE_MAX = 5
 
-# Geocode proxy (Mapbox) — separate from auth so typing isn't throttled.
+# Geocode proxy (legacy Mapbox path; unused once HERE is the search backend).
 GEOCODE_IP_WINDOW_S = 60
 GEOCODE_IP_MAX = 60
+
+# HERE Autosuggest / Lookup — per-request billing, so tighter than Mapbox sessions.
+# 40/min covers two search boxes at 300 ms debounce without feeding a scraper.
+HERE_SEARCH_IP_WINDOW_S = 60
+HERE_SEARCH_IP_MAX = 40
 
 # Committed Get Route (purpose=commit) — does NOT cover background prefetch.
 ROUTE_COMMIT_IP_WINDOW_S = 60
@@ -88,6 +93,7 @@ _reset_ip_hits: dict[str, list[float]] = {}
 _signup_ip_hits: dict[str, list[float]] = {}
 _user_sensitive_hits: dict[str, list[float]] = {}
 _geocode_ip_hits: dict[str, list[float]] = {}
+_here_search_ip_hits: dict[str, list[float]] = {}
 _route_commit_ip_hits: dict[str, list[float]] = {}
 _route_prefetch_ip_hits: dict[str, list[float]] = {}
 _map_load_ip_hits: dict[str, list[float]] = {}
@@ -271,6 +277,23 @@ def check_geocode_allowed(ip: str) -> RateLimitResult:
     return RateLimitResult(True)
 
 
+def check_here_search_allowed(ip: str) -> RateLimitResult:
+    """Per-IP cap on Flask /geocode/* (HERE Autosuggest + Lookup)."""
+    now = time.monotonic()
+    with _lock:
+        hits = _prune(_here_search_ip_hits.get(ip, []), HERE_SEARCH_IP_WINDOW_S, now)
+        if len(hits) >= HERE_SEARCH_IP_MAX:
+            retry = max(1, int(HERE_SEARCH_IP_WINDOW_S - (now - hits[0])) + 1)
+            return RateLimitResult(
+                False,
+                retry,
+                f"Too many search requests. Try again in {retry} seconds.",
+            )
+        hits.append(now)
+        _here_search_ip_hits[ip] = hits
+    return RateLimitResult(True)
+
+
 def check_route_commit_allowed(ip: str) -> RateLimitResult:
     """5 Get Route (purpose=commit) per IP per minute. Prefetch must not call this."""
     now = time.monotonic()
@@ -429,6 +452,7 @@ def reset_for_tests() -> None:
         _signup_ip_hits.clear()
         _user_sensitive_hits.clear()
         _geocode_ip_hits.clear()
+        _here_search_ip_hits.clear()
         _route_commit_ip_hits.clear()
         _route_prefetch_ip_hits.clear()
         _map_load_ip_hits.clear()

@@ -24,6 +24,8 @@ from attraction_spatial import (
     geometry_from_geojson,
     init_attraction_attrs,
     tag_buffered_line,
+    tag_canal_line,
+    tag_canal_polygon,
     tag_point_radius,
     tag_polygon,
     tag_river_polygon,
@@ -69,6 +71,21 @@ def _apply_region(G, region: dict, edge_list, tree) -> int:
         if geom.geom_type == "LineString":
             buffer_m = float(region.get("buffer_m") or 200)
             return tag_buffered_line(
+                G, geom, buffer_m, edge_list=edge_list, tree=tree, name=name,
+            )
+        return 0
+
+    if rtype == "canal":
+        geom = geometry_from_geojson(geom_dict)
+        if geom is None:
+            return 0
+        if geom.geom_type in ("Polygon", "MultiPolygon"):
+            return tag_canal_polygon(
+                G, geom, edge_list=edge_list, tree=tree, name=name,
+            )
+        if geom.geom_type == "LineString":
+            buffer_m = float(region.get("buffer_m") or 200)
+            return tag_canal_line(
                 G, geom, buffer_m, edge_list=edge_list, tree=tree, name=name,
             )
         return 0
@@ -146,7 +163,7 @@ def main() -> int:
         if (i + 1) % 50 == 0:
             print(f"   -> {i + 1}/{len(regions)} regions...")
 
-    for flag in ("is_park", "is_river", "is_sight"):
+    for flag in ("is_park", "is_river", "is_sight", "is_canal"):
         count = sum(
             1 for _u, _v, d in G.edges(data=True)
             if str(d.get(flag, "")).strip().lower() == "yes"
