@@ -1,120 +1,148 @@
-> **Notice:** This project is currently in development. The documentation below provides a current overview of the architecture, pipeline, and features that are successfully working so far.
+> **Notice:** This project is in active development. The planner below is the shipped Greater London cycling router (web + mobile), backed by a custom graph and a request-time cost function.
 
 # London Cycle Maps
 
+A cycling route planner for Greater London. Routes are computed on a custom directed graph, not on a commercial bicycle API. Edge costs combine infrastructure, collision history, speed stress, hills, surface, lighting, live closures, and rider reports. Three named presets (**Fast**, **Safe**, **Leisure**) and saved custom profiles drive the same engine from the browser and from the phone.
 
-## TL;DR
-The primary goal of the London Cycle Maps project is to deliver a routing application specifically tuned for cyclists in London. The system processes raw geographic data into a custom directed graph, factoring in elevation, traffic speed stress, cyclist collision history, and cycleway infrastructure. It currently consists of a fully functional data processing pipeline, a multi-factor routing backend with live disruption awareness, a user-facing map app, and an extensive debug application for data validation. Preset ride modes (**Fast**, **Safe**, **Leisure**) are designed and dependency-mapped, but not yet wired into the UI.
-https://tuned-cycling.subscribepage.io/
+**Planner:** [app.tunedcycling.online](https://app.tunedcycling.online) · **Updates:** [tuned-cycling.subscribepage.io](https://tuned-cycling.subscribepage.io/)
 
-<img width="959" height="452" alt="Screenshot 2026-06-18 190105" src="https://github.com/user-attachments/assets/3df32217-ee3b-4b17-af05-0c0d89bf2015" />
+<p align="center">
+  <img src="docs/readme/web_app_route_collapsed_dynamic_island.png" alt="Browser planner with collapsed analysis island" />
+</p>
+<p align="center"><em>Web planner on Imperial College → King's Cross (Fast). Origin, destination, preset, and bike type sit in the top-left card. The collapsed island at the bottom centre shows duration, length, and cycleway / incident shares.</em></p>
+
 ---
 
-## Project Overview & Current Results
+## Architecture
 
-I am building a production-grade cycle route planner that goes beyond simple distance calculation. Rather than relying purely on the shortest path, the routing engine evaluates safety, comfort, infrastructure, and live conditions at request time.
+The stack splits into a data pipeline that builds the graph, a main routing server that answers live requests, a debug server for overlay checks, and two planner clients that share the same API.
 
-Current major achievements include:
-* **Custom Graph Generation:** A multi-stage data pipeline converts OpenStreetMap data, UK accident CSVs, and LIDAR elevation models into a consolidated, directed routing graph.
-* **Multi-Factor Routing Engine:** Request-scoped A\* weights cover collision risk, lighting, surface, hills, speed stress, barriers, calming, junctions, signals, green space, and TfL infrastructure — with highway-type masks and vehicular-free penalty rules.
-* **Live Transit Integration:** Real-time disruption data from TfL and TomTom is merged, snapped to the graph, and can dynamically reroute cyclists around closures or incidents.
-* **Park Hours:** Closed parks are impassable at request time (London local time, OSM opening hours with dawn–dusk fallback).
-* **Weight Dependency Matrix:** Parameter sweeps produced a coupling model (antagonisms, synergies, escape mechanisms) with per-mode tie-breakers for the planned presets — ready for a translation layer that keeps conflicting preferences coherent.
-* **Data Inspection Suite:** A dedicated debugging frontend overlays surfaces, gradients, calming, barriers, and live disruptions for validation. The following image shows TomTom traffic incidents colour-coded by severity and type:
-<img width="1916" height="910" alt="Debug app — live TomTom disruptions overlay" src="https://github.com/user-attachments/assets/573d4d38-5012-4670-943d-7385c28dbf22" />
+<p align="center">
+  <img src="docs/readme/system_architecture.png" alt="System architecture: inputs, servers, and clients" width="920" />
+</p>
+<p align="center"><em>Inputs (graph file, runtime overlays, saved profiles) → Flask servers → web, mobile, and debug clients.</em></p>
+
+**Data path**
+
+1. A dedicated pipeline turns an OpenStreetMap Greater London extract into a directed, noded cycle graph. STATS19 collisions, Environment Agency LIDAR elevations, park polygons, attractions, and TfL cycle-programme geometries are attached before the graph is written to disk.
+2. At process start, the main and debug Flask servers load that graph file into memory (~8 GB resident). Closures, weather, and in-ride reports stay in RAM overlays so they can change without a rebuild.
+3. User accounts and saved routing profiles live in [Supabase](https://supabase.com/). Guests can use the three named presets; only signed-in riders can create stored custom profiles.
+4. The **web planner** (React + Mapbox) and the **mobile planner** (Expo / React Native) call the same route, geocode, overlay, and profile endpoints. Commercial map services supply the basemap and place search only. Bicycle paths are always this system's A\* result.
+5. A second Flask process plus a Leaflet debug map colour-codes graph tags (surfaces, grades, TfL network, barriers, live disruptions) without running the planner UI.
+
+<p align="center">
+  <img src="docs/readme/graph_pipeline.png" alt="Graph construction pipeline" width="920" />
+</p>
+<p align="center"><em>Graph pipeline. Blue: PostGIS stages (import, collision matching, vertex noding). Green: NetworkX stages (directed build, elevation, parks, TfL tagging, final file).</em></p>
+
+### Tech stack
+
+| Layer | Technology | Role |
+| :--- | :--- | :--- |
+| Web planner | React, Mapbox GL | Browser map, place search, analysis island, overlays |
+| Mobile planner | Expo, React Native, Mapbox (plan), MapLibre (guidance) | Native planning UI and spoken turn-by-turn |
+| Debug map | React, Leaflet | Colour-coded tag overlays for pipeline checks |
+| Routing server | Flask, NetworkX, Numba A\* | Request-scoped costs, live overlays, profiles |
+| Profiles / auth | Supabase | Accounts, JWT sessions, row-level profile storage |
+| Graph build | Python, PostgreSQL / PostGIS | OSM ingest, noding, snapping, elevation, TfL tags |
+
+<p align="center">
+  <img src="docs/readme/debug_mode.png" alt="Debug application with graph-network overlay" />
+</p>
+<p align="center"><em>Debug application with the graph-network overlay. Right-click inspection of a segment returns the tags the cost function actually reads.</em></p>
+
 ---
 
-## Planned User Experience
+## Web application
 
-Modes are **not implemented in the app yet**. The intended flow:
-
-1. **Pick a preset** — **Fast**, **Safe**, or **Leisure** (see below).
-2. **Optionally fine-tune** preferences (sliders / toggles for safety, comfort, scenery, infrastructure). A translation layer will resolve tug-of-wars using the active mode’s tie-breakers so conflicting settings stay coherent. Users can fill out a delay budget to prioritise their choices. 
-3. **Set bike-type and preferences** by answering a few simple questions ("Do you prefer illuminated roads at night?" or "Are you comfortable navigating through traffic jams to save time on your journey?").
-4. **Set start and end** on the map (click or text search).
-5. **Get Route** — compare the absolute fastest path with the mode-optimized path, stats (Δ vs fastest), and optional route overlays (lit segments, TfL network, barriers, etc.).
+The browser planner is the desktop client. Controls float over the map: no full-height sidebar. A rider sets origin and destination (typed search or map tap), chooses a bike type and a preset, then presses **Get Route**. Search starts as soon as both points exist; the path is held until that button so the reveal feels instant.
 
 | Preset | Intent |
 | :--- | :--- |
-| **Fast** | Direct, low-friction routing — prioritises flow (signals, junctions, barriers) and keeps detours short. |
-| **Safe** | Low-stress, low-risk routing — collision history, lit corridors, and infrastructure win when preferences conflict. |
-| **Leisure** | Scenic / comfortable rides — green space and calming-oriented choices, with safety still in the mix where it matters. |
+| **Fast** | Direct, low-friction routing. Flow (signals, barriers, calming) wins over long detours. |
+| **Safe** | Low-stress routing. Collision history, speed stress, junctions, and vehicular-free infrastructure win when preferences conflict. |
+| **Leisure** | Scenic / comfortable rides. Green space and hills matter more; safety still applies where it conflicts. |
 
-| | |
-|:---:|:---:|
-| <img width="334" height="328" alt="Screenshot 2026-07-04 235824" src="https://github.com/user-attachments/assets/30400eb8-b90b-45f8-a80e-8e1654f6ff93" /> | <img width="332" height="311" alt="Screenshot 2026-07-04 235852" src="https://github.com/user-attachments/assets/6e6fb93b-092c-4167-a9fe-9ed31e916c79" /> |
-| <img width="332" height="421" alt="Screenshot 2026-07-04 235919" src="https://github.com/user-attachments/assets/e51ed325-d5ff-4e21-8125-fcbffc20378e" /> | <img width="337" height="397" alt="Screenshot 2026-07-04 235944" src="https://github.com/user-attachments/assets/7601bbf9-4415-4e27-9ee8-e821eca82e51" /> |
+### Functions
 
----
+- **Origin / destination** — place search (proxied through Flask) or tap-to-pin. Snaps onto the Greater London graph; far-off clicks are rejected.
+- **Bike type and preset** — cargo, e-bike, road, or standard bike, plus Fast / Safe / Leisure. Bike type changes hill, barrier, and surface behaviour.
+- **Custom profiles** — signed-in riders run a four-step wizard (bike → preset → sliders / delay budget → lighting, surface, and infrastructure toggles) and save a named profile.
+- **Analysis island** — collapsed: time, distance, and two ring charts. Expanded: elevation profile with total gain, plus stacked bars for incidents, cycleway classes, and attractions. Chart slots follow the active overlay.
+- **Overlay rail** — optional colouring of the drawn path (cycleways, attractions, hills, lighting, live incidents, and related layers) without dumping the whole graph onto the map.
+- **Santander Cycles** — live TfL BikePoint docks, occupancy, walk estimate to the chosen station, then a cycle leg on this system's graph. Mutually exclusive with depart-at and extra stops.
+- **Depart at** — park opening hours evaluated at a future clock. Live traffic and hard closures are left off when the chosen time is more than 30 minutes ahead.
+- **Intermediate stops** — up to three extra snaps; A\* runs on each consecutive pair.
+- **GPX export** — download the revealed path for a bike computer.
+- **First-run tutorial** — highlights one control at a time; can be skipped and reopened.
+- **Live incidents** — TfL / TomTom disruptions drawn on the path (yellow triangles in the overview).
 
-## System Architecture & Tech Stack
+<p align="center">
+  <img src="docs/readme/web_app_route_expanded_dynamic_island.png" alt="Expanded analysis island on the web planner" />
+</p>
+<p align="center"><em>Expanded analysis island: duration and length, elevation with total gain, and composition bars.</em></p>
 
-The architecture is divided into a frontend interface, a routing backend, and a robust data pipeline.
+<p align="center">
+  <img src="docs/readme/web_app_overlays_pair.png" alt="Cycleways overlay and attractions overlay" />
+</p>
+<p align="center"><em>Right-hand overlay rail: cycleways (left) and attractions (right) on the same corridor.</em></p>
 
-| Component | Technology | Description |
-| :--- | :--- | :--- |
-| **Frontend Applications** | React 19, Leaflet | Single-page applications for both main routing and debugging interfaces. |
-| **Backend Engine** | Flask, NetworkX, Shapely | Handles $A^*$ routing, live disruption matching, park hours, and spatial snap. |
-| **Data Processing** | Python, PostgreSQL, PostGIS | Scripts for importing shapefiles, calculating collision risks, and snapping point features. |
-| **Graph Format** | GraphML / gpickle | Compiled graph with node and edge attributes used for memory-efficient routing. |
+<p align="center">
+  <img src="docs/readme/web_app_profile_sequence.png" alt="Four-step new-profile wizard" />
+</p>
+<p align="center"><em>New-profile wizard. Top: bike type and preset. Bottom: delay-budget sliders and lighting / surface / infrastructure toggles.</em></p>
 
----
+<p align="center">
+  <img src="docs/readme/web_app_tutorial.png" alt="First-run tutorial highlighting the analysis panel" />
+</p>
+<p align="center"><em>First-run tutorial highlighting the expanded analysis panel.</em></p>
 
-## The Data Pipeline
-
-The core of the system is the data generation pipeline that builds the underlying road graph. The pipeline must be run sequentially to ensure accurate physical network attributes.
-
-1. **Network Ingestion:** OpenStreetMap shapefiles are loaded into a PostgreSQL database.
-2. **Accident Integration:** Cyclist collision records are imported and matched to road segments.
-3. **Intersection Noding:** Highway lines are split at junctions in PostGIS/pgRouting so the graph connects at T-junctions while preserving OSM tags.
-4. **Graph Construction:** A directed graph is built using NetworkX, banning motorways while respecting one-way streets and cycling contraflows.
-5. **Island Cleanup:** Disconnected nodes and isolated road clusters are purged, leaving only the largest weakly connected component.
-6. **Intersection Snapping:** Point features like traffic signals, crossings, and barriers are snapped to the nearest graph node or edge.
-7. **Elevation Processing:** LIDAR raster data is sampled to attach elevation values to nodes and calculate physical grades for edges.
-8. **TfL Tagging:** Geographic data for Cycleways, Quietways, and Superhighways is algorithmically mapped onto graph edges.
-
----
-
-## Main Routing Application
-
-The main app (**Tuned Cycling**) is the production environment where cyclists plan journeys. It focuses on clean route presentation rather than raw data exploration.
-
-### Key Routing Features
-* **Dual Route Output:** Simultaneously calculates and displays the absolute fastest route and the preference-optimized route.
-* **Preference Weights:** Continuous activation scalars for safety, comfort, scenery, and infrastructure (profiles / Test Mode today; Fast / Safe / Leisure presets planned).
-* **Location Search:** Mapbox-backed start/end search alongside map clicks.
-* **Route Overlays:** A layers picker draws lit segments, TfL network, green space, barriers, signals, junctions, calming, and live disruptions on the optimized path.
-* **Segment Inspector:** Right-click inspects underlying graph tags (and live disruption metadata when present).
-* **Automated Night Mode:** Sunrise–sunset detection adjusts visual contrast and map layers for night riding.
-
-### Routing Cost Functions
-
-Edge cost is computed at request time. The base model is:
-
-$$\text{Weight}(u,v) = (\text{Length} \times M_{\text{total}} \times M_{\text{highway}} \times R) + A_{\text{total}} + H$$
-
-* $\text{Length}$ — edge length in metres.
-* $M_{\text{total}}$ — penalty multiplier from user preferences (risk, light, surface, speed stress, etc.).
-* $M_{\text{highway}}$ — always-on highway-type multiplier (e.g. steps and non-cycle footways are heavily discouraged).
-* $R$ — reward multiplier for preferred edges (TfL cycleways, quietways, green space).
-* $A_{\text{total}}$ — fixed additive penalties (signals, barriers, junctions, calming, …).
-* $H$ — physical effort cost for steep ascents.
-
-The **fastest** route uses length and highway masks only. Live closures and closed parks are hard-blocked on both routes.
+<p align="center">
+  <img src="docs/readme/web_app_santander.png" alt="Santander dock selection on the website" />
+</p>
+<p align="center"><em>Santander dock selection: station markers with occupancy and a selected-station card (regular / electric bikes, empty docks, walk estimate).</em></p>
 
 ---
 
-## Data Debugging Application
+## Mobile application
 
-To ensure the routing engine makes safe decisions, a separate visualization app audits the underlying graph. It uses the same network but disables A\* pathfinding.
+The Expo client ships the same planner onto a phone and calls the same Flask route, profile, and geocode endpoints. Planning still uses Mapbox. Once the rider is moving, guidance switches to MapLibre on this system's geometry (not a second commercial cycle network).
 
-### Validation Features
-* **Uphill Heatmaps:** Highlights road segments with grades exceeding 3.3%.
-* **Surface Toggles:** Color-codes road surfaces to identify cobblestone, gravel, mud, or unmapped terrain.
-* **Infrastructure Overlays:** Visualizes barriers, signals, mini-roundabouts, give-way signs, and traffic calming.
-* **Live Ground Truth:** Displays TfL and TomTom disruptions to verify spatial matching onto the road network.
-* **Manual Map Edits:** Override TfL cycle route assignments on the map; changes save to a JSON ledger for the pipeline to re-apply.
+### Functions
+
+- **Same planning surface as the website** — origin / destination, preset, bike type, Santander, depart-at, and extra stops.
+- **Three-slide island** — the desktop island is one wide row; the phone splits it into core metrics, elevation, and detailed bars.
+- **Turn-by-turn** — next instruction, following-turn preview, remaining time and distance, ETA, voice, and mute. The path, step list, and arrows come from this system's A\* geometry.
+- **Off-path replan** — if the marker leaves the path (about 40 m, or heading the wrong way for several seconds), the old line greys and the planner is called from the current location.
+- **In-ride reports** — one tap while navigating opens Surface, Danger, Impassable, and Speeding (Unlit after dark). Reports snap to the nearest edge and enter the same RAM overlay as live closures. Impassable replans immediately; other categories affect later routes after corroboration (signed-in riders also keep a personal overlay of their own reports).
+
+<p align="center">
+  <img src="docs/readme/mobile_app_route.png" alt="Mobile planning screen" width="260" />
+  &nbsp;
+  <img src="docs/readme/mobile_app_tbt.png" alt="Turn-by-turn session" width="260" />
+  &nbsp;
+  <img src="docs/readme/mobile_app_feedback.png" alt="In-ride report picker" width="260" />
+</p>
+<p align="center"><em>Left: planning screen on Imperial → King's Cross. Centre: turn-by-turn (MapLibre). Right: in-ride report picker (Surface, Danger, Impassable, Speeding).</em></p>
+
+<p align="center">
+  <img src="docs/readme/mobile_app_island_slides.png" alt="Expanded mobile island as three slides" />
+</p>
+<p align="center"><em>Expanded mobile island as three slides: core metrics (Santander hire trip with pick-up / drop-off cards), elevation, and detailed bars.</em></p>
 
 ---
 
-*Note: Access to third-party routing disruption and location-search features requires active environment variables containing secure API credentials.*
+## Repository layout
+
+| Path | Contents |
+| :--- | :--- |
+| `3_pipeline/` | Graph construction and I/O |
+| `4_backend_engine/` | Main Flask routing server |
+| `5_frontend/` | Web planner (`src/v2/` is the customer UI) |
+| `8_debug/` | Debug Flask server and Leaflet frontend |
+| `9_mobile/` | Expo / React Native client |
+| `docs/readme/` | Screenshots used in this README |
+
+Further notes: [`0_documentation/APP_MAIN.md`](0_documentation/APP_MAIN.md), [`0_documentation/APP_DEBUG.md`](0_documentation/APP_DEBUG.md), [`0_documentation/GRAPH.md`](0_documentation/GRAPH.md).
+
+Third-party map, search, and disruption features need API credentials in local environment files (not committed).
