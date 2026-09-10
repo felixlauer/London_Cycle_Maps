@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { reportSlots, type RideReportCategory } from '../../feedback/rideReportCategories';
 import { DONUT } from './NavIsland';
+import { useReduceMotion } from '../../lib/useReduceMotion';
 import { useChrome } from '../../theme/useChrome';
 
 const EASE = Easing.bezier(0.23, 1, 0.32, 1);
@@ -29,26 +30,14 @@ export function ReportPicker({ isDark, onPick, onHoldChange }: Props) {
   const { c } = useChrome();
   const slots = useMemo(() => reportSlots(isDark), [isDark]);
   const enter = useRef(slots.map(() => new Animated.Value(0))).current;
-  const reduceMotion = useRef(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((on) => {
-        if (!cancelled) reduceMotion.current = on;
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const reduceMotion = useReduceMotion();
 
   useEffect(() => {
     const animations = enter.map((value, i) =>
       Animated.timing(value, {
         toValue: 1,
         duration: ENTER_MS,
-        delay: reduceMotion.current ? 0 : i * STAGGER_MS,
+        delay: reduceMotion ? 0 : i * STAGGER_MS,
         easing: EASE,
         useNativeDriver: true,
       }),
@@ -68,7 +57,7 @@ export function ReportPicker({ isDark, onPick, onHoldChange }: Props) {
             styles.slot,
             {
               opacity: enter[i],
-              transform: reduceMotion.current
+              transform: reduceMotion
                 ? []
                 : [
                   {

@@ -2,7 +2,8 @@
 
 Same role as `[../0_documentation/startup.md](../0_documentation/startup.md)`, but for `9_mobile`.  
 Plan / first-time setup: `[../0_documentation/tasks/SETUP_ANDROID.md](../0_documentation/tasks/SETUP_ANDROID.md)` · `[../0_documentation/tasks/MOBILE_RN_PLAN.md](../0_documentation/tasks/MOBILE_RN_PLAN.md)`  
-**Handoff / what’s done:** `[../0_documentation/tasks/MOBILE_WORKING_NOTES.md](../0_documentation/tasks/MOBILE_WORKING_NOTES.md)` · MapLibre TBT: `[../0_documentation/tasks/MAPLIBRE_BYOR_PLAN.md](../0_documentation/tasks/MAPLIBRE_BYOR_PLAN.md)`
+**Handoff / what’s done:** `[../0_documentation/tasks/MOBILE_WORKING_NOTES.md](../0_documentation/tasks/MOBILE_WORKING_NOTES.md)` · MapLibre TBT: `[../0_documentation/tasks/MAPLIBRE_BYOR_PLAN.md](../0_documentation/tasks/MAPLIBRE_BYOR_PLAN.md)`  
+**iOS / TestFlight:** `[../0_documentation/tasks/IOS_TESTFLIGHT_BETA1.md](../0_documentation/tasks/IOS_TESTFLIGHT_BETA1.md)` · fidelity `[../0_documentation/tasks/IOS_FIDELITY_SHEET.md](../0_documentation/tasks/IOS_FIDELITY_SHEET.md)` — §6 below is the short form
 
 Use **two PowerShell terminals** for desk work (like Flask + web). Do **not** set `$env:CI=1` — that disables Fast Refresh.
 
@@ -371,4 +372,78 @@ $env:Path = "$env:ANDROID_HOME\platform-tools;$env:ANDROID_HOME\emulator;$env:JA
 cd c:\London_Cycle_Maps\9_mobile
 npm run android:device
 ```
+
+---
+
+## 6. iOS — physical iPhone from this Windows PC
+
+There is no Mac and no Simulator here. **EAS compiles and signs in the cloud**; this PC
+only runs Metro and the CLI. Never run `expo run:ios` or `expo prebuild --platform ios`
+locally. Full walkthrough and the Apple-side gates:
+`[../0_documentation/tasks/IOS_TESTFLIGHT_BETA1.md](../0_documentation/tasks/IOS_TESTFLIGHT_BETA1.md)`.
+
+**Beta 1 is the planner only.** Turn-by-turn is not in the iOS build: Navigate appears in
+island slot 4, asks for location, fetches the real maneuvers, then shows a coming-soon
+pill instead of starting guidance. The Swift module is still an empty view.
+
+### Environment
+
+`EXPO_PUBLIC_API_BASE` ships inside `eas.json`. Two tokens must exist as **EAS
+environment variables**, never in git:
+
+| Name | What |
+|------|------|
+| `EXPO_PUBLIC_MAPBOX_TOKEN` | the same public `pk.` token Android uses (runtime map) |
+| `RNMAPBOX_MAPS_DOWNLOAD_TOKEN` | Mapbox **secret** `sk.` token with `Downloads:Read` — CocoaPods needs it to fetch the iOS Maps SDK on the EAS worker |
+
+### Dev client (Fast Refresh on the iPhone)
+
+Ad hoc builds only install on registered devices, so register the UDID first.
+
+```powershell
+cd c:\London_Cycle_Maps\9_mobile
+eas login
+eas device:create                                 # open the link on the iPhone, install the profile
+eas build --profile development --platform ios
+```
+
+Install the IPA from the Expo build page, trust the developer under
+**Settings → General → VPN & Device Management**, then:
+
+```powershell
+npx expo start --dev-client            # iPhone and PC on the same Wi-Fi
+npx expo start --dev-client --tunnel   # if the firewall or LAN blocks port 8081
+```
+
+### TestFlight
+
+```powershell
+eas build --profile preview --platform ios
+eas submit --profile preview --platform ios
+```
+
+External testers do not need a UDID — that limit is only for the ad hoc dev client.
+
+### After changing `app.config.js` or a plugin
+
+Check the generated Info.plist without building:
+
+```powershell
+npx expo config --type introspect --json | Select-String "NSLocationAlways|UIBackgroundModes"
+```
+
+Both must come back empty. The app is When In Use only, and
+`plugins/withIosWhenInUseLocation.js` strips the Always keys `expo-location` adds by
+default. Info.plist mods run in reverse registration order, so that plugin is listed
+first in `app.config.js` on purpose.
+
+### Regenerating the app icons
+
+```powershell
+cd c:\London_Cycle_Maps\9_mobile
+python scripts/make-app-icons.py
+```
+
+Rasterises the brand wordmark from `5_frontend/public/favicon.svg`. The iOS icon must
+stay **opaque** — Apple rejects alpha and applies its own corner rounding.
 

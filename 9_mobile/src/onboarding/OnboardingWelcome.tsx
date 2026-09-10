@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaEdges } from '../lib/safeArea';
 import { brand } from '../theme/tokens';
 import { useOnboarding } from './OnboardingContext';
 
@@ -12,19 +13,29 @@ export function OnboardingWelcome() {
     skipAll,
   } = useOnboarding();
 
+  const insets = useSafeAreaEdges();
   const dark = onboardingTheme === 'dark';
   const bg = dark ? '#0a0a0a' : '#f4f4f5';
   const text = dark ? '#fafafa' : '#18181b';
   const muted = dark ? '#a1a1aa' : '#71717a';
 
   return (
-    <View style={[styles.screen, { backgroundColor: bg }]}>
+    <View
+      style={[
+        styles.screen,
+        {
+          backgroundColor: bg,
+          paddingTop: insets.top + 24,
+          paddingBottom: insets.bottom + 24,
+        },
+      ]}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Skip"
         onPress={skipAll}
         hitSlop={10}
-        style={styles.skip}
+        style={[styles.skip, { top: insets.top + 12, left: insets.left + 20 }]}
       >
         <Text style={[styles.skipText, { color: muted }]}>Skip</Text>
       </Pressable>
@@ -71,13 +82,11 @@ export function OnboardingWelcome() {
 const styles = StyleSheet.create({
   screen: {
     ...StyleSheet.absoluteFill,
-    padding: 24,
+    paddingHorizontal: 24,
     justifyContent: 'center',
   },
   skip: {
     position: 'absolute',
-    top: 52,
-    left: 20,
     zIndex: 2,
   },
   skipText: {

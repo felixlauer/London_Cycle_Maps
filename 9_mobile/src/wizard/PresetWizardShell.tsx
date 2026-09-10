@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -12,6 +13,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaBottom } from '../lib/safeArea';
 import { apiFetch } from '../api/flaskClient';
 import { brand, chromeForTheme } from '../theme/tokens';
 import type { ThemeMode } from '../theme/resolveAppearance';
@@ -57,7 +59,9 @@ export function PresetWizardShell({
   const c = chromeForTheme(themeMode);
   const isEditing = embedded ? false : Boolean(editingProfileId);
   const activeEditId = embedded ? null : editingProfileId;
-  const footerPadBottom = Platform.OS === 'ios' ? 28 : 14;
+  // Footer buttons clear the home indicator / gesture bar, then keep the
+  // Tuned gap inside the safe rectangle.
+  const footerPadBottom = useSafeAreaBottom() + 14;
 
   const [config, setConfig] = useState<PresetConfig | null>(null);
   const [loadError, setLoadError] = useState('');
@@ -312,7 +316,12 @@ export function PresetWizardShell({
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: c.shellBg }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { backgroundColor: c.shellBg }]}
+      // iOS does not resize under the keyboard, so the profile-name field on
+      // the Questions step and the footer buttons would sit behind it.
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -443,7 +452,7 @@ export function PresetWizardShell({
           </Pressable>
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

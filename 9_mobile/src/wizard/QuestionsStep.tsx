@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { brand, type ChromeTokens } from '../theme/tokens';
+import { useInputChrome } from '../theme/useInputChrome';
 import { HelpTip } from './HelpTip';
 import { MAX_PROFILE_NAME_LEN } from './profileName';
 import type { PresetConfig, WizardToggles } from './types';
@@ -32,6 +33,7 @@ export function QuestionsStep({
   onNameChange,
   c,
 }: Props) {
+  const inputChrome = useInputChrome();
   const cfg = config.toggles || {};
   const hideSurface = (cfg.surface?.hidden_for || []).includes(bikeType);
   const vfOptions = cfg.vf_infrastructure?.options || {};
@@ -156,6 +158,7 @@ export function QuestionsStep({
         <Text style={[styles.panelTitle, { color: c.text }]}>Profile name</Text>
         <Animated.View style={{ transform: [{ translateX: shakeX }] }}>
           <TextInput
+            {...inputChrome}
             style={[
               styles.nameInput,
               { color: c.text, borderColor: c.line, backgroundColor: c.inset },

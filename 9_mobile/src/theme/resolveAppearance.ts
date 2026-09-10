@@ -10,6 +10,9 @@ export const APPEARANCE_STORAGE_KEY = 'tuned_ui_appearance';
 export type AppearancePref = 'light' | 'dark' | 'system' | 'auto';
 export type ThemeMode = 'light' | 'dark';
 
+/** Unstored default — the shell follows the device until the rider picks otherwise. */
+export const DEFAULT_APPEARANCE: AppearancePref = 'system';
+
 export const APPEARANCE_OPTIONS: { id: AppearancePref; label: string }[] = [
   { id: 'light', label: 'Light' },
   { id: 'dark', label: 'Dark' },
@@ -30,12 +33,12 @@ export async function loadStoredAppearance(): Promise<AppearancePref> {
   } catch {
     /* ignore */
   }
-  memoryAppearance = 'auto';
-  return 'auto';
+  memoryAppearance = DEFAULT_APPEARANCE;
+  return DEFAULT_APPEARANCE;
 }
 
 export function peekAppearance(): AppearancePref {
-  return memoryAppearance || 'auto';
+  return memoryAppearance || DEFAULT_APPEARANCE;
 }
 
 export async function writeStoredAppearance(pref: AppearancePref): Promise<void> {

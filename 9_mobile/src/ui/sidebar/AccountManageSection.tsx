@@ -14,6 +14,7 @@ import { ChevronDown, KeyRound, Trash2, UserRound } from 'lucide-react-native';
 import { useAuth } from '../../auth/AuthProvider';
 import { brand } from '../../theme/tokens';
 import { useChrome } from '../../theme/useChrome';
+import { useInputChrome } from '../../theme/useInputChrome';
 
 export type AccountPanelId = 'name' | 'pwd' | 'del' | null;
 
@@ -27,6 +28,7 @@ export function AccountManageSection({
   onExpandedPanelChange,
 }: Props) {
   const { c } = useChrome();
+  const inputChrome = useInputChrome();
   const { user, changePassword, updateDisplayName, deleteAccount } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -113,6 +115,7 @@ export function AccountManageSection({
           <View style={styles.panel}>
             <Text style={[styles.fieldLabel, { color: c.textSub }]}>Name</Text>
             <TextInput
+              {...inputChrome}
               style={[styles.input, { borderColor: c.line, backgroundColor: c.shellBg, color: c.text }]}
               value={displayName}
               onChangeText={setDisplayName}
@@ -138,6 +141,7 @@ export function AccountManageSection({
           <View style={styles.panel}>
             <Text style={[styles.fieldLabel, { color: c.textSub }]}>Current password</Text>
             <TextInput
+              {...inputChrome}
               style={[styles.input, { borderColor: c.line, backgroundColor: c.shellBg, color: c.text }]}
               value={currentPassword}
               onChangeText={setCurrentPassword}
@@ -147,6 +151,7 @@ export function AccountManageSection({
             />
             <Text style={[styles.fieldLabel, { color: c.textSub }]}>New password</Text>
             <TextInput
+              {...inputChrome}
               style={[styles.input, { borderColor: c.line, backgroundColor: c.shellBg, color: c.text }]}
               value={newPassword}
               onChangeText={setNewPassword}
@@ -156,6 +161,7 @@ export function AccountManageSection({
             />
             <Text style={[styles.fieldLabel, { color: c.textSub }]}>Confirm new password</Text>
             <TextInput
+              {...inputChrome}
               style={[styles.input, { borderColor: c.line, backgroundColor: c.shellBg, color: c.text }]}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
@@ -182,6 +188,7 @@ export function AccountManageSection({
             </Text>
             <Text style={[styles.fieldLabel, { color: c.textSub }]}>Confirm with your password</Text>
             <TextInput
+              {...inputChrome}
               style={[styles.input, { borderColor: c.line, backgroundColor: c.shellBg, color: c.text }]}
               value={deletePassword}
               onChangeText={setDeletePassword}

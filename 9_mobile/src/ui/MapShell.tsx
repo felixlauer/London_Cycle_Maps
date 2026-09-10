@@ -7,6 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { chromeForTheme, space } from '../theme/tokens';
+import { useSafeAreaEdges } from '../lib/safeArea';
 import type { ThemeMode } from '../theme/resolveAppearance';
 
 type Props = {
@@ -41,14 +42,21 @@ export function MapShell({
   style,
 }: Props) {
   const c = chromeForTheme(themeMode);
+  const insets = useSafeAreaEdges();
   const [topH, setTopH] = useState(0);
 
   const onTopLayout = (e: LayoutChangeEvent) => {
     setTopH(e.nativeEvent.layout.height);
   };
 
-  const belowTop = Math.max(0, space.inset - 4) + topH + 8;
-  const islandBottom = islandExpanded ? space.inset * 1.4 : space.inset * 3.5;
+  const chromeTop = Math.max(0, space.inset - 4);
+  const belowTop = chromeTop + topH + 8;
+  // Tuned spacing sits inside the safe rectangle, so the island keeps its gap
+  // measured from the home indicator instead of the screen edge. The island is
+  // swipeable, so it must not share space with the system swipe-up gesture.
+  const islandBottom = insets.bottom
+    + (islandExpanded ? space.inset * 1.4 : space.inset * 3.5);
+  const sideInset = { left: insets.left + space.inset, right: insets.right + space.inset };
 
   return (
     <View style={[styles.root, { backgroundColor: c.mapFallback }, style]}>
@@ -64,7 +72,7 @@ export function MapShell({
 
         {top ? (
           <View
-            style={[styles.top, { top: Math.max(0, space.inset - 4) }]}
+            style={[styles.top, { top: chromeTop, ...sideInset }]}
             pointerEvents="box-none"
             onLayout={onTopLayout}
           >
@@ -83,7 +91,7 @@ export function MapShell({
 
         {mapControls ? (
           <View
-            style={[styles.mapControls, { top: belowTop }]}
+            style={[styles.mapControls, { top: belowTop, right: sideInset.right }]}
             pointerEvents="box-none"
           >
             {mapControls}
@@ -91,7 +99,10 @@ export function MapShell({
         ) : null}
 
         {island ? (
-          <View style={[styles.island, { bottom: islandBottom }]} pointerEvents="box-none">
+          <View
+            style={[styles.island, { bottom: islandBottom, ...sideInset }]}
+            pointerEvents="box-none"
+          >
             {island}
           </View>
         ) : null}

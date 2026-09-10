@@ -2,7 +2,7 @@
 Main routing backend: /route, /inspect, /profiles. Uses 1_data/london_elev_final_tfl.gpickle (fast) or .graphml fallback.
 Profile-driven routing via user_profiles.json (local mock DB). When changing API or cost logic, update 0_documentation/APP_MAIN.md.
 """
-from flask import Flask, request, jsonify, g
+from flask import Flask, request, jsonify, g, send_from_directory
 from flask_cors import CORS
 import math
 import networkx as nx
@@ -1944,6 +1944,15 @@ def inspect_segment():
 
 
 # --- LIVE TfL DISRUPTIONS ENDPOINT ---
+
+@app.route('/privacy', methods=['GET'])
+def privacy_policy():
+    """Public HTML privacy policy (App Store / TestFlight URL)."""
+    return send_from_directory(
+        os.path.join(os.path.dirname(__file__), 'static'),
+        'privacy.html',
+    )
+
 
 @app.route('/health', methods=['GET'])
 def health():

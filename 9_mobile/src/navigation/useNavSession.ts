@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { fetchRoute, type RouteVariant } from '../api/route';
 import type { LatLon } from '../lib/coords';
 import type { ViaPoint } from '../routing/constants';
@@ -18,6 +19,18 @@ import { flatIndexOf, flattenNavSteps, remainingViaIndices } from './navSteps';
 import type { NavigationPayload } from './types';
 
 const SIMULATE = (process.env.EXPO_PUBLIC_NAV_SIMULATE || '').trim() === '1';
+/**
+ * Platforms with a real guidance engine behind TunedMaplibreNavView.
+ *
+ * iOS ships the planner first: modules/tuned-maplibre-nav/ios still exposes an
+ * empty ExpoView, so setting a session there would replace the map with a blank
+ * surface. Everything upstream of the mount — the Navigate cell, the
+ * `navigate: true` fetch, the maneuver payload, the preview-sheet fallback —
+ * runs unchanged, so beta 2 only has to write the Swift view.
+ */
+const TBT_ENGINE = Platform.OS === 'android';
+const TBT_COMING_SOON = 'Turn-by-turn arrives in the next TestFlight build. '
+  + 'Your route stays on the map.';
 /** Ignore fresh off-route reports right after a successful replan. */
 const REROUTE_COOLDOWN_MS = 4_000;
 const REROUTE_FAIL_COOLDOWN_MS = 8_000;
@@ -228,6 +241,11 @@ export function useNavSession({
       if (!next) {
         setError('Route has no navigable geometry');
         setFallback(navigation);
+        return;
+      }
+      if (!TBT_ENGINE) {
+        // Maneuvers built fine — say so instead of mounting the empty view.
+        pushAlert({ type: 'info', message: TBT_COMING_SOON });
         return;
       }
       setProgress(initialProgress(navigation));

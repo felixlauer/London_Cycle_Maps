@@ -175,6 +175,17 @@ type AnchorRect = {
   right: number;
 };
 
+export type ScreenInsets = { top: number; bottom: number; left: number; right: number };
+
+const NO_INSETS: ScreenInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+
+/**
+ * Place a tooltip inside the safe rectangle.
+ *
+ * `vw`/`vh` are the raw window, so on a Dynamic Island phone the old flat 16 px
+ * margin put tips under the status bar and over the home indicator. Every edge
+ * clamp is measured from the insets instead.
+ */
 export function placeTooltip(
   anchor: AnchorRect | null,
   placement: string | undefined,
@@ -183,33 +194,42 @@ export function placeTooltip(
   vw: number,
   vh: number,
   avoidRects: MeasuredCutout[] = [],
+  insets: ScreenInsets = NO_INSETS,
 ) {
   const gap = 18;
+  const minTop = insets.top + 16;
+  const minLeft = insets.left + 16;
+  const maxRight = vw - insets.right - 16;
+  // Lowest the tip may reach, and the same bound with the old slack allowances.
+  const maxBottom = vh - insets.bottom - 16;
+  const looseBottom = vh - insets.bottom - 56;
+  const parkedTop = Math.max(minTop, vh - insets.bottom - tipH - 72);
+  const centredLeft = Math.max(minLeft, (vw - tipW) / 2);
   let top: number;
   let left: number;
 
   if (placement === 'avoid-route' && avoidRects[0]) {
     const routeCutout = avoidRects[0];
     const below = routeCutout.top + routeCutout.height + gap;
-    if (below + tipH < vh - 56) {
+    if (below + tipH < looseBottom) {
       top = below;
       left = routeCutout.left + routeCutout.width / 2 - tipW / 2;
-    } else if (routeCutout.top - tipH - gap > 16) {
+    } else if (routeCutout.top - tipH - gap > minTop) {
       top = routeCutout.top - tipH - gap;
       left = routeCutout.left + routeCutout.width / 2 - tipW / 2;
     } else {
-      top = Math.max(16, vh - tipH - 72);
-      left = Math.max(16, (vw - tipW) / 2);
+      top = parkedTop;
+      left = centredLeft;
     }
   } else if (placement === 'center' || !anchor) {
-    top = Math.max(16, (vh - tipH) / 2);
-    left = Math.max(16, (vw - tipW) / 2);
+    top = Math.max(minTop, minTop + (maxBottom - minTop - tipH) / 2);
+    left = centredLeft;
   } else if (placement === 'bottom') {
     top = anchor.bottom + gap;
     left = anchor.left + anchor.width / 2 - tipW / 2;
   } else if (placement === 'screen-bottom') {
-    top = Math.max(16, vh - tipH - 28);
-    left = Math.max(16, (vw - tipW) / 2);
+    top = Math.max(minTop, vh - insets.bottom - tipH - 28);
+    left = centredLeft;
   } else if (placement === 'top') {
     top = anchor.top - tipH - gap;
     left = anchor.left + anchor.width / 2 - tipW / 2;
@@ -221,8 +241,8 @@ export function placeTooltip(
     left = anchor.right + gap;
   }
 
-  if (left < 16) left = 16;
-  if (left + tipW > vw - 16) left = Math.max(16, vw - tipW - 16);
+  if (left < minLeft) left = minLeft;
+  if (left + tipW > maxRight) left = Math.max(minLeft, maxRight - tipW);
 
   const tipRect = () => ({ top, left, width: tipW, height: tipH });
 
@@ -232,13 +252,13 @@ export function placeTooltip(
       const hit = avoidRects.find((c) => rectsOverlap(tipRect(), c));
       if (!hit) break;
       top = hit.top + hit.height + gap;
-      if (top + tipH > vh - 56) {
-        top = Math.max(16, hit.top - tipH - gap);
+      if (top + tipH > looseBottom) {
+        top = Math.max(minTop, hit.top - tipH - gap);
       }
-      if (top < 16) top = 16;
-      if (top + tipH > vh - 16) {
-        top = Math.max(16, vh - tipH - 72);
-        left = Math.max(16, (vw - tipW) / 2);
+      if (top < minTop) top = minTop;
+      if (top + tipH > maxBottom) {
+        top = parkedTop;
+        left = centredLeft;
         break;
       }
       guard += 1;
@@ -246,14 +266,14 @@ export function placeTooltip(
   };
 
   if (placement === 'bottom' && anchor) {
-    if (top + tipH > vh - 16) {
-      top = Math.min(vh - tipH - 16, Math.max(16, anchor.top));
-      left = Math.min(vw - tipW - 16, anchor.right + gap);
-      if (left < 16) left = Math.max(16, anchor.left - tipW - gap);
+    if (top + tipH > maxBottom) {
+      top = Math.min(maxBottom - tipH, Math.max(minTop, anchor.top));
+      left = Math.min(maxRight - tipW, anchor.right + gap);
+      if (left < minLeft) left = Math.max(minLeft, anchor.left - tipW - gap);
     }
   } else {
-    if (top + tipH > vh - 16) top = Math.max(16, (anchor?.top || tipH) - tipH - gap);
-    if (top < 16) top = Math.min(vh - tipH - 16, (anchor?.bottom || 0) + gap);
+    if (top + tipH > maxBottom) top = Math.max(minTop, (anchor?.top || tipH) - tipH - gap);
+    if (top < minTop) top = Math.min(maxBottom - tipH, (anchor?.bottom || 0) + gap);
   }
 
   pushClear();

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ChevronDown, ChevronLeft, ChevronRight, Clock } from 'lucide-react-native';
 import { BLOCKED } from '../routing/constants';
 import { useChrome } from '../theme/useChrome';
+import { useInputChrome } from '../theme/useInputChrome';
 import { formatDepartHm, maskTimeDigits, parseDepartTime } from './departTime';
 
 const STEP_MIN = 15;
@@ -245,6 +246,12 @@ export function useDepartAtControl({
     applyParsedTime(timeText, { revert });
   };
 
+  /** Return / Done: keep what was typed instead of reverting on the blur that follows. */
+  const onTimeSubmit = () => {
+    timeSubmitCommittedRef.current = true;
+    onTimeBlur();
+  };
+
   const commitDraft = () => {
     if (!timeFocusedRef.current) return;
     if (timeCommitRef.current) {
@@ -329,6 +336,7 @@ export function useDepartAtControl({
     handleTimeText,
     onTimeFocus,
     onTimeBlur,
+    onTimeSubmit,
   };
 }
 
@@ -379,8 +387,10 @@ export function DepartAtPanel({
   handleTimeText,
   onTimeFocus,
   onTimeBlur,
+  onTimeSubmit,
 }: ReturnType<typeof useDepartAtControl>) {
   const { c } = useChrome();
+  const inputChrome = useInputChrome();
   return (
     <View style={styles.panel}>
       <View style={[styles.seg, { backgroundColor: c.inset, borderColor: c.line }]}>
@@ -416,14 +426,12 @@ export function DepartAtPanel({
               <ChevronLeft size={15} strokeWidth={2} color={c.text} />
             </Pressable>
             <TextInput
+              {...inputChrome}
               value={timeText}
               onChangeText={handleTimeText}
               onFocus={onTimeFocus}
               onBlur={onTimeBlur}
-              onSubmitEditing={() => {
-                timeSubmitCommittedRef.current = true;
-                onTimeBlur();
-              }}
+              onSubmitEditing={onTimeSubmit}
               keyboardType="number-pad"
               inputMode="numeric"
               returnKeyType="done"

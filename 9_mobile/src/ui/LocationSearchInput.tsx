@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
+  Keyboard,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,10 +14,40 @@ import {
 import { createSessionToken, retrieve, suggest, type SuggestItem } from '../api/geocode';
 import { TutorialAnchor } from '../onboarding/tutorial/TutorialAnchor';
 import { useChrome } from '../theme/useChrome';
+import { useInputChrome } from '../theme/useInputChrome';
 import { useSuggestPortal } from './SuggestPortal';
 
 const DEBOUNCE_MS = 300;
 const MIN_QUERY_LEN = 3;
+const DROPDOWN_MAX_H = 220;
+/** Below this the list is not worth showing; the dropdown flips above instead. */
+const DROPDOWN_MIN_H = 132;
+
+/**
+ * Top edge of the on-screen keyboard in window coordinates, or null when it is
+ * closed. iOS does not resize the app under the keyboard, so the suggestion
+ * dropdown has to measure the gap itself.
+ */
+function useKeyboardTop() {
+  const [top, setTop] = useState<number | null>(null);
+
+  useEffect(() => {
+    const shown = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow',
+      (e) => setTop(e.endCoordinates.screenY),
+    );
+    const hidden = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setTop(null),
+    );
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, []);
+
+  return top;
+}
 
 /** Map-picked labels look like "51.5074, -0.1278" — never send those to suggest. */
 export function looksLikeCoordinates(text: string) {
@@ -48,6 +81,7 @@ export function LocationSearchInput({
   compact = false,
 }: Props) {
   const { c, themeMode } = useChrome();
+  const inputChrome = useInputChrome();
   const { setSuggestNode } = useSuggestPortal();
   const dropdownShadowOpacity = themeMode === 'light' ? 0.08 : 0.25;
   const [query, setQuery] = useState(value || '');
@@ -63,6 +97,7 @@ export function LocationSearchInput({
   const inputRef = useRef<TextInput>(null);
   const pickingRef = useRef(false);
   const interactingSuggestRef = useRef(false);
+  const keyboardTop = useKeyboardTop();
 
   useEffect(() => {
     setQuery(value || '');
@@ -196,6 +231,18 @@ export function LocationSearchInput({
   const showSheet = open && !!anchor && (suggestions.length > 0 || (!!error && !loading)
     || (!loading && query.length >= MIN_QUERY_LEN && suggestions.length === 0 && !looksLikeCoordinates(query)));
 
+  // Fit the list between the field and the keyboard, and flip it above the
+  // field when the remaining gap is too small to read.
+  const below = anchor ? anchor.y + anchor.h + 2 : 0;
+  const floor = keyboardTop ?? Dimensions.get('window').height;
+  const roomBelow = floor - below - 8;
+  const flipAbove = Boolean(anchor) && roomBelow < DROPDOWN_MIN_H
+    && anchor!.y - 10 > roomBelow;
+  const dropdownH = Math.min(
+    DROPDOWN_MAX_H,
+    Math.max(DROPDOWN_MIN_H, flipAbove ? anchor!.y - 10 : roomBelow),
+  );
+
   useEffect(() => {
     if (!showSheet || !anchor) {
       setSuggestNode(null);
@@ -211,9 +258,10 @@ export function LocationSearchInput({
           style={[
             styles.dropdown,
             {
-              top: anchor.y + anchor.h + 2,
+              top: flipAbove ? Math.max(8, anchor.y - dropdownH - 2) : below,
               left: anchor.x,
               width: Math.max(anchor.w, 200),
+              maxHeight: dropdownH,
               backgroundColor: c.shellBg,
               borderColor: c.line,
               shadowOpacity: dropdownShadowOpacity,
@@ -223,7 +271,7 @@ export function LocationSearchInput({
           <ScrollView
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
-            style={styles.dropdownScroll}
+            style={[styles.dropdownScroll, { maxHeight: dropdownH }]}
             onTouchStart={() => { interactingSuggestRef.current = true; }}
             onScrollBeginDrag={() => { interactingSuggestRef.current = true; }}
           >
@@ -260,11 +308,13 @@ export function LocationSearchInput({
     return () => setSuggestNode(null);
   }, [
     showSheet, anchor, suggestions, error, loading, query, c, dropdownShadowOpacity, setSuggestNode,
+    below, dropdownH, flipAbove,
   ]);
 
   return (
     <View style={styles.wrap} ref={wrapRef} collapsable={false}>
       <TextInput
+        {...inputChrome}
         ref={inputRef}
         value={query}
         onChangeText={handleChange}
@@ -318,7 +368,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderWidth: 1,
     borderRadius: 8,
-    maxHeight: 220,
     zIndex: 100,
     elevation: 20,
     shadowColor: '#000',
@@ -326,9 +375,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     overflow: 'hidden',
   },
-  dropdownScroll: {
-    maxHeight: 220,
-  },
+  dropdownScroll: {},
   suggestion: {
     paddingVertical: 10,
     paddingHorizontal: 12,

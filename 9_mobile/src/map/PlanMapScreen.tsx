@@ -94,6 +94,10 @@ const MAPBOX_TOKEN = (process.env.EXPO_PUBLIC_MAPBOX_TOKEN || '').trim();
 if (MAPBOX_TOKEN) {
   Mapbox.setAccessToken(MAPBOX_TOKEN);
 }
+// Maps SDK 11 collects usage telemetry by default. The privacy labels declare
+// no tracking and the app ships no ATT prompt, so it stays off on both
+// platforms — see 0_documentation/tasks/IOS_TESTFLIGHT_BETA1.md.
+Mapbox.setTelemetryEnabled(false);
 
 function labelForCoord(c: LatLon) {
   return `${c[0].toFixed(4)}, ${c[1].toFixed(4)}`;
@@ -1114,7 +1118,9 @@ export function PlanMapScreen() {
 
   const onStartNavigate = useCallback(async () => {
     if (!routeRevealed || nav.busy) return;
-    if (Platform.OS === 'android' && !nav.simulate) {
+    // Both platforms ask here. On iOS this is the When In Use prompt, raised in
+    // the planner so beta 2 does not introduce a new permission moment.
+    if (!nav.simulate) {
       const perm = await Location.requestForegroundPermissionsAsync();
       if (!perm.granted) {
         pushAlert({
@@ -1477,7 +1483,9 @@ export function PlanMapScreen() {
     routeRevealed && activeSafest && (locateActive || nav.simulate),
   );
 
-  const navMap = navSession ? (
+  // useNavSession never opens a session without a guidance engine, so this is
+  // belt and braces: an empty ExpoView must never replace the planning map.
+  const navMap = navSession && Platform.OS === 'android' ? (
     <TunedMaplibreNavView
       style={StyleSheet.absoluteFill}
       directionsJson={navSession.directionsJson}

@@ -17,6 +17,7 @@ import {
 import {
   type AppearancePref,
   type ThemeMode,
+  DEFAULT_APPEARANCE,
   loadStoredAppearance,
   resolveEffectiveTheme,
   systemPrefersDark,
@@ -70,7 +71,7 @@ export function SidebarProvider({
   const [view, setView] = useState<SidebarView>('sidebar');
   const [authTab, setAuthTab] = useState<AuthTab>('login');
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
-  const [appearance, setAppearanceState] = useState<AppearancePref>('auto');
+  const [appearance, setAppearanceState] = useState<AppearancePref>(DEFAULT_APPEARANCE);
   const [units, setUnitsState] = useState<UnitsPref>('metric');
   const [systemDark, setSystemDark] = useState(systemPrefersDark);
   const [favouriteOrder, setFavouriteOrderState] = useState<string[]>([]);

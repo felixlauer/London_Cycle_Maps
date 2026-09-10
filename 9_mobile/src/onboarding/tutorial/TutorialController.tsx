@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -9,6 +8,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { X } from 'lucide-react-native';
+import { useSafeAreaEdges } from '../../lib/safeArea';
 import { useOnboarding } from '../OnboardingContext';
 import {
   blockerRectsForHoles,
@@ -124,7 +124,9 @@ async function measureRouteCutout(
 export function TutorialController({ signals }: Props) {
   const { onboardingTheme, finishOnboarding, setTutorialMapPass } = useOnboarding();
   const steps = useMemo(() => buildMobileTutorialSteps(), []);
-  const skipBottom = Platform.OS === 'ios' ? 28 : 20;
+  const insets = useSafeAreaEdges();
+  const safeBottom = insets.bottom;
+  const skipBottom = safeBottom + 20;
   const [stepIndex, setStepIndex] = useState(0);
   const [cutouts, setCutouts] = useState<MeasuredCutout[]>([]);
   const [tipPos, setTipPos] = useState({ top: 80, left: 16 });
@@ -391,11 +393,16 @@ export function TutorialController({ signals }: Props) {
       ? [routeCutout, ...measured.filter((m) => m !== routeCutout)]
       : measured;
 
-    setTipPos(placeTooltip(anchor, step.placement, tipSize.w, tipSize.h, vw, vh, avoid));
+    setTipPos(
+      placeTooltip(anchor, step.placement, tipSize.w, tipSize.h, vw, vh, avoid, insets),
+    );
   }, [
     step, cameraSettled, viewport, tipSize.w, tipSize.h,
     signals.safestPath, signals.start, signals.end, signals.projectToWindow,
     signals.islandExpanded, signals.islandPage,
+    // Insets land a frame after mount on iOS; re-measure so holes and the tip
+    // move with the Dynamic Island / home indicator instead of staying stale.
+    insets,
   ]);
 
   useEffect(() => {
@@ -444,7 +451,7 @@ export function TutorialController({ signals }: Props) {
     });
     if (chromeBottom < 120) chromeBottom = Math.min(vh * 0.42, 320);
     const RIGHT_CONTROLS = 72;
-    const BOTTOM_SAFE = 28;
+    const BOTTOM_SAFE = safeBottom + 28;
     const mapHole = {
       top: chromeBottom + 6,
       left: 0,
@@ -551,6 +558,8 @@ export function TutorialController({ signals }: Props) {
               accessibilityRole="button"
               disabled={!buttonEnabled}
               onPress={goNext}
+              // The pill is ~29 pt tall; slop brings the target to 45 pt.
+              hitSlop={8}
               style={({ pressed }) => [
                 styles.next,
                 !buttonEnabled && styles.nextDisabled,

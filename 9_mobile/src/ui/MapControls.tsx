@@ -133,8 +133,9 @@ const styles = StyleSheet.create({
   },
   navBtn: {
     width: '100%',
-    height: 42,
-    minHeight: 42,
+    // 44 pt minimum: the capsule clips touches, so hitSlop cannot do this.
+    height: 44,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',

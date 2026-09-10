@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { apiFetch } from './src/api/flaskClient';
 import { AuthProvider, useAuth } from './src/auth/AuthProvider';
 import { PlanMapScreen } from './src/map/PlanMapScreen';
@@ -71,9 +72,11 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Root />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <Root />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

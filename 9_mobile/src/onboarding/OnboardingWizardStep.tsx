@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaEdges } from '../lib/safeArea';
 import { PresetWizardShell } from '../wizard/PresetWizardShell';
 import { useOnboarding } from './OnboardingContext';
 
@@ -19,6 +20,7 @@ export function OnboardingWizardStep({ onProfileCreated }: Props) {
     skipAll,
   } = useOnboarding();
 
+  const insets = useSafeAreaEdges();
   const name = displayName || 'there';
   const dark = onboardingTheme === 'dark';
   const bg = dark ? '#1c1c1e' : '#ffffff';
@@ -36,12 +38,12 @@ export function OnboardingWizardStep({ onProfileCreated }: Props) {
         accessibilityLabel="Skip"
         onPress={skipAll}
         hitSlop={10}
-        style={styles.skip}
+        style={[styles.skip, { top: insets.top + 12, left: insets.left + 20 }]}
       >
         <Text style={[styles.skipText, { color: muted }]}>Skip</Text>
       </Pressable>
 
-      <View style={styles.intro}>
+      <View style={[styles.intro, { paddingTop: insets.top + 48 }]}>
         <Text style={[styles.introText, { color: muted }]}>
           {`Hey ${name}, let's build your first riding profile so the algorithm knows exactly how you like your routes.`}
         </Text>
@@ -64,8 +66,6 @@ const styles = StyleSheet.create({
   },
   skip: {
     position: 'absolute',
-    top: 52,
-    left: 20,
     zIndex: 4,
   },
   skipText: {
@@ -74,7 +74,6 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   intro: {
-    paddingTop: 72,
     paddingHorizontal: 24,
     paddingBottom: 8,
   },

@@ -10,6 +10,7 @@ import type { RouteHover } from '../../map/routeHover';
 import type { HireStation } from '../../api/santander';
 import type { HireWalkStats } from '../../map/useSantanderHire';
 import { useChrome } from '../../theme/useChrome';
+import { REDUCED_MOTION_MS, useReduceMotion } from '../../lib/useReduceMotion';
 import { CollapsedIsland } from './CollapsedIsland';
 import { ExpandedIsland } from './ExpandedIsland';
 import { IslandLegLatch } from './IslandLegLatch';
@@ -109,6 +110,7 @@ export function DynamicIsland({
   onNavigate,
 }: Props) {
   const { c, themeMode } = useChrome();
+  const reduceMotion = useReduceMotion();
   const shellShadowOpacity = themeMode === 'light' ? 0.08 : 0.45;
   const navMode = Boolean(nav);
   // Nav owns the capsule — analysis stays collapsed underneath it.
@@ -171,21 +173,28 @@ export function DynamicIsland({
     return () => progress.removeListener(id);
   }, [progress, effExpanded]);
 
+  // Reduce Motion turns the 108 → 240 morph and the plan ↔ nav swap into a
+  // short cross-fade. Start and end states are unchanged, and stopAnimation
+  // still hands over the presentation value, so a drag stays interruptible.
+  const navMorphMs = reduceMotion ? REDUCED_MOTION_MS : MORPH_MS;
+
   const animateTo = useCallback((next: boolean) => {
     progress.stopAnimation((v) => {
       progressNum.current = typeof v === 'number' ? v : progressNum.current;
     });
     Animated.timing(progress, {
       toValue: next ? 1 : 0,
-      duration: next ? EXPAND_MS : COLLAPSE_MS,
-      easing: EASE,
+      duration: reduceMotion
+        ? REDUCED_MOTION_MS
+        : (next ? EXPAND_MS : COLLAPSE_MS),
+      easing: reduceMotion ? Easing.linear : EASE,
       useNativeDriver: false,
     }).start(({ finished }) => {
       if (!finished) return;
       setRenderExpanded(next);
       setRenderCollapsed(!next);
     });
-  }, [progress]);
+  }, [progress, reduceMotion]);
 
   useEffect(() => {
     if (dragging.current) return;
@@ -195,17 +204,17 @@ export function DynamicIsland({
   useEffect(() => {
     Animated.timing(navFade, {
       toValue: navMode ? 1 : 0,
-      duration: MORPH_MS,
-      easing: EASE,
+      duration: navMorphMs,
+      easing: reduceMotion ? Easing.linear : EASE,
       useNativeDriver: false,
     }).start();
     if (navMode) {
       setRenderNav(true);
       return undefined;
     }
-    const id = setTimeout(() => setRenderNav(false), MORPH_MS);
+    const id = setTimeout(() => setRenderNav(false), navMorphMs);
     return () => clearTimeout(id);
-  }, [navMode, navFade]);
+  }, [navMode, navFade, navMorphMs, reduceMotion]);
 
   useEffect(() => {
     const duration = reportMode ? REPORT_IN_MS : REPORT_OUT_MS;

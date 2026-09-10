@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="index,follow" />
+  <title>TUNE — Privacy policy</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0;
+      font: 17px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1a1a1a;
+      background: #fff;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { color: #f4f4f4; background: #111; }
+      a { color: #ff7aa8; }
+      header { border-color: #333; }
+    }
+    header {
+      padding: 20px 20px 16px;
+      border-bottom: 3px solid #FF0061;
+    }
+    header a { color: #FF0061; text-decoration: none; font-weight: 700; letter-spacing: 0.04em; }
+    main { max-width: 40rem; margin: 0 auto; padding: 24px 20px 64px; }
+    h1 { font-size: 1.6rem; margin: 0 0 8px; }
+    h2 { font-size: 1.15rem; margin: 1.6em 0 0.4em; }
+    p, li { margin: 0 0 0.75em; }
+    ul { padding-left: 1.2em; }
+    .meta { color: #666; font-size: 0.92rem; }
+    @media (prefers-color-scheme: dark) { .meta { color: #aaa; } }
+  </style>
+</head>
+<body>
+  <header><a href="/">TUNE</a></header>
+  <main>
+    <h1>Privacy policy</h1>
+    <p class="meta">Last updated 8 September 2026. Applies to the TUNE iOS and Android apps and the web planner at app.tunedcycling.online.</p>
+    <p>TUNE is a cycle route planner for Greater London, operated by Felix Lauer as an individual developer. This page describes what the apps and API collect, why, and how to delete an account. It is written for App Store / TestFlight disclosure, not as formal legal advice.</p>
+
+    <h2>What TUNE does</h2>
+    <p>You enter a start and destination (and optional vias), pick a riding profile, and the app returns a route from TUNE’s own routing engine. Overlays can show cycleways, hills, traffic and Santander hire stations. An account is optional: the planner works as a guest.</p>
+
+    <h2>Who processes the data</h2>
+    <p>Route requests, accounts, place search, bug reports and ride reports are sent to TUNE’s API at <a href="https://app.tunedcycling.online/api">https://app.tunedcycling.online/api</a>. Map tiles are loaded from Mapbox (OpenStreetMap data). Place suggestions use HERE via that same API. TUNE does not use an advertising SDK, does not show an App Tracking Transparency prompt, and does not sell personal data.</p>
+
+    <h2>Location</h2>
+    <p>The mobile app requests <strong>precise location (When In Use only)</strong>. Location is used to show your position on the map, to start a route from where you are, and to enable the Navigate control. Location is not used in the background. There is no Always permission and no background location mode.</p>
+    <p>When you request a route, start, end and via coordinates are sent to the API. If you are signed in, that request is associated with your account. Turn-by-turn guidance is not in the current iOS TestFlight build; tapping Navigate may still request location and fetch manoeuvres, then show that guidance is not available yet.</p>
+
+    <h2>Account data</h2>
+    <p>If you create an account, TUNE stores an email address, a hashed password, an optional display name, and an internal user id. These are used to sign in, save riding profiles, and attach routes or reports to the account. Password-reset mail is sent only if you request it.</p>
+
+    <h2>Place search</h2>
+    <p>Text you type into start, end or via search is sent to the API (and onward to HERE) to return place suggestions. That is search history in Apple’s sense: the query leaves the device.</p>
+
+    <h2>Bug reports and ride reports</h2>
+    <p>The in-app bug report sends the text you write, plus coarse app context (platform, theme, a generic page identifier). Ride reports send the category you pick and the position along the route. If you are signed in, these can be stored against your user id.</p>
+
+    <h2>What TUNE does not collect</h2>
+    <ul>
+      <li>Contacts, photos, microphone, HealthKit, payment cards, or advertising identifiers</li>
+      <li>Approximate/IP-only location as a substitute for GPS (the app uses precise GPS when you grant it)</li>
+      <li>Crash-log or analytics SDKs (no Sentry, Firebase Analytics, or Crashlytics in the mobile app)</li>
+    </ul>
+
+    <h2>How long data is kept</h2>
+    <p>Account records remain until you delete the account. Route and report payloads kept on the server are retained to operate the planner and to debug reports you send. Guest use does not create an account record.</p>
+
+    <h2>How to delete your account</h2>
+    <p>In the mobile or web app, open the profile sidebar, sign in, open the account section, and use <strong>Delete account</strong>. You confirm with your password. That removes the account on the API. Uninstalling the app alone does not delete the server account.</p>
+
+    <h2>Your rights</h2>
+    <p>If you are in the UK or EEA you can ask for a copy of the account data TUNE holds, or ask for it to be corrected or erased, by using the in-app bug report or the support/feedback email given on the App Store / TestFlight listing. You can also complain to the ICO (UK) or your local supervisory authority.</p>
+
+    <h2>Children</h2>
+    <p>TUNE is not directed at children under 16. Do not create an account for a child under that age.</p>
+
+    <h2>Changes</h2>
+    <p>If this policy changes in a material way, the date at the top of this page will be updated. Continued use of the app after that date is the notice of the new text.</p>
+
+    <h2>Contact</h2>
+    <p>Felix Lauer — use the in-app bug report, or the feedback email shown in App Store Connect / TestFlight for TUNE.</p>
+  </main>
+</body>
+</html>

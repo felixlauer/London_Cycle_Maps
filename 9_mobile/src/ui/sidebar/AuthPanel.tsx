@@ -15,6 +15,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { brand, chromeForTheme } from '../../theme/tokens';
 import type { ThemeMode } from '../../theme/resolveAppearance';
 import { useChrome } from '../../theme/useChrome';
+import { useInputChrome } from '../../theme/useInputChrome';
 import type { AuthTab } from './SidebarContext';
 
 const TABS: { id: AuthTab; label: string }[] = [
@@ -47,6 +48,7 @@ export function AuthPanel({
 }: Props) {
   const chrome = useChrome();
   const c = themeProp ? chromeForTheme(themeProp) : chrome.c;
+  const inputChrome = useInputChrome(themeProp);
   const { signIn, signUp, resetPassword } = useAuth();
   const [tab, setTab] = useState<AuthTab>(signupOnly ? 'signup' : initialTab);
   const [displayName, setDisplayName] = useState('');
@@ -166,6 +168,7 @@ export function AuthPanel({
             <Text style={[styles.label, { color: c.textSub }]}>Name</Text>
           ) : null}
           <TextInput
+            {...inputChrome}
             style={[styles.input, { borderColor: c.line, backgroundColor: c.inset, color: c.text }]}
             value={displayName}
             onChangeText={setDisplayName}
@@ -183,6 +186,7 @@ export function AuthPanel({
           <Text style={[styles.label, { color: c.textSub }]}>Email</Text>
         ) : null}
         <TextInput
+          {...inputChrome}
           style={[styles.input, { borderColor: c.line, backgroundColor: c.inset, color: c.text }]}
           value={email}
           onChangeText={setEmail}
@@ -202,6 +206,7 @@ export function AuthPanel({
             <Text style={[styles.label, { color: c.textSub }]}>Password</Text>
           ) : null}
           <TextInput
+            {...inputChrome}
             style={[styles.input, { borderColor: c.line, backgroundColor: c.inset, color: c.text }]}
             value={password}
             onChangeText={setPassword}

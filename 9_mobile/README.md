@@ -8,6 +8,7 @@ Expo / React Native app. **Primary product client** (full native UI rewrite of w
 **Plan:** [`../0_documentation/tasks/MOBILE_RN_PLAN.md`](../0_documentation/tasks/MOBILE_RN_PLAN.md)  
 **UI port waves:** [`../0_documentation/tasks/MOBILE_UI_PORT.md`](../0_documentation/tasks/MOBILE_UI_PORT.md)  
 **Turn-by-turn:** [`../0_documentation/tasks/MAPLIBRE_BYOR_PLAN.md`](../0_documentation/tasks/MAPLIBRE_BYOR_PLAN.md) · background [`navigation_SKDs.md`](../0_documentation/tasks/navigation_SKDs.md)  
+**iOS / TestFlight:** [`../0_documentation/tasks/IOS_TESTFLIGHT_BETA1.md`](../0_documentation/tasks/IOS_TESTFLIGHT_BETA1.md) · fidelity [`IOS_FIDELITY_SHEET.md`](../0_documentation/tasks/IOS_FIDELITY_SHEET.md) — planner only, EAS cloud builds  
 **Web port reference:** [`../5_frontend/src/v2/`](../5_frontend/src/v2/)  
 **API:** same Flask as web (prod or local)
 

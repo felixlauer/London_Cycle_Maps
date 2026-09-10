@@ -17,6 +17,7 @@ import { X } from 'lucide-react-native';
 import { apiFetch } from '../../api/flaskClient';
 import { brand, chromeForTheme, space } from '../../theme/tokens';
 import type { ThemeMode } from '../../theme/resolveAppearance';
+import { useInputChrome } from '../../theme/useInputChrome';
 
 export const BUG_REPORT_MAX_CHARS = 1500;
 export const BUG_REPORT_MIN_CHARS = 10;
@@ -29,6 +30,7 @@ type Props = {
 
 export function BugReportModal({ open, onClose, themeMode = 'dark' }: Props) {
   const c = chromeForTheme(themeMode);
+  const inputChrome = useInputChrome(themeMode);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
@@ -125,6 +127,7 @@ export function BugReportModal({ open, onClose, themeMode = 'dark' }: Props) {
 
             <Text style={[styles.label, { color: c.textSub }]}>What happened?</Text>
             <TextInput
+              {...inputChrome}
               style={[
                 styles.textarea,
                 {

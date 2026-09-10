@@ -6,6 +6,7 @@ import {
   Animated,
   BackHandler,
   Dimensions,
+  KeyboardAvoidingView,
   PanResponder,
   Platform,
   Pressable,
@@ -26,7 +27,7 @@ import { useSidebar } from './SidebarContext';
 import { BugReportModal } from '../feedback/BugReportModal';
 import { TutorialAnchor } from '../../onboarding/tutorial/TutorialAnchor';
 import { useOnboardingOptional } from '../../onboarding/OnboardingContext';
-import { useSafeAreaTop } from '../../lib/safeArea';
+import { useSafeAreaBottom, useSafeAreaTop } from '../../lib/safeArea';
 import type { ProfileRow } from '../../routing/constants';
 import { useChrome } from '../../theme/useChrome';
 import { PresetWizardShell } from '../../wizard/PresetWizardShell';
@@ -69,7 +70,8 @@ export function ProfileSidebar({
   const [wizardMounted, setWizardMounted] = useState(false);
   const screenW = Dimensions.get('window').width;
   const screenH = Dimensions.get('window').height;
-  const bottomPad = Platform.OS === 'ios' ? 28 : 16;
+  // Account rows and help links sit above the home indicator / gesture bar.
+  const bottomPad = useSafeAreaBottom() + 16;
 
   const progress = useRef(new Animated.Value(0)).current;
   const dragX = useRef(new Animated.Value(0)).current;
@@ -281,7 +283,12 @@ export function ProfileSidebar({
         >
           <View style={StyleSheet.absoluteFill} pointerEvents="none" />
         </TutorialAnchor>
-        <View style={[styles.sheetInner, { backgroundColor: c.shellBg }]}>
+        <KeyboardAvoidingView
+          style={[styles.sheetInner, { backgroundColor: c.shellBg }]}
+          // Auth fields and the account rows in the pinned bottom block sit
+          // behind the iOS keyboard otherwise.
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           {wizardMounted ? (
             <>
               <ProfilePillBar topInset={Math.max(0, topInset - 4)} />
@@ -375,7 +382,7 @@ export function ProfileSidebar({
               )}
             </>
           )}
-        </View>
+        </KeyboardAvoidingView>
       </Animated.View>
 
       <BugReportModal

@@ -3,7 +3,7 @@ import { X } from 'lucide-react-native';
 import type { NavigationPayload, NavStep } from './types';
 import { ManeuverIcon } from './ManeuverIcon';
 import { formatStepDistance } from './navFormat';
-import { useSafeAreaTop } from '../lib/safeArea';
+import { useSafeAreaEdges } from '../lib/safeArea';
 import { brand, space } from '../theme/tokens';
 import { useChrome } from '../theme/useChrome';
 
@@ -53,7 +53,7 @@ export function NavigatePreviewSheet({
   error,
   onClose,
 }: Props) {
-  const top = useSafeAreaTop();
+  const insets = useSafeAreaEdges();
   const { c } = useChrome();
   const steps = navigation?.legs?.flatMap((leg) => leg.steps || []) || [];
 
@@ -62,7 +62,12 @@ export function NavigatePreviewSheet({
       <View
         style={[
           styles.root,
-          { paddingTop: top + 8, paddingBottom: 24, backgroundColor: c.shellBg },
+          {
+            paddingTop: insets.top + 8,
+            // Full-screen Modal, so the step list has to clear the home indicator itself.
+            paddingBottom: insets.bottom + 24,
+            backgroundColor: c.shellBg,
+          },
         ]}
       >
         <View style={styles.header}>

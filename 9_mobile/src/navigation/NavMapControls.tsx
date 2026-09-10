@@ -159,8 +159,9 @@ const styles = StyleSheet.create({
   },
   navBtn: {
     width: '100%',
-    height: 42,
-    minHeight: 42,
+    // Matches MapControls: 44 pt minimum inside the clipping capsule.
+    height: 44,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
