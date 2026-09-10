@@ -4,7 +4,7 @@
 
 A cycling route planner for Greater London. Routes are computed on a custom directed graph, not on a commercial bicycle API. Edge costs combine infrastructure, collision history, speed stress, hills, surface, lighting, live closures, and rider reports. Three named presets (**Fast**, **Safe**, **Leisure**) and saved custom profiles drive the same engine from the browser and from the phone.
 
-**Planner:** [app.tunedcycling.online](https://app.tunedcycling.online) · **Updates:** [tuned-cycling.subscribepage.io](https://tuned-cycling.subscribepage.io/)
+**Planner:** [app.tunedcycling.online](https://app.tunedcycling.online) 
 
 <p align="center">
   <img src="docs/readme/web_app_route_collapsed_dynamic_island.png" alt="Browser planner with collapsed analysis island" />
